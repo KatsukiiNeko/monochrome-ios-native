@@ -1,0 +1,31 @@
+{
+  "tracks": [
+    {
+      "id": "155142491052445696",
+      "trackId": "155142491052445696",
+      "title": "Instant Crush (feat. Julian Casablancas)",
+      "artistNames": [
+        "Daft Punk",
+        "Julian Casablancas"
+      ],
+      "releaseId": "155142458219433984",
+      "artwork": "https://tracks.monochrome.st/proxy/mi/155142458219433984-1A01.jpg",
+      "duration": 337560,
+      "playable": true
+    },
+    {
+      "id": "155142501534011392",
+      "trackId": "155142501534011392",
+      "title": "Get Lucky (feat. Pharrell Williams and Nile Rodgers)",
+      "artistNames": [
+        "Daft Punk",
+        "Pharrell Williams",
+        "Nile Rodgers"
+      ],
+      "releaseId": "155142458219433984",
+      "artwork": "https://tracks.monochrome.st/proxy/mi/155142458219433984-1A01.jpg",
+      "duration": 369626,
+      "playable": true
+    }
+  ]
+}

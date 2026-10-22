@@ -1,0 +1,54 @@
+{
+  "releaseId": "155102851176075264",
+  "title": "Discovery",
+  "artists": [
+    {
+      "name": "Daft Punk"
+    }
+  ],
+  "artwork": "https://tracks.monochrome.st/proxy/mi/155102851176075264-1A01.jpg",
+  "releaseDate": "2001-03-12T00:00:00.000Z",
+  "releaseType": "ALBUM",
+  "trackCount": 14,
+  "tracks": [
+    {
+      "trackId": "155102871061270528",
+      "title": "One More Time",
+      "duration": 320357,
+      "playable": true,
+      "artwork": "https://tracks.monochrome.st/proxy/mi/155102851176075264-1A01.jpg",
+      "trackNumber": 1,
+      "artists": [
+        {
+          "name": "Daft Punk"
+        }
+      ]
+    },
+    {
+      "trackId": "155102874622234624",
+      "title": "Aerodynamic",
+      "duration": 212546,
+      "playable": true,
+      "artwork": "https://tracks.monochrome.st/proxy/mi/155102851176075264-1A01.jpg",
+      "trackNumber": 2,
+      "artists": [
+        {
+          "name": "Daft Punk"
+        }
+      ]
+    },
+    {
+      "trackId": "155102878162227200",
+      "title": "Digital Love",
+      "duration": 301373,
+      "playable": true,
+      "artwork": "https://tracks.monochrome.st/proxy/mi/155102851176075264-1A01.jpg",
+      "trackNumber": 3,
+      "artists": [
+        {
+          "name": "Daft Punk"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "tracks": [
+    {
+      "trackId": 12345,
+      "title": "Numeric id",
+      "duration": 1000,
+      "playable": true
+    },
+    {
+      "trackId": "900",
+      "title": "No duration",
+      "artistNames": null,
+      "artwork": "http://insecure.example/cover.jpg",
+      "playable": true
+    },
+    {
+      "trackId": "901",
+      "title": "Not playable",
+      "artistNames": ["Nobody"],
+      "duration": 1000,
+      "playable": false
+    },
+    {
+      "trackId": "902",
+      "title": "Artist objects and bad duration",
+      "artists": [{ "name": "Artist A" }, { "name": "Artist B" }],
+      "duration": "not a number",
+      "playable": true
+    }
+  ]
+}

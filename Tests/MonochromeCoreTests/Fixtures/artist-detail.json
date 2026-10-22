@@ -1,0 +1,56 @@
+{
+  "artistId": "153542153123926016",
+  "name": "Daft Punk",
+  "avatar": "https://tracks.monochrome.st/proxy/c/media/153542153123926016-5A04.jpg",
+  "topTracks": [
+    {
+      "trackId": "287206674229092352",
+      "title": "Get Lucky (Radio Edit) [feat. Pharrell Williams and Nile Rodgers]",
+      "duration": 248360,
+      "playable": true,
+      "artwork": "https://tracks.monochrome.st/proxy/mi/287206337208393728-1A01.jpg",
+      "artists": [
+        {
+          "name": "Daft Punk"
+        },
+        {
+          "name": "Pharrell Williams"
+        },
+        {
+          "name": "Nile Rodgers"
+        }
+      ]
+    },
+    {
+      "trackId": "257609914632790016",
+      "title": "Instant Crush (feat. Julian Casablancas)",
+      "duration": 337547,
+      "playable": true,
+      "artwork": "https://tracks.monochrome.st/proxy/mi/257609878599208960-1A01.jpg",
+      "artists": [
+        {
+          "name": "Daft Punk"
+        },
+        {
+          "name": "Julian Casablancas"
+        }
+      ]
+    }
+  ],
+  "releases": [
+    {
+      "releaseId": "157107691316121600",
+      "title": "Infinity Repeating (2013 Demo) [feat. Julian Casablancas+The Voidz]",
+      "artistNames": null,
+      "releaseDate": "2023-05-11T00:00:00.000Z",
+      "artwork": "https://tracks.monochrome.st/proxy/mi/157107691316121600-1A01.jpg"
+    },
+    {
+      "releaseId": "165737609279148032",
+      "title": "GLBTM (Studio Outtakes)",
+      "artistNames": null,
+      "releaseDate": "2023-04-20T00:00:00.000Z",
+      "artwork": "https://tracks.monochrome.st/proxy/mi/165737609279148032-1A01.jpg"
+    }
+  ]
+}
