@@ -22,7 +22,7 @@ Gaps against the brief:
 - Now Playing uses a fixed 280-pt frame instead of `containerRelativeFrame` and
   breaks on small phones and with large Dynamic Type.
 - No design tokens: paddings, radii and type are inline and inconsistent.
-- No app icon (`the local xtool manifest` has no `iconPath`, no asset catalog), no logo
+- No app icon (the xtool manifest has no `iconPath`, no asset catalog), no logo
   anywhere in the UI.
 - No empty/error state for anything online, because nothing online exists.
 

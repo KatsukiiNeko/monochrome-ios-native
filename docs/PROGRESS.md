@@ -23,7 +23,7 @@ not start playing, and no audio-format badge is shown. Verification so far is
 | R8 | regression pass | done | L1 + L2 + L3 rerun, all green |
 | R9 | integrate and push `main` | done | remote ref verified with `git ls-remote` |
 | R10 | handoff | done | final report |
-| R11 | feature branch + device-testing rules | done | remote ref verified, `the contributor rules` updated |
+| R11 | feature branch + device-testing rules | done | remote ref verified |
 | R15 | branch cleanup | done | only `main` and `development` remain, locally and on `origin` |
 | R12 | player/audio-session diagnostics | done | L1 build + L2 tests green |
 | R13 | playable stream for AVPlayer | done | L1 build + L2 tests; device run pending |
@@ -206,8 +206,8 @@ covers the checks and the log command to attach.
 - A `git grep` over every reachable commit for private-key blocks, certificate
   blocks and common token prefixes returns no match; no audio files, IPAs or
   build output are tracked.
-- `the local xtool manifest` is the SwiftPM project manifest `xtool` reads for the bundle id,
-  `Info.plist` path, icon and bundled resources; it holds no credentials.
-- `the contributor rules` exists only in this repository. `upstream` (`monochrome-music/
-  monochrome`) has no such file and never received a push from here: its push
-  URL stays `DISABLED`.
+- The SwiftPM project manifest that `xtool` reads for the bundle id,
+  `Info.plist` path, icon and bundled resources is kept local and excluded from
+  the repository; it holds no credentials.
+- `upstream` (`monochrome-music/monochrome`) never received a push from here:
+  its push URL stays `DISABLED`.

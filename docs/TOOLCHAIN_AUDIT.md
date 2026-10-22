@@ -53,7 +53,7 @@ swift build --build-system native --swift-sdk darwin --triple arm64-apple-ios
 | Portable core + host tests? | yes — `swift test` built `MonochromeCore`, ran one `@Test`, passed, while the iOS-only target compiled to an empty module through `#if canImport(SwiftUI)` |
 | Swift 6 vs 5? | Swift 6 mode (`swiftLanguageModes: [.v6]`) compiles both targets; kept |
 
-## 4. App packaging knobs (the local xtool manifest)
+## 4. App packaging knobs
 
 Read from xtool source (`Sources/PackLib/PackSchema.swift`, current `main`), not guessed:
 
