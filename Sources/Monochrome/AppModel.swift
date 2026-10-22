@@ -13,20 +13,27 @@ final class AppModel {
 
     let player: PlayerController
     private let service: LocalFileService
+    private let audioSession: AudioSessionController
+    private let nowPlaying: NowPlayingController
 
     init() {
         let base = FileManager.default
             .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Monochrome", isDirectory: true)
         let media = base.appendingPathComponent("Media", isDirectory: true)
-        service = LocalFileService(
+        let service = LocalFileService(
             mediaDirectory: media,
             store: LibraryStore(fileURL: base.appendingPathComponent("library.json")),
             metadataReader: AVAssetMetadataReader()
         )
-        player = PlayerController(engine: AVPlayerEngine()) { track in
+        let player = PlayerController(engine: AVPlayerEngine()) { track in
             media.appendingPathComponent(track.fileName)
         }
+        self.service = service
+        self.player = player
+        // System integration: audio session first, then Lock Screen metadata/commands.
+        self.audioSession = AudioSessionController(player: player)
+        self.nowPlaying = NowPlayingController(player: player)
     }
 
     func loadTracks() async {

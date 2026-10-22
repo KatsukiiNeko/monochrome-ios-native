@@ -7,11 +7,11 @@ import MonochromeCore
 @MainActor
 final class AVPlayerEngine: PlaybackEngine {
     var onEvent: ((PlaybackEvent) -> Void)? {
-        didSet { relay.send = onEvent }
+        didSet { relay.handler = onEvent }
     }
 
     private let player = AVPlayer()
-    private let relay = EventRelay()
+    private let relay = CallbackRelay<PlaybackEvent>()
     private var timeObserver: Any?
     private var endObserver: NSObjectProtocol?
     private var failureObserver: NSObjectProtocol?
@@ -22,8 +22,7 @@ final class AVPlayerEngine: PlaybackEngine {
             forInterval: CMTime(seconds: 0.5, preferredTimescale: 600),
             queue: .main
         ) { [relay] time in
-            let seconds = time.seconds
-            Task { @MainActor in relay.send?(.position(seconds)) }
+            relay.send(.position(time.seconds))
         }
     }
 
@@ -42,14 +41,14 @@ final class AVPlayerEngine: PlaybackEngine {
         endObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main
         ) { [relay] _ in
-            Task { @MainActor in relay.send?(.finished) }
+            relay.send(.finished)
         }
         failureObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemFailedToPlayToEndTime, object: item, queue: .main
         ) { [relay] notification in
             let message = (notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error)?
                 .localizedDescription ?? "Playback failed."
-            Task { @MainActor in relay.send?(.failed(message)) }
+            relay.send(.failed(message))
         }
         player.replaceCurrentItem(with: item)
 
@@ -90,11 +89,5 @@ enum EngineError: LocalizedError {
     var errorDescription: String? {
         "This file could not be played. It may be corrupted or use an unsupported format."
     }
-}
-
-/// AVFoundation callbacks are not main-actor annotated, so they forward through
-/// this box instead of capturing the engine from a @Sendable closure.
-private final class EventRelay: @unchecked Sendable {
-    var send: ((PlaybackEvent) -> Void)?
 }
 #endif
