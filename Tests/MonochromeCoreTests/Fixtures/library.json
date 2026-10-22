@@ -1,0 +1,17 @@
+[
+  {
+    "id": "9f1b2c3d",
+    "title": "One More Time",
+    "artist": "Daft Punk",
+    "album": "Discovery",
+    "durationSeconds": 320,
+    "fileName": "9f1b2c3d.flac",
+    "importedAt": 780000000
+  },
+  {
+    "id": "a2c4e6f8",
+    "title": "Untagged Demo",
+    "fileName": "a2c4e6f8.mp3",
+    "importedAt": 779000000
+  }
+]

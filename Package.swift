@@ -11,7 +11,7 @@ let package = Package(
     targets: [
         .target(name: "MonochromeCore"),
         .target(name: "Monochrome", dependencies: ["MonochromeCore"]),
-        .testTarget(name: "MonochromeCoreTests", dependencies: ["MonochromeCore"]),
+        .testTarget(name: "MonochromeCoreTests", dependencies: ["MonochromeCore"], resources: [.copy("Fixtures")]),
     ],
     swiftLanguageModes: [.v6]
 )
