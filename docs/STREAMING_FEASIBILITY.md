@@ -1,5 +1,12 @@
 # Streaming feasibility
 
+> **Superseded decision (same day).** The facts below still hold, but the
+> conclusion was revisited when the user explicitly asked for streaming to be
+> implemented. The app now uses this endpoint as **Path A**, with a
+> user-configurable host and no credential bypass. The rights caveat is stated
+> in [`ONLINE_STREAMING_AUDIT.md`](ONLINE_STREAMING_AUDIT.md), and that file is
+> the current decision record.
+
 Checked live from Linux on 2026-10-22 with `curl`, plus source reading. No account,
 no token, no proxy bypass, four requests total, no full download (1 KiB range).
 

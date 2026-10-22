@@ -37,7 +37,7 @@ Checked in
 | `GlassEffectContainer` | **no** | not in this SDK |
 | `glassEffectID` | **no** | not in this SDK |
 | `.buttonStyle(.glass)` / `GlassButtonStyle` | yes | iOS 26.0 |
-| `tabViewBottomAccessory` | yes | iOS 26.0, iOS-only |
+| `tabViewBottomAccessory` | yes | iOS 26.0 (the `isEnabled:` overload is **26.1**) |
 | `tabViewBottomAccessoryPlacement` | yes | iOS 26.0 |
 | `tabBarMinimizeBehavior` | yes | iOS 26.0 |
 | `Tab(_:image:value:)` typed tabs | yes | **iOS 18.0** |
@@ -53,9 +53,9 @@ Package deployment target is **iOS 17.0** and stays there. Consequences:
    classic `TabView` + `.tabItem`, which works on 17 and renders with Liquid
    Glass on 26 (system components adopt the new design when built with this
    SDK).
-3. `tabViewBottomAccessory` is iOS 26-only. The mini player uses it behind
-   `#available(iOS 26, *)`, and an `overlay(alignment: .bottom)` fallback
-   above the tab bar otherwise.
+3. `tabViewBottomAccessory` is iOS 26-only, and its `isEnabled:` overload is
+   26.1. The mini player uses that overload behind `#available(iOS 26.1, *)`,
+   and a `safeAreaInset` bar on everything older.
 4. `.buttonStyle(.glass)` is iOS 26-only. It is applied through **one**
    `glassControlStyle()` helper with a `.bordered` fallback, honoring
    `accessibilityReduceTransparency`.
@@ -102,3 +102,21 @@ system materials. We never paint opaque backgrounds over system chrome.
 6. Remote artwork loading over a slow connection (placeholder then fade).
 7. Haptics/animations timing — none were added beyond system defaults.
 8. Background audio + lock-screen controls after the navigation rewrite.
+
+## What shipped (R5–R7)
+
+| screen | file | data source |
+|---|---|---|
+| Shell: Home / Search / Library tabs + mini player | `ContentView.swift`, `Theme.swift` | player + model only |
+| Home: greeting, recently played, favorites | `HomeView.swift` | `HistoryStore`, favorites |
+| Search: tracks, albums, artists (debounced, cancellable) | `SearchView.swift` | catalog API |
+| Album detail | `CatalogDetailViews.swift` | `/releases/{id}` |
+| Artist detail: top tracks + albums | `CatalogDetailViews.swift` | `/artists/{id}` |
+| Library: imported files and favorites, import/delete | `LibraryView.swift` | local files + favorites |
+| Now Playing: artwork, seek, transport, favorite, retry | `PlayerView.swift` | `PlayerController` |
+| Queue: jump, reorder, remove | `QueueView.swift` | `PlayerController` |
+| Shared row / artwork | `TrackRow.swift`, `TrackArtwork.swift` | local or remote |
+
+Deliberately absent: shuffle, repeat, lyrics, playlists, accounts, downloads and
+offline caching — the player does not implement them, and fake controls were
+ruled out. `ArtworkView.swift` was removed; `TrackArtwork.swift` replaces it.

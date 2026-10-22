@@ -2,10 +2,10 @@
 
 ## Status
 
-R3 complete: the app searches the real catalog, resolves a stream at play time
-and plays it through the existing player. Verified live (L3: search, stream URL,
-206 response with `fLaC` bytes) and unit-tested with a fake HTTP client (L2).
-Next: R4 icon, then the UI milestones.
+R7 complete: streaming (search, resolve, play, retry), the web app's icon and
+logo, and the new UI (Home / Search / Library tabs, persistent mini player, Now
+Playing, queue, album and artist sheets) are implemented and committed on
+`feat/online-streaming-and-ui`. Next: R8 regression pass, then R9 integration.
 
 ## Milestones
 
@@ -15,11 +15,11 @@ Next: R4 icon, then the UI milestones.
 | R1 | replace `origin/main` | done | remote refs verified, backup branch created |
 | R2 | streaming + UI audits, plan | done | reading only, live contract recorded |
 | R3 | streaming vertical slice | done | L2 tests + L3 live request |
-| R4 | app icon from the web app | todo | file-level evidence |
-| R5 | UI foundation (glass + tabs) | todo | L1 |
-| R6 | mini-player, Now Playing, queue | todo | L1 |
-| R7 | Search, Home, Library | todo | L1 |
-| R8 | regression pass | todo | L1 + L2 rerun |
+| R4 | app icon from the web app | done | byte-identical copy; `iconPath` matches the xtool schema |
+| R5 | UI foundation (glass + tabs) | done | L1 |
+| R6 | mini-player, Now Playing, queue | done | L1 |
+| R7 | Search, Home, Library | done | L1 + L3 live catalog requests |
+| R8 | regression pass | in progress | L1 + L2 rerun |
 | R9 | integrate and push `main` | todo | remote ref verified |
 | R10 | handoff | todo | report |
 
@@ -42,6 +42,22 @@ Next: R4 icon, then the UI milestones.
   Retry action.
 - **Only CD-quality FLAC** (16-bit/44.1 kHz) is available on this path. The
   `application/octet-stream` response header is the main on-device risk.
+- **Icon and logo are the web app's own artwork, unchanged.** `Branding/appicon.png`
+  is a byte-identical copy of `public/assets/appicon.png` from `a3c86df`
+  (1024×1024, already opaque); the SVGs are kept as sources. `iconPath` is a
+  real key: `PackSchema.swift` in xtool 1.22.2 declares it and requires `.png`.
+  Packing an `.app` needs `xtool dev`, which also installs, so the icon on the
+  Home Screen is unverified (L4).
+- **Liquid Glass is gated in one helper.** `glassEffect`/`GlassEffectContainer`
+  do not exist in the installed SDK at all; only `.buttonStyle(.glass)` (iOS 26)
+  does. `Theme.swift` wraps it with a bordered fallback, and system components
+  (tab bar, navigation bars, sheets) get the new design from the OS on iOS 26.
+  `tabViewBottomAccessory` is iOS 26, but its `isEnabled:` overload is 26.1, so
+  the mini player's native accessory path is gated at 26.1 with a bottom inset
+  fallback below that.
+- **Favorites now store full tracks**, not ids, so streamed tracks survive a
+  restart. The v1 id-only file is detected on load, resolved against the library
+  and rewritten once. History is a separate capped file.
 
 - **Migration:** `main` was fast-forwarded, not force-pushed. Old `main` is kept
   on `archive/webapp-main-before-native-2026-10-22` and `backup/pre-native-rebuild`.
@@ -61,9 +77,13 @@ Next: R4 icon, then the UI milestones.
 
 ## Blockers
 
-- Previously rejected: `tracks.monochrome.st` relays Tidal-derived audio without
-  rights. Re-examined in R2 against the current upstream tree; the outcome is
-  recorded in `docs/ONLINE_STREAMING_AUDIT.md`.
+- No code blocker. Remaining unknowns are device-level only (L4): whether
+  `AVPlayer` accepts the host's `application/octet-stream` FLAC, whether the
+  `iconPath`/`resources` keys are packaged into the `.app`, and visual checks of
+  the glass fallbacks. Nothing has been installed or run.
+- Distribution is blocked by rights, not by code: the catalog is Tidal-derived
+  and relayed by a third party, and the upstream repository has no content
+  licence or terms. See `docs/ONLINE_STREAMING_AUDIT.md`.
 
 ## Commands that actually ran
 
@@ -81,3 +101,6 @@ Next: R4 icon, then the UI milestones.
 | `swift test` after the API client and resolver | 68 tests in 9 suites, green (L2) |
 | `MONOCHROME_LIVE=1 swift test --filter LiveTracksAPITests` | 1 test passed in 3.3 s: real search, real stream URL, 206 + `fLaC` (L3) |
 | `scripts/build.sh` after the UI wiring | `Build complete!` (L1) |
+| `swift test` after favorites/history and the UI | 73 tests in 10 suites, green (L2) |
+| `scripts/build.sh` after the tab shell, Now Playing and search | `Build complete!` (L1) |
+| `file`/`sha256sum` on `Branding/*` | 1024×1024 opaque PNG + SVG sources, hashes recorded in `Branding/SOURCE.md` |
