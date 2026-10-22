@@ -10,12 +10,15 @@ struct ContentView: View {
     @State private var isShowingPlayer = false
     @State private var pendingDeletion: Track?
     @State private var isShowingQueue = false
+    @State private var favoritesOnly = false
 
     var body: some View {
         NavigationStack {
             Group {
                 if model.tracks.isEmpty {
                     emptyState
+                } else if visibleTracks.isEmpty {
+                    noFavoritesState
                 } else {
                     libraryList
                 }
@@ -33,6 +36,16 @@ struct ContentView: View {
                     }
                     .disabled(model.player.queue.isEmpty)
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu(
+                        "Filter",
+                        systemImage: favoritesOnly
+                            ? "line.3.horizontal.decrease.circle.fill"
+                            : "line.3.horizontal.decrease.circle"
+                    ) {
+                        Toggle("Favorites only", isOn: $favoritesOnly)
+                    }
+                }
             }
             .safeAreaInset(edge: .bottom) {
                 if model.player.currentTrack != nil {
@@ -40,7 +53,7 @@ struct ContentView: View {
                 }
             }
             .sheet(isPresented: $isShowingPlayer) {
-                PlayerView(player: model.player)
+                PlayerView(model: model)
             }
             .sheet(isPresented: $isShowingQueue) {
                 QueueView(player: model.player)
@@ -90,13 +103,25 @@ struct ContentView: View {
     }
 
     private var libraryList: some View {
-        List(model.tracks) { track in
+        List(visibleTracks) { track in
             Button {
                 Task { await model.play(track) }
             } label: {
-                TrackRow(track: track, isCurrent: model.player.currentTrack?.id == track.id)
+                TrackRow(
+                    track: track,
+                    isCurrent: model.player.currentTrack?.id == track.id,
+                    isFavorite: model.isFavorite(track)
+                )
             }
             .buttonStyle(.plain)
+            .swipeActions(edge: .leading) {
+                Button(
+                    model.isFavorite(track) ? "Unfavorite" : "Favorite",
+                    systemImage: model.isFavorite(track) ? "heart.slash" : "heart"
+                ) {
+                    model.toggleFavorite(track)
+                }
+            }
             .swipeActions {
                 Button("Delete", role: .destructive) {
                     pendingDeletion = track
@@ -110,6 +135,20 @@ struct ContentView: View {
                     .padding()
                     .background(.regularMaterial, in: .rect(cornerRadius: 12))
             }
+        }
+    }
+
+    private var visibleTracks: [Track] {
+        favoritesOnly ? model.tracks.filter { model.favoriteIDs.contains($0.id) } : model.tracks
+    }
+
+    private var noFavoritesState: some View {
+        ContentUnavailableView {
+            Label("No favorites yet", systemImage: "heart")
+        } description: {
+            Text("Swipe a track to the right to mark it as a favorite.")
+        } actions: {
+            Button("Show all tracks") { favoritesOnly = false }
         }
     }
 
@@ -128,6 +167,7 @@ struct ContentView: View {
 private struct TrackRow: View {
     let track: Track
     let isCurrent: Bool
+    let isFavorite: Bool
 
     var body: some View {
         HStack(spacing: 12) {
@@ -144,6 +184,12 @@ private struct TrackRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
+            if isFavorite {
+                Image(systemName: "heart.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityLabel("Favorite")
+            }
             if let duration = track.durationSeconds {
                 Text(formatDuration(duration))
                     .font(.footnote.monospacedDigit())

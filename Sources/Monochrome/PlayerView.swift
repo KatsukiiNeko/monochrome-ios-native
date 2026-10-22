@@ -4,8 +4,10 @@ import MonochromeCore
 import SwiftUI
 
 struct PlayerView: View {
-    let player: PlayerController
+    let model: AppModel
     @Environment(\.dismiss) private var dismiss
+
+    private var player: PlayerController { model.player }
 
     var body: some View {
         NavigationStack {
@@ -26,6 +28,17 @@ struct PlayerView: View {
                         Text(album)
                             .font(.footnote)
                             .foregroundStyle(.tertiary)
+                    }
+                    if let track = player.currentTrack {
+                        Button {
+                            model.toggleFavorite(track)
+                        } label: {
+                            Image(systemName: model.isFavorite(track) ? "heart.fill" : "heart")
+                                .font(.title3)
+                                .frame(width: 44, height: 44)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(model.isFavorite(track) ? "Remove from favorites" : "Add to favorites")
                     }
                 }
 

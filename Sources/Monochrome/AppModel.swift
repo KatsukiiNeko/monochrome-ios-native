@@ -8,11 +8,13 @@ import Observation
 @Observable
 final class AppModel {
     private(set) var tracks: [Track] = []
+    private(set) var favoriteIDs: Set<String> = []
     private(set) var errorMessage: String?
     private(set) var isImporting = false
 
     let player: PlayerController
     private let service: LocalFileService
+    private let favoritesStore: FavoritesStore
     private let audioSession: AudioSessionController
     private let nowPlaying: NowPlayingController
 
@@ -31,6 +33,7 @@ final class AppModel {
         }
         self.service = service
         self.player = player
+        self.favoritesStore = FavoritesStore(fileURL: base.appendingPathComponent("favorites.json"))
         // System integration: audio session first, then Lock Screen metadata/commands.
         self.audioSession = AudioSessionController(player: player)
         self.nowPlaying = NowPlayingController(player: player)
@@ -43,6 +46,7 @@ final class AppModel {
             errorMessage = "The music library could not be read: \(error.localizedDescription)"
             tracks = []
         }
+        favoriteIDs = (try? favoritesStore.load()) ?? []
     }
 
     func importFiles(_ urls: [URL]) async {
@@ -92,6 +96,27 @@ final class AppModel {
 
     func report(_ error: Error) {
         errorMessage = error.localizedDescription
+    }
+
+    // MARK: - Favorites
+
+    func isFavorite(_ track: Track) -> Bool {
+        favoriteIDs.contains(track.id)
+    }
+
+    func toggleFavorite(_ track: Track) {
+        var ids = favoriteIDs
+        if ids.contains(track.id) {
+            ids.remove(track.id)
+        } else {
+            ids.insert(track.id)
+        }
+        do {
+            try favoritesStore.save(ids)
+            favoriteIDs = ids
+        } catch {
+            errorMessage = "The favorite could not be saved: \(error.localizedDescription)"
+        }
     }
 }
 #endif
