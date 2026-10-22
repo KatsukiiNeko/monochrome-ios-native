@@ -8,6 +8,13 @@ import os
 /// One shared logger so device logs can be filtered by subsystem/category.
 let playerLog = Logger(subsystem: "com.neko-ngtran.monochrome", category: "player")
 
+/// AVFoundation's out-of-band MIME key ships in the framework symbol table but is
+/// missing from this SDK's headers, so the documented key string is used directly.
+private let outOfBandMIMETypeKey = "AVURLAssetOutOfBandMIMETypeKey"
+/// Upper bound for the item to become ready; AVFoundation has no timeout of its own.
+private let readinessTimeout = Duration.seconds(20)
+private let readinessPollInterval = Duration.milliseconds(100)
+
 @MainActor
 final class AVPlayerEngine: PlaybackEngine {
     var onEvent: ((PlaybackEvent) -> Void)? {
@@ -21,6 +28,8 @@ final class AVPlayerEngine: PlaybackEngine {
     private var failureObserver: NSObjectProtocol?
     private var statusObservation: NSKeyValueObservation?
     private var timeControlObservation: NSKeyValueObservation?
+    /// Set while `load` waits for the item, so the status observer does not race it.
+    private var isWaitingForReadiness = false
 
     init() {
         // AVPlayer callbacks arrive on the main queue; hand them to the controller there.
@@ -39,18 +48,15 @@ final class AVPlayerEngine: PlaybackEngine {
         }
     }
 
-    func load(url: URL) async throws {
-        playerLog.notice("load start url=\(url.absoluteString, privacy: .public)")
-        let asset = AVURLAsset(url: url)
-        let playable: Bool
-        do {
-            playable = try await asset.load(.isPlayable)
-        } catch {
-            logFailure("asset isPlayable threw", error)
-            throw EngineError.unreadable
+    func load(url: URL, contentType: String?) async throws {
+        playerLog.notice("load start url=\(url.absoluteString, privacy: .public) type=\(contentType ?? "none", privacy: .public)")
+        // The catalog host serves FLAC as application/octet-stream without a path
+        // extension, which leaves AVFoundation unable to pick a parser on its own.
+        var options: [String: Any] = [:]
+        if let contentType {
+            options[outOfBandMIMETypeKey] = contentType
         }
-        playerLog.notice("asset isPlayable=\(playable, privacy: .public)")
-        guard playable else { throw EngineError.unreadable }
+        let asset = AVURLAsset(url: url, options: options)
 
         let item = AVPlayerItem(asset: asset)
         stopObservingItem()
@@ -67,25 +73,45 @@ final class AVPlayerEngine: PlaybackEngine {
             playerLog.error("item failed to play to end: \(describe(error), privacy: .public)")
             relay.send(.failed(error?.localizedDescription ?? "Playback failed."))
         }
-        statusObservation = item.observe(\.status, options: [.initial, .new]) { item, _ in
+        statusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
             let status = item.status.rawValue
             playerLog.notice("item.status=\(status, privacy: .public)")
-            if item.status == .failed {
-                playerLog.error("item error: \(describe(item.error), privacy: .public)")
-                logErrorLog(item)
+            guard item.status == .failed else { return }
+            let error = item.error
+            playerLog.error("item error: \(describe(error), privacy: .public)")
+            logErrorLog(item)
+            // Mid-playback failures reach the controller here; initial-load failures
+            // are thrown from `load` so the retry path stays in one place.
+            Task { @MainActor [weak self] in
+                guard let self, !self.isWaitingForReadiness else { return }
+                self.relay.send(.failed(error?.localizedDescription ?? "Playback failed."))
             }
         }
         player.replaceCurrentItem(with: item)
         playerLog.notice("replaced current item")
 
-        do {
-            let duration = try await asset.load(.duration)
-            playerLog.notice("asset duration numeric=\(duration.isNumeric, privacy: .public) seconds=\(duration.seconds)")
-            if duration.isNumeric {
-                onEvent?(.ready(duration: duration.seconds))
+        isWaitingForReadiness = true
+        defer { isWaitingForReadiness = false }
+        var waited = Duration.zero
+        while true {
+            switch item.status {
+            case .readyToPlay:
+                let duration = item.duration.isNumeric ? item.duration.seconds : nil
+                playerLog.notice("item ready seconds=\(duration ?? -1)")
+                onEvent?(.ready(duration: duration))
+                return
+            case .failed:
+                let error = item.error ?? EngineError.unreadable
+                logFailure("item failed during load", error)
+                throw error
+            default:
+                if waited >= readinessTimeout {
+                    playerLog.error("item not ready after timeout")
+                    throw EngineError.timedOut
+                }
+                try await Task.sleep(for: readinessPollInterval)
+                waited += readinessPollInterval
             }
-        } catch {
-            logFailure("asset duration threw", error)
         }
     }
 
@@ -153,9 +179,15 @@ private func logErrorLog(_ item: AVPlayerItem) {
 
 enum EngineError: LocalizedError {
     case unreadable
+    case timedOut
 
     var errorDescription: String? {
-        "This file could not be played. It may be corrupted or use an unsupported format."
+        switch self {
+        case .unreadable:
+            "This file could not be played. It may be corrupted or use an unsupported format."
+        case .timedOut:
+            "The stream did not start. Check the connection, then retry."
+        }
     }
 }
 #endif

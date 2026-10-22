@@ -25,7 +25,7 @@ not start playing, and no audio-format badge is shown. Verification so far is
 | R10 | handoff | done | final report |
 | R11 | `dev` branch + device-testing rules | done | remote ref verified, `the contributor rules` updated |
 | R12 | player/audio-session diagnostics | done | L1 build + L2 tests green |
-| R13 | playable stream for AVPlayer | in progress | awaiting device evidence |
+| R13 | playable stream for AVPlayer | done | L1 build + L2 tests; device run pending |
 | R14 | audio-format badge | in progress | not started |
 
 ## Baseline (R0, imported HEAD)
@@ -91,12 +91,20 @@ not start playing, and no audio-format badge is shown. Verification so far is
 
 ## Blockers
 
-- **Device playback.** On the device, catalog tracks do not play and the UI
-  shows no failure reason. Off-device, the stream URL answers `206` with
-  `content-type: application/octet-stream`, `x-content-type-options: nosniff`,
-  no URL extension, and the body starts with `fLaC`. `AVPlayerItem.status` is
-  never observed by the app, so a failed item cannot reach the UI. Root cause
-  pending the first device log capture.
+- **Device playback.** Catalog tracks did not play. Off-device, the stream URL
+  answers `206` with `content-type: application/octet-stream`,
+  `x-content-type-options: nosniff`, no URL extension, and the body starts with
+  `fLaC`; the host does not serve `.flac` suffixes (`502`) and ignores a format
+  query. `AVPlayer` therefore had to pick a demuxer from a generic type, and the
+  previous code took `AVURLAsset.isPlayable` as the gate: either it refused the
+  asset outright, or the item failed after the engine had already reported a
+  start. Both paths are now handled (out-of-band MIME + item-status wait), but
+  the exact device error could not be captured: `xtool dev` installs and signs
+  the app on this host, yet does not launch it, and launching by other means is
+  not permitted.
+- **No device logs for the app.** The syslog capture during the install run only
+  contains installation lines; there is no `Monochrome[pid]` line, no scene
+  launch and no crash report, so the app was not started by the tool.
 - No code blocker. Remaining unknowns are device-level only (L4): whether
   `AVPlayer` accepts the host's `application/octet-stream` FLAC, whether the
   `iconPath`/`resources` keys are packaged into the `.app`, and visual checks of
@@ -139,7 +147,16 @@ not start playing, and no audio-format badge is shown. Verification so far is
 | `swift test` after adding player diagnostics | 73 tests in 10 suites, green (L2) |
 | `scripts/build.sh` after adding player diagnostics | `Build complete!` (L1) |
 | `idevice_id -l` | `00008101-000868E222E9001E` |
+| `curl -r 0-3 https://tracks.monochrome.st/track/<id>.flac` | `502`, `text/plain`; the host has no extension route |
+| `curl -r 0-3 'https://tracks.monochrome.st/track/<id>?format=flac'` | `206`, still `application/octet-stream` |
+| `timeout 600 xtool dev run --udid 00008101-000868E222E9001E` | build, provision, sign, install, verify all `100%`; app not launched |
+| `timeout 900 idevicesyslog -u <udid> -m monochrome` during the install | install lines only, no app process |
+| `swift test` after the stream-format fix | 74 tests in 10 suites, green (L2) |
+| `scripts/build.sh` after the stream-format fix | `Build complete!` (L1) |
 
 ## Deploy log
 
-No `xtool dev` run has been made yet.
+| # | commit | change | outcome |
+|---|---|---|---|
+| 1 | `707cc9a` | player/audio-session diagnostics | installed; not launched, no app logs |
+| 2 | pending | stream format + item readiness | pending |

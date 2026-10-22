@@ -47,6 +47,21 @@ struct TrackURLResolverTests {
         #expect(url.absoluteString == "https://catalog.test/track/7")
     }
 
+    @Test func streamTrackDeclaresTheServedFormat() async throws {
+        let directory = try makeDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let resolver = DefaultTrackResolver(localDirectory: directory)
+
+        let streaming = await resolver.contentType(
+            for: Track(id: "stream:7", title: "Song", provider: "monochrome", streamID: "7")
+        )
+        let local = await resolver.contentType(for: Track(title: "Song", fileName: "song.m4a"))
+
+        // The host answers application/octet-stream, so the format travels out of band.
+        #expect(streaming == "audio/flac")
+        #expect(local == nil)
+    }
+
     @Test func streamTrackWithoutClientIsNotStreamable() async throws {
         let directory = try makeDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }

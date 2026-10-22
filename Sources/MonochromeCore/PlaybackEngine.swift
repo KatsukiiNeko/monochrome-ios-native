@@ -12,7 +12,9 @@ public enum PlaybackEvent: Equatable, Sendable {
 @MainActor
 public protocol PlaybackEngine: AnyObject {
     var onEvent: ((PlaybackEvent) -> Void)? { get set }
-    func load(url: URL) async throws
+    /// `contentType` is the out-of-band MIME type when the server does not state
+    /// a usable one; nil lets AVFoundation decide.
+    func load(url: URL, contentType: String?) async throws
     func play()
     func pause()
     func seek(to seconds: Double)

@@ -7,14 +7,16 @@ import Testing
 private final class FakeEngine: PlaybackEngine {
     var onEvent: ((PlaybackEvent) -> Void)?
     private(set) var loadedURLs: [URL] = []
+    private(set) var contentTypes: [String?] = []
     private(set) var playCount = 0
     private(set) var pauseCount = 0
     private(set) var seeks: [Double] = []
     private(set) var stopCount = 0
     var loadError: (any Error)?
 
-    func load(url: URL) async throws {
+    func load(url: URL, contentType: String?) async throws {
         loadedURLs.append(url)
+        contentTypes.append(contentType)
         if let loadError { throw loadError }
     }
 
@@ -75,6 +77,7 @@ struct PlayerControllerTests {
         #expect(controller.state == .playing)
         #expect(controller.currentTrack?.id == "b")
         #expect(engine.loadedURLs.map(\.lastPathComponent) == ["b.m4a"])
+        #expect(engine.contentTypes == [nil])
         #expect(engine.playCount == 1)
     }
 

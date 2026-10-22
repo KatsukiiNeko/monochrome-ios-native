@@ -150,7 +150,8 @@ public final class PlayerController {
         duration = track.durationSeconds ?? 0
         do {
             let url = try await resolver.url(for: track)
-            try await engine.load(url: url)
+            let contentType = await resolver.contentType(for: track)
+            try await engine.load(url: url, contentType: contentType)
             engine.play()
             state = .playing
             onTrackStarted?(track)
