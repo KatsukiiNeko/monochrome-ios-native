@@ -2,10 +2,11 @@
 
 ## Status
 
-R8 complete: streaming (search, resolve, play, retry), the web app's icon and
-logo, and the new UI (Home / Search / Library tabs, persistent mini player, Now
-Playing, queue, album and artist sheets) are implemented, and the full
-regression pass is green. Next: R9 integration.
+All milestones are complete. `main` on `origin` holds the native app with
+streaming (search, resolve, play, retry), the web app's icon and logo, and the
+new UI (Home / Search / Library tabs, persistent mini player, Now Playing,
+queue, album and artist sheets). Verification reached **L1 + L2 + L3**; nothing
+was installed, so L4 is not claimed.
 
 ## Milestones
 
@@ -20,8 +21,8 @@ regression pass is green. Next: R9 integration.
 | R6 | mini-player, Now Playing, queue | done | L1 |
 | R7 | Search, Home, Library | done | L1 + L3 live catalog requests |
 | R8 | regression pass | done | L1 + L2 + L3 rerun, all green |
-| R9 | integrate and push `main` | todo | remote ref verified |
-| R10 | handoff | todo | report |
+| R9 | integrate and push `main` | done | remote ref verified with `git ls-remote` |
+| R10 | handoff | done | final report |
 
 ## Baseline (R0, imported HEAD)
 
@@ -107,3 +108,8 @@ regression pass is green. Next: R9 integration.
 | `touch Sources/**/*.swift && scripts/build.sh` (R8, forced recompile) | 39 compile steps, `Build complete!` (L1) |
 | `swift test` (R8) | 73 tests in 10 suites, green (L2); baseline was 44 |
 | `MONOCHROME_LIVE=1 swift test --filter LiveTracksAPITests` (R8) | passed in 2.1 s (L3) |
+| `git merge-base --is-ancestor main feat/online-streaming-and-ui` before R9 | exit 0 (fast-forward possible) |
+| `git merge --ff-only feat/online-streaming-and-ui` on `main` | fast-forward, no merge commit |
+| `git push origin feat/online-streaming-and-ui` | `bad10ab..a892244` |
+| `git push origin main` | `d2b453d..a892244` |
+| `git ls-remote origin refs/heads/main refs/heads/archive/...` | `main` at `a89224428f35da7052a9b35211eb2d4a8d4156e0`, archive still `a3c86df0436a3eedc341ab5163fc5ee6b1688b5d` |
