@@ -181,12 +181,33 @@ not start playing, and no audio-format badge is shown. Verification so far is
 
 | # | commit | change | outcome |
 |---|---|---|---|
-| 1 | `707cc9a` | player/audio-session diagnostics | installed; not launched, no app logs |
-| 2 | `1b008d5` | stream format, item readiness, format badge | installed; not launched, no app logs |
+| 1 | `707cc9a` | player/audio-session diagnostics | installed; at first reading no app lines (capture filter matched message bodies only) |
+| 2 | `1b008d5` | stream format, item readiness, format badge | installed and launched; player logged `load start` for real track ids with `type=audio/flac` |
+| 3 | `1b008d5` | same build, debug launch probe | installed and launched; probe output missed (capture filter) |
+| 4 | `1b008d5` | probe rerun | interrupted before the log was read |
+| 5 | `81a346f` | docs and ignore rules only; no probe | installed and verified; the probe source is gone from the tree |
 
-`xtool dev run` builds, provisions, signs, installs and verifies the app, then
-exits without launching it. `idevicesyslog -m monochrome` during the run shows
-installation lines only: no app process, no scene launch, no crash. Device-level
-playback therefore stays unverified (L4 not reached) until the app is opened on
-the phone by hand; `docs/DEVICE_TEST_CHECKLIST.md` covers what to check and how
-to capture the player log.
+`xtool dev run` builds, provisions, signs, installs, verifies and then launches
+the app; the `Monochrome[pid]` process appears a few seconds after the install
+step, which is why the first reading of run 1 saw installation lines only.
+Device-level playback is still unverified (L4 not reached): no run captured a
+`readyToPlay`, a playing state or an advancing position for a stream, and the
+app had exited by the time run 5's log capture started. `docs/DEVICE_TEST_CHECKLIST.md`
+covers the checks and the log command to attach.
+
+## Repository hygiene
+
+- `git ls-remote --heads origin` lists `main` and `development` only; the
+  feature, backup and archive branches were deleted after confirming each tip
+  was an ancestor of `main`, so no revision became unreachable.
+- `.gitignore` covers build output, Apple artifacts and, explicitly, `.env*`,
+  `.netrc`, `*.p8`, `*.p12`, `*.pem`, `*.key`, `*.cer`, `*.crt`,
+  `*.mobileprovision` and `*.provisionprofile`.
+- A `git grep` over every reachable commit for private-key blocks, certificate
+  blocks and common token prefixes returns no match; no audio files, IPAs or
+  build output are tracked.
+- `the local xtool manifest` is the SwiftPM project manifest `xtool` reads for the bundle id,
+  `Info.plist` path, icon and bundled resources; it holds no credentials.
+- `the contributor rules` exists only in this repository. `upstream` (`monochrome-music/
+  monochrome`) has no such file and never received a push from here: its push
+  URL stays `DISABLED`.

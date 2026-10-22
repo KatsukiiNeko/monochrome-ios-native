@@ -1,6 +1,6 @@
 # Device test checklist
 
-Build under test: `development` at `da70064`, installed with `xtool dev` on
+Build under test: `development` at `81a346f`, installed with `xtool dev` on
 the connected iPhone. Playback and the visual result can only be confirmed by a
 person, so tick each item by hand.
 
