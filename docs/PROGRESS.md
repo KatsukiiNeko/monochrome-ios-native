@@ -2,15 +2,15 @@
 
 ## Status
 
-M0 (safety baseline) complete. Next: M1 audits of the upstream web app and the
-official iOS reference project.
+M1 (audits) complete. Next: M2 toolchain spike write-up, then M3 streaming
+feasibility.
 
 ## Milestones
 
 | id | name | status | verification |
 |---|---|---|---|
 | M0 | safety baseline | done | n/a |
-| M1 | audit upstream + official iOS reference | todo | reading only |
+| M1 | audit upstream + official iOS reference | done | reading only |
 | M2 | toolchain audit and spike | doing | commands run |
 | M3 | streaming feasibility | todo | — |
 | M4 | implementation plan | todo | — |
