@@ -314,4 +314,65 @@ struct PlayerControllerTests {
 
         #expect(started == ["a", "b"])
     }
+
+    // MARK: - Repeat modes
+
+    @Test func repeatOneRestartsALocalTrackWithoutReloading() async {
+        let (controller, engine) = makeController()
+        await controller.play(tracks: [track("a")], startingAt: 0)
+        controller.setRepeatMode(.one)
+
+        await controller.handle(.finished)
+
+        #expect(controller.state == .playing)
+        #expect(controller.position == 0)
+        #expect(engine.seeks == [0])
+        #expect(engine.loadedURLs.count == 1)
+    }
+
+    @Test func repeatOneResolvesAStreamAgain() async {
+        let engine = FakeEngine()
+        let resolver = FakeResolver()
+        let controller = PlayerController(engine: engine, resolver: resolver)
+        await controller.play(tracks: [streamTrack("42")], startingAt: 0)
+        controller.setRepeatMode(.one)
+
+        await controller.handle(.finished)
+
+        #expect(controller.state == .playing)
+        #expect(engine.loadedURLs.count == 2)
+        let requests = await resolver.requests()
+        #expect(requests.count == 2)
+    }
+
+    @Test func repeatAllWrapsToTheFirstTrack() async {
+        let (controller, engine) = makeController()
+        await controller.play(tracks: [track("a"), track("b")], startingAt: 1)
+        controller.setRepeatMode(.all)
+
+        await controller.handle(.finished)
+
+        #expect(controller.currentTrack?.id == "a")
+        #expect(engine.loadedURLs.last?.lastPathComponent == "a.m4a")
+    }
+
+    @Test func repeatOffStillAdvances() async {
+        let (controller, _) = makeController()
+        await controller.play(tracks: [track("a"), track("b")], startingAt: 0)
+
+        await controller.handle(.finished)
+
+        #expect(controller.currentTrack?.id == "b")
+    }
+
+    @Test func cycleRepeatModeRunsOffAllOne() {
+        let (controller, _) = makeController()
+        #expect(controller.repeatMode == .off)
+        controller.cycleRepeatMode()
+        #expect(controller.repeatMode == .all)
+        controller.cycleRepeatMode()
+        #expect(controller.repeatMode == .one)
+        controller.cycleRepeatMode()
+        #expect(controller.repeatMode == .off)
+    }
 }

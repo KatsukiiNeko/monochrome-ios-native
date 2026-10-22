@@ -32,6 +32,7 @@ struct PlayerView: View {
 
                 seekBlock
                 transportBlock
+                repeatControl
 
                 Spacer(minLength: 0)
             }
@@ -170,6 +171,21 @@ struct PlayerView: View {
             .glassControlStyle()
             .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
         }
+    }
+
+    private var repeatControl: some View {
+        Button {
+            player.cycleRepeatMode()
+        } label: {
+            Label(player.repeatMode.label, systemImage: player.repeatMode.symbolName)
+                .labelStyle(.iconOnly)
+                .font(.subheadline)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(player.repeatMode == .off ? Color.secondary : Color.primary)
+        .accessibilityLabel(player.repeatMode.label)
     }
 
     private var positionBinding: Binding<Double> {

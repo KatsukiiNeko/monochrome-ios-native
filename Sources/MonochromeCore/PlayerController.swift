@@ -11,6 +11,8 @@ public final class PlayerController {
     public private(set) var duration: Double = 0
     /// Parsed format of the current stream; nil until the item is ready.
     public private(set) var format: AudioFormat?
+    /// Repeat control; `one` restarts the current track at its end.
+    public private(set) var repeatMode: RepeatMode = .off
 
     /// Called once per successful start; the app uses it to record history.
     public var onTrackStarted: ((Track) -> Void)?
@@ -19,6 +21,8 @@ public final class PlayerController {
     private let resolver: any TrackURLResolver
     /// One fresh resolution per track after a failure, then the error is shown.
     private var didRetryCurrentTrack = false
+    /// True while the engine holds a file, so a restart needs no network round trip.
+    private var currentItemIsLocal = false
 
     public var currentTrack: Track? { queue.current }
     public var isPlaying: Bool { state == .playing }
@@ -112,6 +116,14 @@ public final class PlayerController {
         await loadCurrent()
     }
 
+    public func setRepeatMode(_ mode: RepeatMode) {
+        repeatMode = mode
+    }
+
+    public func cycleRepeatMode() {
+        repeatMode = repeatMode.next
+    }
+
     // MARK: - Engine events
 
     func handle(_ event: PlaybackEvent) async {
@@ -124,7 +136,7 @@ public final class PlayerController {
         case .position(let seconds):
             position = seconds
         case .finished:
-            await next()
+            await handleEndOfTrack()
         case .failed(let message):
             // A stream can expire mid-playback; resolve once more before giving up.
             if queue.current?.isStreaming == true, !didRetryCurrentTrack {
@@ -138,12 +150,41 @@ public final class PlayerController {
 
     // MARK: - Internals
 
+    private func handleEndOfTrack() async {
+        let hasNext = queue.currentIndex.map { $0 + 1 < queue.tracks.count } ?? false
+        let action = EndOfTrackDecision.action(
+            repeatMode: repeatMode,
+            hasNext: hasNext,
+            hasTracks: !queue.isEmpty,
+            itemIsLocal: currentItemIsLocal
+        )
+        switch action {
+        case .advance:
+            await next()
+        case .wrap:
+            guard queue.jump(to: 0) != nil else { return }
+            await loadCurrent()
+        case .replayInPlace:
+            engine.seek(to: 0)
+            position = 0
+            engine.play()
+            state = .playing
+        case .reload:
+            await loadCurrent()
+        case .stop:
+            engine.stop()
+            position = 0
+            state = .idle
+        }
+    }
+
     private func loadCurrent(retrying: Bool = false) async {
         guard let track = queue.current else {
             engine.stop()
             state = .idle
             position = 0
             duration = 0
+            currentItemIsLocal = false
             return
         }
         if !retrying { didRetryCurrentTrack = false }
@@ -158,6 +199,7 @@ public final class PlayerController {
             try await engine.load(url: url, contentType: contentType)
             engine.play()
             state = .playing
+            currentItemIsLocal = !track.isStreaming
             onTrackStarted?(track)
         } catch {
             if !retrying, track.isStreaming, !didRetryCurrentTrack {
