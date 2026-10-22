@@ -442,7 +442,7 @@ struct PlayerControllerTests {
         #expect(controller.isCurrentFromCache == false)
     }
 
-    @Test func repeatOneRechecksTheCache() async {
+    @Test func repeatOneReplaysTheCachedFileInPlace() async {
         let engine = FakeEngine()
         let resolver = FakeResolver()
         let cache = FakeCache()
@@ -452,12 +452,16 @@ struct PlayerControllerTests {
         await controller.play(tracks: [streamTrack("42")], startingAt: 0)
         controller.setRepeatMode(.one)
 
+        var lines: [String] = []
+        controller.log = { lines.append($0) }
+
         await controller.handle(.finished)
 
         #expect(controller.state == .playing)
-        #expect(engine.seeks.isEmpty)
-        #expect(engine.loadedURLs.count == 2)
+        #expect(engine.seeks == [0])
+        #expect(engine.loadedURLs.count == 1)
         #expect(await resolver.requests().isEmpty)
+        #expect(lines.contains("loop source=cache"))
     }
 
     @Test func switchingTracksClearsTheCacheSourceFlag() async {

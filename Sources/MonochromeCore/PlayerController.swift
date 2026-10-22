@@ -208,7 +208,7 @@ public final class PlayerController {
             engine.play()
             state = .playing
         case .reload:
-            await loadCurrent()
+            await loadCurrent(forLoop: true)
         case .stop:
             engine.stop()
             position = 0
@@ -218,7 +218,7 @@ public final class PlayerController {
         }
     }
 
-    private func loadCurrent(retrying: Bool = false) async {
+    private func loadCurrent(retrying: Bool = false, forLoop: Bool = false) async {
         guard let track = queue.current else {
             engine.stop()
             state = .idle
@@ -248,7 +248,9 @@ public final class PlayerController {
                 if let cachedDuration = cached.duration, cachedDuration > 0 {
                     duration = cachedDuration
                 }
+                currentItemIsLocal = true
                 isCurrentFromCache = true
+                if forLoop { log?("loop source=cache") }
                 onTrackStarted?(track)
                 return
             } catch {
@@ -256,6 +258,8 @@ public final class PlayerController {
                 log?("cache hit unusable track=\(track.id)")
             }
         }
+        if forLoop { log?("loop source=network reason=cache-miss") }
+
         do {
             let url = try await resolver.url(for: track)
             let contentType = await resolver.contentType(for: track)
@@ -274,7 +278,7 @@ public final class PlayerController {
             pendingCache = nil
             if !retrying, track.isStreaming, !didRetryCurrentTrack {
                 didRetryCurrentTrack = true
-                await loadCurrent(retrying: true)
+                await loadCurrent(retrying: true, forLoop: forLoop)
             } else {
                 state = .failed(error.localizedDescription)
             }
