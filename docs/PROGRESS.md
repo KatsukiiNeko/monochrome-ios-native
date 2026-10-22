@@ -2,7 +2,7 @@
 
 ## Status
 
-M3 (streaming feasibility) complete: Path B, local files. Next: M4 plan, then M5 cleanup.
+M4 (plan) complete. Next: M5 cleanup of the root.
 
 ## Milestones
 
@@ -12,7 +12,7 @@ M3 (streaming feasibility) complete: Path B, local files. Next: M4 plan, then M5
 | M1 | audit upstream + official iOS reference | done | reading only |
 | M2 | toolchain audit and spike | done | commands run |
 | M3 | streaming feasibility | done | live contract check (L3) |
-| M4 | implementation plan | todo | — |
+| M4 | implementation plan | done | n/a |
 | M5 | clean the root | todo | — |
 | M6 | scaffold native package | todo | — |
 | M7 | data layer | todo | — |
