@@ -1,0 +1,19 @@
+# build output
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+
+# editors
+.vscode/
+.idea/
+*.swp
+
+# Apple artifacts — never committed
+*.ipa
+*.app
+*.dSYM/
+*.xcarchive
+
+# macOS
+.DS_Store
