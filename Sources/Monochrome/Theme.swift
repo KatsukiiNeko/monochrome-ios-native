@@ -26,22 +26,18 @@ extension View {
         modifier(GlassSurface(cornerRadius: cornerRadius))
     }
 
-    /// The mini player uses the native tab-bar accessory where the SDK supports toggling it
-    /// (iOS 26.1), and a bottom inset everywhere else. The container supplies the background.
+    /// Sits above the tab bar on every iOS version. Applied to each tab's root, which also
+    /// keeps it on pushed screens and lets scroll views inset their last row automatically.
     @ViewBuilder
-    func miniPlayerAccessory<Content: View>(
+    func nowPlayingBarInset<Content: View>(
         isPresented: Bool,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        if #available(iOS 26.1, *) {
-            tabViewBottomAccessory(isEnabled: isPresented) { content() }
-        } else {
-            safeAreaInset(edge: .bottom, spacing: 0) {
-                if isPresented {
-                    content()
-                        .background(.bar)
-                        .overlay(alignment: .top) { Divider() }
-                }
+        safeAreaInset(edge: .bottom, spacing: 0) {
+            if isPresented {
+                content()
+                    .background(.bar)
+                    .overlay(alignment: .top) { Divider() }
             }
         }
     }

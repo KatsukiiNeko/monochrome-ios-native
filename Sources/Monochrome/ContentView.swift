@@ -24,10 +24,12 @@ struct ContentView: View {
                 onOpenLibrary: { tab = .library },
                 onOpenSettings: { isShowingSettings = true }
             )
+            .nowPlayingBarInset(isPresented: isPlayingBarVisible) { miniPlayer }
             .tabItem { Label("Home", systemImage: "house") }
             .tag(Tab.home)
 
             SearchView(model: model)
+                .nowPlayingBarInset(isPresented: isPlayingBarVisible) { miniPlayer }
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 .tag(Tab.search)
 
@@ -36,11 +38,9 @@ struct ContentView: View {
                 onOpenPlayer: { isShowingPlayer = true },
                 onOpenSettings: { isShowingSettings = true }
             )
+            .nowPlayingBarInset(isPresented: isPlayingBarVisible) { miniPlayer }
             .tabItem { Label("Library", systemImage: "music.note.list") }
             .tag(Tab.library)
-        }
-        .miniPlayerAccessory(isPresented: model.player.currentTrack != nil) {
-            MiniPlayerView(model: model) { isShowingPlayer = true }
         }
         .fullScreenCover(isPresented: $isShowingPlayer) {
             PlayerView(model: model)
@@ -62,6 +62,12 @@ struct ContentView: View {
             Text(model.errorMessage ?? "")
         }
         .task { await model.loadTracks() }
+    }
+
+    private var isPlayingBarVisible: Bool { model.player.currentTrack != nil }
+
+    private var miniPlayer: some View {
+        MiniPlayerView(model: model) { isShowingPlayer = true }
     }
 }
 #endif
