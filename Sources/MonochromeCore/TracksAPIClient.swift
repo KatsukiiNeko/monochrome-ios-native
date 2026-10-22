@@ -64,12 +64,14 @@ public struct RemoteArtistDetail: Equatable, Sendable {
 }
 
 public enum TracksAPIError: LocalizedError, Equatable {
+    case notConfigured
     case httpStatus(Int)
     case unavailable(String)
     case invalidPayload
 
     public var errorDescription: String? {
         switch self {
+        case .notConfigured: "No streaming host is configured. Add one in Settings."
         case .httpStatus(let code): "The music service answered with HTTP \(code)."
         case .unavailable(let reason): "The music service is unreachable. \(reason)"
         case .invalidPayload: "The music service returned data this app cannot read."
