@@ -1,4 +1,4 @@
-// App.swift: SwiftUI entry point for the iOS app shell.
+// App.swift: SwiftUI entry point.
 #if canImport(SwiftUI)
 import SwiftUI
 
@@ -6,8 +6,8 @@ import SwiftUI
 struct MonochromeApp: App {
     var body: some Scene {
         WindowGroup {
-            Text("Monochrome")
-                .font(.title)
+            ContentView()
+                .preferredColorScheme(.dark)
         }
     }
 }
