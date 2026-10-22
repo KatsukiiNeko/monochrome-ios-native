@@ -8,7 +8,8 @@ import Observation
 @Observable
 final class AppModel {
     private(set) var tracks: [Track] = []
-    private(set) var favoriteIDs: Set<String> = []
+    private(set) var favorites: [Track] = []
+    private(set) var recents: [Track] = []
     private(set) var errorMessage: String?
     private(set) var isImporting = false
 
@@ -18,6 +19,7 @@ final class AppModel {
 
     private let service: LocalFileService
     private let favoritesStore: FavoritesStore
+    private let historyStore: HistoryStore
     private let resolver: DefaultTrackResolver
     private let streamingSettings: StreamingSettings
     private var streamingClient: TracksAPIClient?
@@ -46,10 +48,13 @@ final class AppModel {
         self.isStreamingConfigured = settings.baseURL != nil
         self.mediaDirectory = media
         self.favoritesStore = FavoritesStore(fileURL: base.appendingPathComponent("favorites.json"))
+        self.historyStore = HistoryStore(fileURL: base.appendingPathComponent("history.json"))
         // System integration: audio session first, then Lock Screen metadata/commands.
         self.audioSession = AudioSessionController(player: player)
         self.nowPlaying = NowPlayingController(player: player)
         applyStreamingSettings()
+        // One source of truth: every track the player actually starts lands in history.
+        player.onTrackStarted = { [weak self] track in self?.record(track) }
     }
 
     // MARK: - Streaming
@@ -99,7 +104,30 @@ final class AppModel {
             errorMessage = "The music library could not be read: \(error.localizedDescription)"
             tracks = []
         }
-        favoriteIDs = (try? favoritesStore.load()) ?? []
+        favorites = loadFavorites()
+        recents = (try? historyStore.load()) ?? []
+    }
+
+    private func loadFavorites() -> [Track] {
+        do {
+            switch try favoritesStore.load() {
+            case .tracks(let tracks):
+                return tracks
+            case .legacyIDs(let ids):
+                // v1 stored ids only: keep what is still in the library and rewrite the file.
+                let migrated = ids.compactMap { id in tracks.first { $0.id == id } }
+                try? favoritesStore.save(migrated)
+                return migrated
+            }
+        } catch {
+            errorMessage = "Favorites could not be read: \(error.localizedDescription)"
+            return []
+        }
+    }
+
+    private func record(_ track: Track) {
+        // History is a convenience: a failed write must never interrupt playback.
+        recents = (try? historyStore.record(track)) ?? recents
     }
 
     func importFiles(_ urls: [URL]) async {
@@ -159,19 +187,19 @@ final class AppModel {
     // MARK: - Favorites
 
     func isFavorite(_ track: Track) -> Bool {
-        favoriteIDs.contains(track.id)
+        favorites.contains { $0.id == track.id }
     }
 
     func toggleFavorite(_ track: Track) {
-        var ids = favoriteIDs
-        if ids.contains(track.id) {
-            ids.remove(track.id)
+        var updated = favorites
+        if let index = updated.firstIndex(where: { $0.id == track.id }) {
+            updated.remove(at: index)
         } else {
-            ids.insert(track.id)
+            updated.insert(track, at: 0)
         }
         do {
-            try favoritesStore.save(ids)
-            favoriteIDs = ids
+            try favoritesStore.save(updated)
+            favorites = updated
         } catch {
             errorMessage = "The favorite could not be saved: \(error.localizedDescription)"
         }

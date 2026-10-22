@@ -152,7 +152,7 @@ struct ContentView: View {
     }
 
     private var visibleTracks: [Track] {
-        favoritesOnly ? model.tracks.filter { model.favoriteIDs.contains($0.id) } : model.tracks
+        favoritesOnly ? model.favorites : model.tracks
     }
 
     private var noFavoritesState: some View {
