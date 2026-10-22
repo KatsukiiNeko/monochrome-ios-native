@@ -62,8 +62,8 @@ cannot resolve the `iphoneos` platform on this host.
 
 There is no `xtool build`; the only xtool command that packages an app is
 `xtool dev`, which also installs it, so this repository never runs it. The
-placeholder bundle id in `the local xtool manifest` (`com.example.monochrome`) **must be
-changed** before any real deployment.
+bundle id in `the local xtool manifest` (`com.neko-ngtran.monochrome`) is a personal identifier
+for local device runs; change it before any distribution.
 
 ## Repository layout
 
