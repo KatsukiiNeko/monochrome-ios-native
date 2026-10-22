@@ -52,6 +52,29 @@ private actor FakeResolver: TrackURLResolver {
     func requests() -> [String] { requestedIDs }
 }
 
+/// Serves a canned hit and records what the controller asks to cache.
+private actor FakeCache: AudioCaching {
+    private var hit: CachedAudio?
+    private(set) var storedIDs: [String] = []
+    private(set) var storedURLs: [URL] = []
+
+    func setHit(_ audio: CachedAudio?) { hit = audio }
+
+    func cachedAudio(for track: Track, quality: AudioQuality?) async -> CachedAudio? { hit }
+
+    func store(
+        _ track: Track,
+        quality: AudioQuality?,
+        url: URL,
+        contentType: String?,
+        format: AudioFormat?,
+        duration: Double?
+    ) async {
+        storedIDs.append(track.id)
+        storedURLs.append(url)
+    }
+}
+
 private func track(_ id: String, duration: Double? = nil) -> Track {
     Track(id: id, title: "Track \(id)", durationSeconds: duration, fileName: "\(id).m4a")
 }
@@ -374,5 +397,82 @@ struct PlayerControllerTests {
         #expect(controller.repeatMode == .one)
         controller.cycleRepeatMode()
         #expect(controller.repeatMode == .off)
+    }
+
+    // MARK: - Audio cache
+
+    @Test func cacheHitPlaysTheLocalFileWithoutResolving() async {
+        let engine = FakeEngine()
+        let resolver = FakeResolver()
+        let cache = FakeCache()
+        let local = URL(fileURLWithPath: "/cache/42.flac")
+        await cache.setHit(
+            CachedAudio(
+                url: local,
+                format: AudioFormat(codec: "flac", bitDepth: 16, sampleRateHz: 44_100),
+                duration: 210,
+                byteSize: 1_024
+            )
+        )
+        let controller = PlayerController(engine: engine, resolver: resolver, cache: cache)
+
+        await controller.play(tracks: [streamTrack("42")], startingAt: 0)
+
+        #expect(controller.state == .playing)
+        #expect(controller.isCurrentFromCache)
+        #expect(engine.loadedURLs == [local])
+        #expect(engine.contentTypes.count == 1)
+        #expect(engine.contentTypes[0] == nil)
+        #expect(await resolver.requests().isEmpty)
+        #expect(controller.format == AudioFormat(codec: "flac", bitDepth: 16, sampleRateHz: 44_100))
+        #expect(controller.duration == 210)
+    }
+
+    @Test func missStartsABackgroundStoreAfterTheItemIsReady() async {
+        let engine = FakeEngine()
+        let resolver = FakeResolver()
+        let cache = FakeCache()
+        let controller = PlayerController(engine: engine, resolver: resolver, cache: cache)
+
+        await controller.play(tracks: [streamTrack("42")], startingAt: 0)
+        await controller.handle(.ready(duration: 100, format: AudioFormat(codec: "flac")))
+        try? await Task.sleep(for: .milliseconds(20))
+
+        #expect(await cache.storedIDs == [Track.remoteIDPrefix + "42"])
+        #expect(controller.isCurrentFromCache == false)
+    }
+
+    @Test func repeatOneRechecksTheCache() async {
+        let engine = FakeEngine()
+        let resolver = FakeResolver()
+        let cache = FakeCache()
+        let local = URL(fileURLWithPath: "/cache/42.flac")
+        await cache.setHit(CachedAudio(url: local, duration: 200, byteSize: 1_024))
+        let controller = PlayerController(engine: engine, resolver: resolver, cache: cache)
+        await controller.play(tracks: [streamTrack("42")], startingAt: 0)
+        controller.setRepeatMode(.one)
+
+        await controller.handle(.finished)
+
+        #expect(controller.state == .playing)
+        #expect(engine.seeks.isEmpty)
+        #expect(engine.loadedURLs.count == 2)
+        #expect(await resolver.requests().isEmpty)
+    }
+
+    @Test func switchingTracksClearsTheCacheSourceFlag() async {
+        let engine = FakeEngine()
+        let resolver = FakeResolver()
+        let cache = FakeCache()
+        await cache.setHit(CachedAudio(url: URL(fileURLWithPath: "/cache/1.flac"), byteSize: 10))
+        let controller = PlayerController(engine: engine, resolver: resolver, cache: cache)
+        await controller.play(tracks: [streamTrack("1"), streamTrack("2")], startingAt: 0)
+        #expect(controller.isCurrentFromCache)
+
+        await cache.setHit(nil)
+        await controller.next()
+
+        #expect(controller.currentTrack?.id == Track.remoteIDPrefix + "2")
+        #expect(controller.isCurrentFromCache == false)
     }
 }

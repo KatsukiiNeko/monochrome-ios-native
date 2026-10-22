@@ -13,23 +13,42 @@ public final class PlayerController {
     public private(set) var format: AudioFormat?
     /// Repeat control; `one` restarts the current track at its end.
     public private(set) var repeatMode: RepeatMode = .off
+    /// True when the engine is playing a file served from the audio cache.
+    public private(set) var isCurrentFromCache = false
 
     /// Called once per successful start; the app uses it to record history.
     public var onTrackStarted: ((Track) -> Void)?
+    /// Technical log sink; the app forwards these to os.Logger.
+    public var log: ((String) -> Void)?
 
     private let engine: any PlaybackEngine
     private let resolver: any TrackURLResolver
+    private let cache: (any AudioCaching)?
     /// One fresh resolution per track after a failure, then the error is shown.
     private var didRetryCurrentTrack = false
     /// True while the engine holds a file, so a restart needs no network round trip.
     private var currentItemIsLocal = false
+    /// Stream resolved for the current item, waiting for the parsed format before caching.
+    private var pendingCache: PendingCache?
+
+    private struct PendingCache {
+        var track: Track
+        var quality: AudioQuality?
+        var url: URL
+        var contentType: String?
+    }
 
     public var currentTrack: Track? { queue.current }
     public var isPlaying: Bool { state == .playing }
 
-    public init(engine: any PlaybackEngine, resolver: any TrackURLResolver) {
+    public init(
+        engine: any PlaybackEngine,
+        resolver: any TrackURLResolver,
+        cache: (any AudioCaching)? = nil
+    ) {
         self.engine = engine
         self.resolver = resolver
+        self.cache = cache
         engine.onEvent = { [weak self] event in
             guard let self else { return }
             Task { await self.handle(event) }
@@ -65,6 +84,8 @@ public final class PlayerController {
             engine.stop()
             position = 0
             state = .idle
+            isCurrentFromCache = false
+            currentItemIsLocal = false
         }
     }
 
@@ -129,10 +150,11 @@ public final class PlayerController {
     func handle(_ event: PlaybackEvent) async {
         switch event {
         case .ready(let engineDuration, let engineFormat):
-            format = engineFormat
+            if let engineFormat { format = engineFormat }
             if let engineDuration, engineDuration > 0 {
                 duration = engineDuration
             }
+            startCacheStoreIfReady(format: engineFormat, duration: engineDuration ?? duration)
         case .position(let seconds):
             position = seconds
         case .finished:
@@ -150,6 +172,21 @@ public final class PlayerController {
 
     // MARK: - Internals
 
+    private func startCacheStoreIfReady(format: AudioFormat?, duration: Double) {
+        guard let cache, let pending = pendingCache else { return }
+        pendingCache = nil
+        Task(priority: .utility) {
+            await cache.store(
+                pending.track,
+                quality: pending.quality,
+                url: pending.url,
+                contentType: pending.contentType,
+                format: format,
+                duration: duration
+            )
+        }
+    }
+
     private func handleEndOfTrack() async {
         let hasNext = queue.currentIndex.map { $0 + 1 < queue.tracks.count } ?? false
         let action = EndOfTrackDecision.action(
@@ -165,6 +202,7 @@ public final class PlayerController {
             guard queue.jump(to: 0) != nil else { return }
             await loadCurrent()
         case .replayInPlace:
+            log?(isCurrentFromCache ? "loop source=cache" : "loop source=local-file")
             engine.seek(to: 0)
             position = 0
             engine.play()
@@ -175,6 +213,8 @@ public final class PlayerController {
             engine.stop()
             position = 0
             state = .idle
+            isCurrentFromCache = false
+            currentItemIsLocal = false
         }
     }
 
@@ -185,6 +225,8 @@ public final class PlayerController {
             position = 0
             duration = 0
             currentItemIsLocal = false
+            isCurrentFromCache = false
+            pendingCache = nil
             return
         }
         if !retrying { didRetryCurrentTrack = false }
@@ -193,15 +235,43 @@ public final class PlayerController {
         format = nil
         position = 0
         duration = track.durationSeconds ?? 0
+        isCurrentFromCache = false
+        pendingCache = nil
+
+        if track.isStreaming, let cache,
+           let cached = await cache.cachedAudio(for: track, quality: track.audioQuality) {
+            do {
+                try await engine.load(url: cached.url, contentType: nil)
+                engine.play()
+                state = .playing
+                format = cached.format
+                if let cachedDuration = cached.duration, cachedDuration > 0 {
+                    duration = cachedDuration
+                }
+                isCurrentFromCache = true
+                onTrackStarted?(track)
+                return
+            } catch {
+                // A damaged cache entry must not stop playback; resolve the stream instead.
+                log?("cache hit unusable track=\(track.id)")
+            }
+        }
         do {
             let url = try await resolver.url(for: track)
             let contentType = await resolver.contentType(for: track)
+            pendingCache = PendingCache(
+                track: track,
+                quality: track.audioQuality,
+                url: url,
+                contentType: contentType
+            )
             try await engine.load(url: url, contentType: contentType)
             engine.play()
             state = .playing
             currentItemIsLocal = !track.isStreaming
             onTrackStarted?(track)
         } catch {
+            pendingCache = nil
             if !retrying, track.isStreaming, !didRetryCurrentTrack {
                 didRetryCurrentTrack = true
                 await loadCurrent(retrying: true)
