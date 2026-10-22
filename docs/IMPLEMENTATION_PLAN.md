@@ -1,80 +1,72 @@
-# Implementation plan (M5–M12)
+# Implementation plan (R3–R9)
 
-Refined from the M1–M3 evidence: **Path B, local files** (see
-`docs/STREAMING_FEASIBILITY.md`), two targets (see `docs/TOOLCHAIN_AUDIT.md`),
-no third-party dependencies, no asset catalogs.
+Constraints that shape every step: iOS 17 deployment target, no third-party
+packages, `MonochromeCore` stays Foundation-only and Linux-testable, one
+`PlayerController` remains the source of truth, every commit validated before
+it is made.
 
-Verification levels: L1 = iOS compile, L2 = host `swift test`, L3 = live check.
-Nothing reaches L4 (no device in this run).
+## R3 — streaming vertical slice
 
-## M5 · Clean the root
+Deliver, in separate commits:
 
-Delete the web app and its tooling and the untracked nested iOS project, in three
-reviewed commits. Keep `license`, `.git`, remotes and the Apache-2.0 text; add a
-short `NOTICE` crediting the upstream project. Acceptance: root contains only the
-native project, `git remote -v` unchanged, `~/monochrome-backup-20261022-1234.tar.gz`
-and `~/monochrome-reference/` still hold everything removed.
+1. **HTTP and models** (`feat(api): add tracks API client`): `HTTPClient`
+   protocol + `URLSession` implementation; typed models (`RemoteTrack`,
+   `RemoteRelease`, `RemoteArtist`) with tolerant decoding for missing or
+   mistyped fields; `TracksAPIClient` for `/search/tracks`,
+   `/search/releases`, `/search/artists`, `/releases/{id}`, `/artists/{id}` and
+   the `/track/{id}` URL; duration in milliseconds converted to seconds.
+2. **Stream resolution and failover** (`feat(api): resolve online track
+   streams`): `TrackURLResolver` protocol; local file resolver keeps current
+   behaviour; remote resolver builds the stream URL at play time, never
+   persists it, tries base URLs in order with a 10 s timeout and marks a host
+   unhealthy for the session after a transport failure.
+3. **Player integration** (`fix(player): re-resolve expired stream URLs`):
+   `PlayerController` resolves asynchronously on every load, retries once on a
+   failed load, exposes `retry()`, and calls `onTrackStarted` for history.
+   Tests cover success, retry, and the error state.
+4. **Settings** (`feat(settings): make the streaming host configurable`):
+   base URL stored in `UserDefaults`, empty value = “streaming not configured”.
 
-## M6 · Scaffold
+Acceptance: `swift test` green with fake-HTTP fixtures (failover, malformed
+JSON, unavailable track, expiry); one live `L3` check recorded; build green.
 
-`Package.swift` (two targets, Swift 6), `the local xtool manifest` (`version: 1`,
-`bundleID: com.example.monochrome`, `infoPath`), `Sources/MonochromeCore/`,
-`Sources/Monochrome/`, `Tests/`, `Resources/Info.plist` with
-`UIBackgroundModes: [audio]`, `.gitignore`, `scripts/build.sh`, README stub.
-Acceptance: `scripts/build.sh` green (L1) and `swift test` green with one real
-test (L2).
+## R4 — icon
 
-## M7 · Data layer
+Take the largest original icon/logo from the archive branch, store it untouched
+under `Branding/` with `SOURCE.md`, derive only what the platform requires, and
+wire `iconPath` in `the local xtool manifest` after checking xtool's own documentation. If the
+toolchain rejects it, keep the asset and document the blocker.
 
-- `Track` (id, title, artist, album, duration, file name) + `PlaybackState`.
-- `MusicService` protocol: list / import / delete. `LocalFileService` copies picked
-  files into Application Support and persists a `library.json`.
-- `LibraryStore`: Codable JSON, atomic write, tolerant of unknown/missing fields.
-- `TrackMetadata` protocol (title/artist/album/duration) so the copy+persist logic
-  is host-testable; the AVFoundation reader lives in the iOS layer.
-- Tests use a sanitized fixture of the app's own `library.json`.
-- Acceptance: import/list/delete round-trip tests pass (L2), iOS build green (L1).
+## R5 — UI foundation
 
-## M8 · Player core
+`Theme` (spacing, radii, colors), one `glassControlStyle()` helper gated on
+iOS 26 with a material fallback and Reduce Transparency support, tab shell with
+Home / Search / Library. No view owns playback state.
 
-`PlaybackEngine` protocol (`load`, `play`, `pause`, `seek`, `stop`, events
-`ready/finished/failed/position`); `Queue` (append, remove, next, previous,
-jump); `PlayerController` (`@MainActor @Observable`): idle → loading → playing ⇄
-paused → failed, queue advance on finish, error message on failure.
-Acceptance: fake-engine tests cover every transition, queue edge cases (empty,
-last track, removing current) pass (L2), iOS build green (L1).
+## R6 — mini player, Now Playing, queue
 
-## M9 · AVPlayer + UI
+Mini player with artwork, title, artist, progress and play/pause; iOS 26 uses
+`tabViewBottomAccessory`, older OS uses a bottom overlay. Now Playing as a
+full-screen cover with `containerRelativeFrame` artwork, one control cluster,
+seek, next/previous, queue access. Queue reorder/remove uses the existing
+player API. Background audio and Now Playing info must still work.
 
-`AVPlayerEngine` (AVPlayer + periodic time observer + item-ended/failed
-notifications), `MetadataReader` (AVURLAsset metadata), `fileImporter` import,
-library list, mini player, full player (play/pause, seek slider, title/artist,
-loading and error states), dark monochrome styling, Dynamic Type, accessibility
-labels. Acceptance: L1 build; no device verification.
+## R7 — Search, Home, Library
 
-## M10 · System integration
+Search: debounced (300 ms), cancellable, stale results dropped, tracks /
+albums / artists with artwork; album and artist detail sheets with playable
+track lists from the API. Home: greeting, recently played from the history
+store, quick access to saved albums/tracks, logo in the header; loading, empty
+and error states. Library: local imports plus saved online tracks, favorites
+persisted as full tracks (legacy id-only file migrated on first load).
 
-`AVAudioSession` `.playback` + `.activate` on first play, `UIBackgroundModes`
-audio, `MPNowPlayingInfoCenter`, `MPRemoteCommandCenter` (play/pause/next/prev/seek),
-interruption and route-change handling (pause on old-device-unavailable).
-Compile-checked only (L1). Background/Lock Screen behavior explicitly untested.
+## R8 — regression pass
 
-## M11 · Extras, value order, one commit each
+Rerun `scripts/build.sh` and `swift test`; compare with the R0 baseline (green
+build, 44 tests before new ones). Fix regressions before moving on. Update the
+README feature/verification table.
 
-1. Queue screen (reorder, remove, jump).
-2. Recents + favorites persisted as JSON in Application Support.
-3. Artwork from embedded metadata (if the metadata reader yields it).
-Lyrics/album/artist pages are dropped: no backend (Path B).
+## R9 — integrate
 
-## M12 · Finalize
-
-README with feature/verification matrix, repository layout, exact commands,
-limitations; the contributor rules synced; PROGRESS.md truthful; final `git status`; handoff.
-
-## Risks
-
-- `content-type: application/octet-stream` on the rejected remote path would have
-  needed an on-device AVPlayer check — moot for Path B.
-- iOS-only code cannot be exercised here; a compile is the ceiling.
-- `swift test` must keep passing while the iOS target builds empty on Linux; any
-  Apple-only file needs the `#if canImport(SwiftUI)` guard.
+Fast-forward `main`, push it, verify `git ls-remote origin refs/heads/main`.
+Never push `upstream`; never force.
