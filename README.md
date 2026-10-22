@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://github.com/KatsukiiNeko/monochrome-ios-native/actions">
-    <img src="https://img.shields.io/github/actions/workflow/status/KatsukiiNeko/monochrome-ios-native/ci.yml?branch=main&style=for-the-badge&logo=githubactions&label=CI" alt="CI status">
+    <img src="https://img.shields.io/github/actions/workflow/status/KatsukiiNeko/monochrome-ios-native/swift.yml?branch=main&style=for-the-badge&logo=githubactions&label=CI" alt="CI status">
   </a>
   <img src="https://img.shields.io/badge/Swift-6.4-F05138?style=for-the-badge&logo=swift&logoColor=white" alt="Swift 6.4">
   <img src="https://img.shields.io/badge/Framework-SwiftUI-blue?style=for-the-badge&logo=swift" alt="SwiftUI">
