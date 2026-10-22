@@ -5,8 +5,8 @@ import PackageDescription
 let package = Package(
     name: "Monochrome",
     platforms: [
-        .iOS(.v16),
-        .macOS(.v12)],
+        .iOS(.v17),
+        .macOS(.v14)],
     products: [
         .library(name: "Monochrome", targets: ["Monochrome"]),
     ],
