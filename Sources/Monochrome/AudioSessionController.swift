@@ -2,6 +2,9 @@
 #if canImport(AVFoundation)
 import AVFoundation
 import MonochromeCore
+import os
+
+private let sessionLog = Logger(subsystem: "com.neko-ngtran.monochrome", category: "audio-session")
 
 @MainActor
 final class AudioSessionController {
@@ -47,16 +50,24 @@ final class AudioSessionController {
         do {
             try session.setCategory(.playback, mode: .default)
             try session.setActive(true)
+            sessionLog.notice(
+                "session ready category=\(session.category.rawValue, privacy: .public) otherAudioPlaying=\(session.isOtherAudioPlaying, privacy: .public)"
+            )
         } catch {
-            // Foreground playback still works; background audio may not.
+            let nsError = error as NSError
+            sessionLog.error(
+                "session setup failed domain=\(nsError.domain, privacy: .public) code=\(nsError.code) description=\(nsError.localizedDescription, privacy: .public)"
+            )
         }
     }
 
     private func handle(_ event: AudioInterruption) {
         switch event {
         case .began:
+            sessionLog.notice("interruption began")
             if player.isPlaying { Task { await player.togglePlayPause() } }
         case .ended(let shouldResume):
+            sessionLog.notice("interruption ended shouldResume=\(shouldResume, privacy: .public)")
             if shouldResume, player.state == .paused { Task { await player.togglePlayPause() } }
         }
     }

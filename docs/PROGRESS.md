@@ -2,11 +2,11 @@
 
 ## Status
 
-All milestones are complete. `main` on `origin` holds the native app with
-streaming (search, resolve, play, retry), the web app's icon and logo, and the
-new UI (Home / Search / Library tabs, persistent mini player, Now Playing,
-queue, album and artist sheets). Verification reached **L1 + L2 + L3**; nothing
-was installed, so L4 is not claimed.
+Work continues on `dev` off `main` at `9e85d63`. The native app (streaming,
+search, resolve, play, retry, icon, tab shell, mini player, Now Playing, queue)
+is unchanged in shape; two device defects are being fixed: catalog tracks do
+not start playing, and no audio-format badge is shown. Verification so far is
+**L1 + L2 + L3**; device runs are logged below as they happen.
 
 ## Milestones
 
@@ -23,6 +23,10 @@ was installed, so L4 is not claimed.
 | R8 | regression pass | done | L1 + L2 + L3 rerun, all green |
 | R9 | integrate and push `main` | done | remote ref verified with `git ls-remote` |
 | R10 | handoff | done | final report |
+| R11 | `dev` branch + device-testing rules | done | remote ref verified, `the contributor rules` updated |
+| R12 | player/audio-session diagnostics | done | L1 build + L2 tests green |
+| R13 | playable stream for AVPlayer | in progress | awaiting device evidence |
+| R14 | audio-format badge | in progress | not started |
 
 ## Baseline (R0, imported HEAD)
 
@@ -43,6 +47,15 @@ was installed, so L4 is not claimed.
   Retry action.
 - **Only CD-quality FLAC** (16-bit/44.1 kHz) is available on this path. The
   `application/octet-stream` response header is the main on-device risk.
+- **Work happens on `dev`.** `dev` was created from `main` at `9e85d63` and is
+  the only branch that is pushed. `main` stays as it was.
+- **Device testing is allowed through `xtool dev`** from this repository against
+  the connected iPhone, after a green build-only check and green host tests, one
+  run at a time with `timeout`. Logs are read with `idevicesyslog` only.
+- **Diagnostics use `os.Logger`** with subsystem `com.neko-ngtran.monochrome`
+  and categories `player` / `audio-session`, values logged `.public` so
+  `idevicesyslog` shows URLs and error domains. Cheap enough to keep
+  permanently; it is the only way to see AVFoundation's error on the device.
 - **Icon and logo are the web app's own artwork, unchanged.** `Branding/appicon.png`
   is a byte-identical copy of `public/assets/appicon.png` from `a3c86df`
   (1024×1024, already opaque); the SVGs are kept as sources. `iconPath` is a
@@ -78,6 +91,12 @@ was installed, so L4 is not claimed.
 
 ## Blockers
 
+- **Device playback.** On the device, catalog tracks do not play and the UI
+  shows no failure reason. Off-device, the stream URL answers `206` with
+  `content-type: application/octet-stream`, `x-content-type-options: nosniff`,
+  no URL extension, and the body starts with `fLaC`. `AVPlayerItem.status` is
+  never observed by the app, so a failed item cannot reach the UI. Root cause
+  pending the first device log capture.
 - No code blocker. Remaining unknowns are device-level only (L4): whether
   `AVPlayer` accepts the host's `application/octet-stream` FLAC, whether the
   `iconPath`/`resources` keys are packaged into the `.app`, and visual checks of
@@ -113,3 +132,14 @@ was installed, so L4 is not claimed.
 | `git push origin feat/online-streaming-and-ui` | `bad10ab..a892244` |
 | `git push origin main` | `d2b453d..a892244` |
 | `git ls-remote origin refs/heads/main refs/heads/archive/...` | `main` at `a89224428f35da7052a9b35211eb2d4a8d4156e0`, archive still `a3c86df0436a3eedc341ab5163fc5ee6b1688b5d` |
+| `git switch -c dev` from `9e85d63`, `git push -u origin dev` | new branch; `dev` = `9e85d638058eff95309a16c110b992fe718078d0` |
+| `git ls-remote origin refs/heads/dev` | matched the local `dev` SHA |
+| `curl -r 0-1` / `HEAD https://tracks.monochrome.st/track/155142491052445696` | `206` / `200`, `application/octet-stream`, `content-range: bytes 0-1/39835632`, 39,835,632 bytes total, no extension in the path |
+| `curl -r 0-1 -A 'AppleCoreMedia/1.0.0.21A360 (iPhone; U; CPU OS 17_0 like Mac OS X; en_us)'` | same `206`; the host does not reject a non-browser user agent |
+| `swift test` after adding player diagnostics | 73 tests in 10 suites, green (L2) |
+| `scripts/build.sh` after adding player diagnostics | `Build complete!` (L1) |
+| `idevice_id -l` | `00008101-000868E222E9001E` |
+
+## Deploy log
+
+No `xtool dev` run has been made yet.
