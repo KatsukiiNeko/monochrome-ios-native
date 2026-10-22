@@ -1,0 +1,9 @@
+Monochrome — native iOS rebuild
+
+This product is a derivative work of the Monochrome music player
+(https://github.com/monochrome-music/monochrome), Copyright 2026 Monochrome Team,
+licensed under the Apache License, Version 2.0. The original license text is in
+the file named "license" at the root of this repository.
+
+The Swift/SwiftUI implementation under Sources/ and Tests/ is new work by this
+repository's contributors and is distributed under the same Apache License 2.0.
