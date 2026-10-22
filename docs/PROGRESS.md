@@ -2,7 +2,7 @@
 
 ## Status
 
-M4 (plan) complete. Next: M5 cleanup of the root.
+M6 (scaffold) complete. Next: M7 data layer.
 
 ## Milestones
 
@@ -13,8 +13,8 @@ M4 (plan) complete. Next: M5 cleanup of the root.
 | M2 | toolchain audit and spike | done | commands run |
 | M3 | streaming feasibility | done | live contract check (L3) |
 | M4 | implementation plan | done | n/a |
-| M5 | clean the root | todo | — |
-| M6 | scaffold native package | todo | — |
+| M5 | clean the root | done | L1 + L2 |
+| M6 | scaffold native package | done | L1 + L2 |
 | M7 | data layer | todo | — |
 | M8 | player core | todo | — |
 | M9 | AVPlayer engine + minimal UI | todo | — |
@@ -48,6 +48,11 @@ M4 (plan) complete. Next: M5 cleanup of the root.
 - Streaming Path A rejected: `tracks.monochrome.st/track/<id>` serves FLAC bytes
   unauthenticated (206, `fLaC`, 40 MB/track) but it is an unofficial relay of
   Tidal audio with no rights statement. Path B (local files) chosen.
+
+- Cleanup removed 287 web files and the untracked nested `monochrome-ios/` repo;
+  root now holds only `the contributor rules`, `docs/`, `license`, `NOTICE` and the native package.
+- `the local xtool manifest` uses `bundleID: com.example.monochrome` (placeholder) and
+  `infoPath: Resources/Info.plist`; the plist declares `UIBackgroundModes: [audio]`.
 
 ## Blockers
 
