@@ -2,7 +2,7 @@
 
 ## Status
 
-M2 (toolchain audit and spike) complete. Next: M3 streaming feasibility.
+M3 (streaming feasibility) complete: Path B, local files. Next: M4 plan, then M5 cleanup.
 
 ## Milestones
 
@@ -11,7 +11,7 @@ M2 (toolchain audit and spike) complete. Next: M3 streaming feasibility.
 | M0 | safety baseline | done | n/a |
 | M1 | audit upstream + official iOS reference | done | reading only |
 | M2 | toolchain audit and spike | done | commands run |
-| M3 | streaming feasibility | todo | — |
+| M3 | streaming feasibility | done | live contract check (L3) |
 | M4 | implementation plan | todo | — |
 | M5 | clean the root | todo | — |
 | M6 | scaffold native package | todo | — |
@@ -43,6 +43,11 @@ M2 (toolchain audit and spike) complete. Next: M3 streaming feasibility.
 - Commit convention in history is inconsistent (`Update package.json`, `shit`,
   `nq`, plus some Conventional Commits). New commits use Conventional Commits
   per the mission contract.
+
+
+- Streaming Path A rejected: `tracks.monochrome.st/track/<id>` serves FLAC bytes
+  unauthenticated (206, `fLaC`, 40 MB/track) but it is an unofficial relay of
+  Tidal audio with no rights statement. Path B (local files) chosen.
 
 ## Blockers
 
