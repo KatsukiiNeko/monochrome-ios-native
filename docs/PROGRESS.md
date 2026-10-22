@@ -2,72 +2,62 @@
 
 ## Status
 
-M6 (scaffold) complete. Next: M7 data layer.
+M12 complete. The app is a compile-checked (L1) local-file player with a
+host-tested core (L2). Nothing was installed, deployed or pushed.
 
 ## Milestones
 
 | id | name | status | verification |
 |---|---|---|---|
-| M0 | safety baseline | done | n/a |
+| M0 | safety baseline | done | backup + branch |
 | M1 | audit upstream + official iOS reference | done | reading only |
 | M2 | toolchain audit and spike | done | commands run |
-| M3 | streaming feasibility | done | live contract check (L3) |
+| M3 | streaming feasibility | done | live contract check (L3 for the remote path, which was rejected) |
 | M4 | implementation plan | done | n/a |
-| M5 | clean the root | done | L1 + L2 |
+| M5 | clean the root | done | three reviewed commits |
 | M6 | scaffold native package | done | L1 + L2 |
-| M7 | data layer | todo | — |
-| M8 | player core | todo | — |
-| M9 | AVPlayer engine + minimal UI | todo | — |
-| M10 | system integration | todo | — |
-| M11 | extras | todo | — |
-| M12 | finalize | todo | — |
+| M7 | data layer | done | L2 |
+| M8 | player core | done | L2 |
+| M9 | AVPlayer engine + UI | done | L1 |
+| M10 | system integration | done | L1 only |
+| M11 | extras | done (queue, favorites, artwork; recents and lyrics dropped) | L1/L2 |
+| M12 | finalize | done | docs + status |
 
 ## Decisions
 
-- Branch `native-rebuild` created from `main` HEAD; `backup/pre-native-rebuild`
-  already existed at the same commit. Remote `origin` has push URL `DISABLED`.
-- `monochrome-ios/` is an **untracked nested git repo** (own `.git`), so it is
-  protected only by the tarball backup `~/monochrome-backup-20261022-1234.tar.gz`
-  and the read-only copy `~/monochrome-reference/`.
-- Entire working tree (incl. untracked `the contributor rules`, `page_content.html`,
-  `get-html.ts`) backed up before any edit; 503 entries verified.
-- Build-only command: `swift build --build-system native --swift-sdk darwin
-  --triple arm64-apple-ios`. The default SwiftBuild engine cannot resolve the
-  `iphoneos` platform on this host; the deprecated-but-working `native` build
-  system can.
-- Git identity already set (`katsukii Neko <katsukii.works@gmail.com>`), so no
-  repo-local identity was needed.
-- `APPIMAGELAUNCHER_DISABLE` / `LD_LIBRARY_PATH` are unset; `env -u
-  LD_LIBRARY_PATH ldd <swiftc>` reports no missing libraries, so the RUNPATH
-  workaround already in place is sufficient.
-- Commit convention in history is inconsistent (`Update package.json`, `shit`,
-  `nq`, plus some Conventional Commits). New commits use Conventional Commits
-  per the mission contract.
-
-
-- Streaming Path A rejected: `tracks.monochrome.st/track/<id>` serves FLAC bytes
-  unauthenticated (206, `fLaC`, 40 MB/track) but it is an unofficial relay of
-  Tidal audio with no rights statement. Path B (local files) chosen.
-
-- Cleanup removed 287 web files and the untracked nested `monochrome-ios/` repo;
-  root now holds only `the contributor rules`, `docs/`, `license`, `NOTICE` and the native package.
-- `the local xtool manifest` uses `bundleID: com.example.monochrome` (placeholder) and
-  `infoPath: Resources/Info.plist`; the plist declares `UIBackgroundModes: [audio]`.
+- Path B (local files): the only streaming source relays Tidal through an
+  unauthenticated host — see `docs/STREAMING_FEASIBILITY.md`.
+- Build-only command: `swift build --build-system native --swift-sdk darwin --triple arm64-apple-ios`.
+  The default SwiftBuild engine fails with `unable to find platform for 'iphoneos'`.
+- Swift 6 language mode held; `#if canImport(SwiftUI)` keeps the iOS target
+  compiling to an empty module on Linux so `swift test` builds the whole package.
+- `@Observable` works on both the Linux host and iOS, so `PlayerController` lives
+  in the portable core and views observe it directly.
+- Imports copy files into Application Support instead of storing security-scoped
+  bookmarks: fewer failure modes, at the cost of disk space.
+- Dropped recents/history and lyrics: recents would need playback events from
+  auto-advance tracks and lyrics had no legitimate source after Path A was
+  rejected. No UI control exists for either.
+- Git identity was already configured; no repo-local override was needed.
 
 ## Blockers
 
-None yet.
+None open. Everything that needs hardware (Playback, background audio, Lock
+Screen, interruptions, route changes, artwork tags) is unverified and marked so
+in the README.
 
-## Commands
+## Commands that actually ran
 
 | command | outcome |
 |---|---|
-| `git --no-pager log --oneline -20` | history is a fork of monochrome-music/monochrome with noisy messages |
-| `tar` backup + `tar -tzf` | 19M archive, 503 entries, includes nested `monochrome-ios/.git/HEAD` |
-| `swift --version` | 6.4.1 (x86_64-unknown-linux-gnu) |
+| `swift --version` | 6.4.1 |
 | `xtool --version` | 1.22.2 |
 | `swift sdk list` | `darwin` |
-| `xtool sdk status` | Darwin SDK installed (slim, iPhoneOS27.1.sdk) |
-| `swift build --swift-sdk darwin --triple arm64-apple-ios` | fails: `unable to find platform for 'iphoneos'` |
-| `swift build --build-system native --swift-sdk darwin --triple arm64-apple-ios` | builds arm64 Mach-O objects |
-| `swift test` | passes a `@Test` in the portable core while the iOS target builds as an empty module on Linux |
+| `xtool sdk status` | Darwin SDK installed (slim) |
+| `swift build --build-system native --swift-sdk darwin --triple arm64-apple-ios` | builds arm64 Mach-O |
+| `scripts/build.sh` | same command, green (L1) |
+| `swift test` | 44 tests in 5 suites, green (L2) |
+| `curl 'https://tracks.monochrome.st/search/tracks?q=daft%20punk&limit=2'` | 200 JSON |
+| `curl -H 'Range: bytes=0-1023' 'https://tracks.monochrome.st/track/155102871061270528'` | 206, `fLaC`, 40 MB total |
+| `idevice_id -l` | `ERROR: Unable to retrieve device list!` (read-only, no device) |
+| `env -u LD_LIBRARY_PATH ldd $(command -v swiftc)` | no missing libraries |
