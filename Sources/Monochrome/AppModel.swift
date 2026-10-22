@@ -87,8 +87,28 @@ final class AppModel {
     }
 
     func searchTracks(_ query: String) async throws -> [Track] {
+        try await requireClient().searchTracks(matching: query)
+    }
+
+    func searchReleases(_ query: String) async throws -> [RemoteRelease] {
+        try await requireClient().searchReleases(matching: query)
+    }
+
+    func searchArtists(_ query: String) async throws -> [RemoteArtist] {
+        try await requireClient().searchArtists(matching: query)
+    }
+
+    func releaseDetail(id: String) async throws -> RemoteReleaseDetail {
+        try await requireClient().release(id: id)
+    }
+
+    func artistDetail(id: String) async throws -> RemoteArtistDetail {
+        try await requireClient().artist(id: id)
+    }
+
+    private func requireClient() throws -> TracksAPIClient {
         guard let streamingClient else { throw TracksAPIError.notConfigured }
-        return try await streamingClient.searchTracks(matching: query)
+        return streamingClient
     }
 
     /// Plays a search result with the rest of the results as the queue.
