@@ -15,6 +15,7 @@ final class AppModel {
     let player: PlayerController
     private let service: LocalFileService
     private let favoritesStore: FavoritesStore
+    private let resolver: DefaultTrackResolver
     private let mediaDirectory: URL
     private let audioSession: AudioSessionController
     private let nowPlaying: NowPlayingController
@@ -29,11 +30,11 @@ final class AppModel {
             store: LibraryStore(fileURL: base.appendingPathComponent("library.json")),
             metadataReader: AVAssetMetadataReader()
         )
-        let player = PlayerController(engine: AVPlayerEngine()) { track in
-            media.appendingPathComponent(track.fileName)
-        }
+        let resolver = DefaultTrackResolver(localDirectory: media)
+        let player = PlayerController(engine: AVPlayerEngine(), resolver: resolver)
         self.service = service
         self.player = player
+        self.resolver = resolver
         self.mediaDirectory = media
         self.favoritesStore = FavoritesStore(fileURL: base.appendingPathComponent("favorites.json"))
         // System integration: audio session first, then Lock Screen metadata/commands.

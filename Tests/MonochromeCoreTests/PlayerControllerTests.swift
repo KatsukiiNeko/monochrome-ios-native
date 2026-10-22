@@ -28,18 +28,42 @@ private struct LoadFailure: LocalizedError {
     var errorDescription: String? { "cannot decode audio" }
 }
 
+/// Fails the first `failures` resolutions so retry behaviour is observable.
+private actor FakeResolver: TrackURLResolver {
+    private var failuresRemaining: Int
+    private var requestedIDs: [String] = []
+
+    init(failures: Int = 0) {
+        self.failuresRemaining = failures
+    }
+
+    func url(for track: Track) async throws -> URL {
+        requestedIDs.append(track.id)
+        if failuresRemaining > 0 {
+            failuresRemaining -= 1
+            throw LoadFailure()
+        }
+        let name = track.fileName.isEmpty ? track.id : track.fileName
+        return URL(fileURLWithPath: "/library/\(name)")
+    }
+
+    func requests() -> [String] { requestedIDs }
+}
+
 private func track(_ id: String, duration: Double? = nil) -> Track {
     Track(id: id, title: "Track \(id)", durationSeconds: duration, fileName: "\(id).m4a")
+}
+
+private func streamTrack(_ id: String) -> Track {
+    Track(id: Track.remoteIDPrefix + id, title: "Stream \(id)", provider: "monochrome", streamID: id)
 }
 
 @MainActor
 @Suite("PlayerController")
 struct PlayerControllerTests {
-    private func makeController() -> (PlayerController, FakeEngine) {
+    private func makeController(resolver: FakeResolver = FakeResolver()) -> (PlayerController, FakeEngine) {
         let engine = FakeEngine()
-        let controller = PlayerController(engine: engine) { track in
-            URL(fileURLWithPath: "/library/\(track.fileName)")
-        }
+        let controller = PlayerController(engine: engine, resolver: resolver)
         return (controller, engine)
     }
 
@@ -66,7 +90,8 @@ struct PlayerControllerTests {
 
     @Test func missingURLFailsWithoutTouchingEngine() async {
         let engine = FakeEngine()
-        let controller = PlayerController(engine: engine) { _ in nil }
+        let resolver = FakeResolver(failures: 5)
+        let controller = PlayerController(engine: engine, resolver: resolver)
 
         await controller.play(tracks: [track("a")], startingAt: 0)
 
@@ -74,6 +99,9 @@ struct PlayerControllerTests {
             Issue.record("expected failed state, got \(controller.state)")
         }
         #expect(engine.loadedURLs.isEmpty)
+        // A local file is not retried: the failure cannot heal by resolving again.
+        let requests = await resolver.requests()
+        #expect(requests.count == 1)
     }
 
     @Test func togglePausesAndResumesWithoutReloading() async {
@@ -216,5 +244,71 @@ struct PlayerControllerTests {
 
         await controller.handle(.failed("stream ended"))
         #expect(controller.state == .failed("stream ended"))
+    }
+
+    // MARK: - Streaming retries
+
+    @Test func streamIsResolvedAgainOnceAfterAFailure() async {
+        let engine = FakeEngine()
+        let resolver = FakeResolver(failures: 1)
+        let controller = PlayerController(engine: engine, resolver: resolver)
+
+        await controller.play(tracks: [streamTrack("42")], startingAt: 0)
+
+        #expect(controller.state == .playing)
+        #expect(engine.loadedURLs.count == 1)
+        let requests = await resolver.requests()
+        #expect(requests.count == 2)
+    }
+
+    @Test func streamGivesUpAfterOneRetry() async {
+        let engine = FakeEngine()
+        let resolver = FakeResolver(failures: 5)
+        let controller = PlayerController(engine: engine, resolver: resolver)
+
+        await controller.play(tracks: [streamTrack("42")], startingAt: 0)
+
+        if case .failed = controller.state {} else {
+            Issue.record("expected failed state, got \(controller.state)")
+        }
+        #expect(engine.loadedURLs.isEmpty)
+        let requests = await resolver.requests()
+        #expect(requests.count == 2)
+    }
+
+    @Test func expiredStreamReloadsOnce() async {
+        let (controller, engine) = makeController()
+        await controller.play(tracks: [streamTrack("42")], startingAt: 0)
+
+        await controller.handle(.failed("HTTP 403"))
+
+        #expect(controller.state == .playing)
+        #expect(engine.loadedURLs.count == 2)
+    }
+
+    @Test func retryAfterFailureResolvesAgain() async {
+        let engine = FakeEngine()
+        let resolver = FakeResolver(failures: 2)
+        let controller = PlayerController(engine: engine, resolver: resolver)
+        await controller.play(tracks: [streamTrack("42")], startingAt: 0)
+        if case .failed = controller.state {} else {
+            Issue.record("expected failed state, got \(controller.state)")
+        }
+
+        await controller.retry()
+
+        #expect(controller.state == .playing)
+        #expect(engine.loadedURLs.count == 1)
+    }
+
+    @Test func trackStartCallbackFiresPerTrack() async {
+        let (controller, _) = makeController()
+        var started: [String] = []
+        controller.onTrackStarted = { started.append($0.id) }
+
+        await controller.play(tracks: [track("a"), track("b")], startingAt: 0)
+        await controller.next()
+
+        #expect(started == ["a", "b"])
     }
 }

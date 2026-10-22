@@ -10,15 +10,20 @@ public final class PlayerController {
     public private(set) var position: Double = 0
     public private(set) var duration: Double = 0
 
+    /// Called once per successful start; the app uses it to record history.
+    public var onTrackStarted: ((Track) -> Void)?
+
     private let engine: any PlaybackEngine
-    private let urlForTrack: (Track) -> URL?
+    private let resolver: any TrackURLResolver
+    /// One fresh resolution per track after a failure, then the error is shown.
+    private var didRetryCurrentTrack = false
 
     public var currentTrack: Track? { queue.current }
     public var isPlaying: Bool { state == .playing }
 
-    public init(engine: any PlaybackEngine, urlForTrack: @escaping (Track) -> URL?) {
+    public init(engine: any PlaybackEngine, resolver: any TrackURLResolver) {
         self.engine = engine
-        self.urlForTrack = urlForTrack
+        self.resolver = resolver
         engine.onEvent = { [weak self] event in
             guard let self else { return }
             Task { await self.handle(event) }
@@ -41,9 +46,7 @@ public final class PlayerController {
             engine.play()
             state = .playing
         case .idle, .failed:
-            if queue.current != nil {
-                await loadCurrent()
-            }
+            await retry()
         case .loading:
             break
         }
@@ -100,6 +103,13 @@ public final class PlayerController {
         queue.move(from: source, to: destination)
     }
 
+    /// User-initiated retry, including a fresh stream resolution.
+    public func retry() async {
+        guard queue.current != nil else { return }
+        didRetryCurrentTrack = false
+        await loadCurrent()
+    }
+
     // MARK: - Engine events
 
     func handle(_ event: PlaybackEvent) async {
@@ -113,13 +123,19 @@ public final class PlayerController {
         case .finished:
             await next()
         case .failed(let message):
-            state = .failed(message)
+            // A stream can expire mid-playback; resolve once more before giving up.
+            if queue.current?.isStreaming == true, !didRetryCurrentTrack {
+                didRetryCurrentTrack = true
+                await loadCurrent(retrying: true)
+            } else {
+                state = .failed(message)
+            }
         }
     }
 
     // MARK: - Internals
 
-    private func loadCurrent() async {
+    private func loadCurrent(retrying: Bool = false) async {
         guard let track = queue.current else {
             engine.stop()
             state = .idle
@@ -127,20 +143,24 @@ public final class PlayerController {
             duration = 0
             return
         }
-        guard let url = urlForTrack(track) else {
-            state = .failed("The audio file for “\(track.title)” is missing.")
-            return
-        }
+        if !retrying { didRetryCurrentTrack = false }
 
         state = .loading
         position = 0
         duration = track.durationSeconds ?? 0
         do {
+            let url = try await resolver.url(for: track)
             try await engine.load(url: url)
             engine.play()
             state = .playing
+            onTrackStarted?(track)
         } catch {
-            state = .failed(error.localizedDescription)
+            if !retrying, track.isStreaming, !didRetryCurrentTrack {
+                didRetryCurrentTrack = true
+                await loadCurrent(retrying: true)
+            } else {
+                state = .failed(error.localizedDescription)
+            }
         }
     }
 }
