@@ -1,7 +1,7 @@
 # Device test checklist
 
-Build under test: `dev` at `1b008d5`, installed with `xtool dev` on the
-connected iPhone. Playback and the visual result can only be confirmed by a
+Build under test: `development` at `da70064`, installed with `xtool dev` on
+the connected iPhone. Playback and the visual result can only be confirmed by a
 person, so tick each item by hand.
 
 ## Playback

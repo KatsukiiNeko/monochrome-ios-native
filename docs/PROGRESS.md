@@ -2,7 +2,7 @@
 
 ## Status
 
-Work continues on `dev` off `main` at `9e85d63`. The native app (streaming,
+Work continues on `development` off `main` at `9e85d63`. The native app (streaming,
 search, resolve, play, retry, icon, tab shell, mini player, Now Playing, queue)
 is unchanged in shape; two device defects are being fixed: catalog tracks do
 not start playing, and no audio-format badge is shown. Verification so far is
@@ -23,7 +23,8 @@ not start playing, and no audio-format badge is shown. Verification so far is
 | R8 | regression pass | done | L1 + L2 + L3 rerun, all green |
 | R9 | integrate and push `main` | done | remote ref verified with `git ls-remote` |
 | R10 | handoff | done | final report |
-| R11 | `dev` branch + device-testing rules | done | remote ref verified, `the contributor rules` updated |
+| R11 | feature branch + device-testing rules | done | remote ref verified, `the contributor rules` updated |
+| R15 | branch cleanup | done | only `main` and `development` remain, locally and on `origin` |
 | R12 | player/audio-session diagnostics | done | L1 build + L2 tests green |
 | R13 | playable stream for AVPlayer | done | L1 build + L2 tests; device run pending |
 | R14 | audio-format badge | done | L1 build + L2 tests |
@@ -47,8 +48,9 @@ not start playing, and no audio-format badge is shown. Verification so far is
   Retry action.
 - **Only CD-quality FLAC** (16-bit/44.1 kHz) is available on this path. The
   `application/octet-stream` response header is the main on-device risk.
-- **Work happens on `dev`.** `dev` was created from `main` at `9e85d63` and is
-  the only branch that is pushed. `main` stays as it was.
+- **Work happens on `development`.** The feature branch was created from `main`
+  at `9e85d63` and later renamed from `dev`; it is the only branch that is
+  pushed. `main` stays as it was, and no other branch exists on `origin`.
 - **Device testing is allowed through `xtool dev`** from this repository against
   the connected iPhone, after a green build-only check and green host tests, one
   run at a time with `timeout`. Logs are read with `idevicesyslog` only.
@@ -104,17 +106,20 @@ not start playing, and no audio-format badge is shown. Verification so far is
   previous code took `AVURLAsset.isPlayable` as the gate: either it refused the
   asset outright, or the item failed after the engine had already reported a
   start. Both paths are now handled (out-of-band MIME + item-status wait), but
-  the exact device error could not be captured: `xtool dev` installs and signs
-  the app on this host, yet does not launch it, and launching by other means is
-  not permitted.
+  the exact device error could not be captured on the first attempt: the app
+  *is* launched by `xtool dev` after the install, the first log check ran before
+  the process existed, and the syslog filter (`-m monochrome`) matched message
+  bodies only, so most player lines were dropped. Later runs captured the app
+  lifecycle.
 - **Badge wording source.** The catalog response has no quality field; the
   client declares `LOSSLESS` for this endpoint exactly as the web client does
   (`js/tracks-api.js`, `audioQuality: 'LOSSLESS'`), and the wording table is
   unit-tested. The codec shown on Now Playing comes from AVFoundation's parsed
   format description, never from the URL.
-- **No device logs for the app.** The syslog capture during the install run only
-  contains installation lines; there is no `Monochrome[pid]` line, no scene
-  launch and no crash report, so the app was not started by the tool.
+- **Device log capture.** `xtool dev run` builds, provisions, signs, installs,
+  verifies and then launches the app; the process appears a few seconds after
+  the install step. Filter `idevicesyslog` by `PROBE` or by an unfiltered dump:
+  `-m <string>` matches message bodies, not the `Monochrome[pid]` prefix.
 - No code blocker. Remaining unknowns are device-level only (L4): whether
   `AVPlayer` accepts the host's `application/octet-stream` FLAC, whether the
   `iconPath`/`resources` keys are packaged into the `.app`, and visual checks of
@@ -152,6 +157,12 @@ not start playing, and no audio-format badge is shown. Verification so far is
 | `git ls-remote origin refs/heads/main refs/heads/archive/...` | `main` at `a89224428f35da7052a9b35211eb2d4a8d4156e0`, archive still `a3c86df0436a3eedc341ab5163fc5ee6b1688b5d` |
 | `git switch -c dev` from `9e85d63`, `git push -u origin dev` | new branch; `dev` = `9e85d638058eff95309a16c110b992fe718078d0` |
 | `git ls-remote origin refs/heads/dev` | matched the local `dev` SHA |
+| `git branch -m dev development`, `git push -u origin development` | `development` = `da700644edabe6fe916741a0b48422265117890c` |
+| `git push origin --delete dev archive/webapp-main-before-native-2026-10-22 feat/online-streaming-and-ui` | three remote branches deleted |
+| `git branch -D backup/pre-native-rebuild feat/online-streaming-and-ui native-rebuild` | local branches deleted; all tips were ancestors of `main` |
+| `git ls-remote --heads origin` | only `main` and `development` |
+| `git grep` for key/token patterns over `git rev-list --all` | no matches |
+| `git status --ignored --short` | only `.bsp/`, `.build/`, `xtool/` ignored |
 | `curl -r 0-1` / `HEAD https://tracks.monochrome.st/track/155142491052445696` | `206` / `200`, `application/octet-stream`, `content-range: bytes 0-1/39835632`, 39,835,632 bytes total, no extension in the path |
 | `curl -r 0-1 -A 'AppleCoreMedia/1.0.0.21A360 (iPhone; U; CPU OS 17_0 like Mac OS X; en_us)'` | same `206`; the host does not reject a non-browser user agent |
 | `swift test` after adding player diagnostics | 73 tests in 10 suites, green (L2) |
