@@ -26,7 +26,7 @@ struct SettingsView: View {
             } header: {
                 Text("Streaming host")
             } footer: {
-                Text("Defaults to the host the Monochrome web app uses. Leave it empty to switch online streaming off; imported files keep playing. Only HTTPS is accepted, and streams are played live, never saved.")
+                Text("Defaults to the host the Monochrome web app uses. Leave it empty to switch online streaming off; imported files keep playing. Only HTTPS is accepted.")
             }
 
             Section {
@@ -43,6 +43,25 @@ struct SettingsView: View {
             Section {
                 LabeledContent("Online streaming", value: model.isStreamingConfigured ? "On" : "Off")
             }
+
+            Section {
+                LabeledContent("Cached audio", value: ByteCountFormatter.string(
+                    fromByteCount: Int64(model.cacheSizeBytes),
+                    countStyle: .file
+                ))
+                Button("Clear cache", role: .destructive) {
+                    Task { await model.clearCache() }
+                }
+                .disabled(model.cacheSizeBytes == 0)
+                Toggle("Cache over cellular", isOn: Binding(
+                    get: { model.allowsCellularCaching },
+                    set: { model.setAllowsCellularCaching($0) }
+                ))
+            } header: {
+                Text("Audio cache")
+            } footer: {
+                Text("Streams are kept on this device so replaying a track does not download it again. Up to 500 MB; the system may clear the cache at any time.")
+            }
         }
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
@@ -55,6 +74,7 @@ struct SettingsView: View {
             }
         }
         .onAppear { host = model.streamingHost }
+        .task { await model.refreshCacheSize() }
     }
 
     private func save() {

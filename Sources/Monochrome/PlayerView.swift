@@ -60,14 +60,25 @@ struct PlayerView: View {
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
             // The parsed stream format wins over the tier the catalog declares.
-            if let badge = AudioBadge.text(format: player.format, quality: player.currentTrack?.audioQuality) {
-                QualityBadgeLabel(
-                    text: badge,
-                    spokenText: AudioBadge.accessibilityLabel(
-                        format: player.format,
-                        quality: player.currentTrack?.audioQuality
+            HStack(spacing: 6) {
+                if let badge = AudioBadge.text(format: player.format, quality: player.currentTrack?.audioQuality) {
+                    QualityBadgeLabel(
+                        text: badge,
+                        spokenText: AudioBadge.accessibilityLabel(
+                            format: player.format,
+                            quality: player.currentTrack?.audioQuality
+                        )
                     )
-                )
+                }
+                if player.isCurrentFromCache {
+                    Text("Cached")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+                        .accessibilityLabel("Playing from the local cache")
+                }
             }
             Text(player.currentTrack?.displayArtist ?? "")
                 .foregroundStyle(.secondary)
