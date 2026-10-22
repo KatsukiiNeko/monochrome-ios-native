@@ -1,102 +1,144 @@
-// PlayerView.swift: full-screen player with seek, transport and error state.
+// PlayerView.swift: full-screen Now Playing with artwork, seek, transport and queue access.
 #if canImport(SwiftUI)
 import MonochromeCore
 import SwiftUI
 
 struct PlayerView: View {
     let model: AppModel
+
     @Environment(\.dismiss) private var dismiss
+    @State private var isShowingQueue = false
 
     private var player: PlayerController { model.player }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
-                Spacer(minLength: 8)
-                ArtworkView(fileURL: model.artworkURL(for: player.currentTrack))
+            VStack(spacing: Theme.spacing) {
+                Spacer(minLength: 4)
 
-                VStack(spacing: 4) {
-                    Text(player.currentTrack?.title ?? "Nothing playing")
-                        .font(.title2.weight(.semibold))
-                        .multilineTextAlignment(.center)
-                    Text(player.currentTrack?.displayArtist ?? "")
-                        .foregroundStyle(.secondary)
-                    if let album = player.currentTrack?.album, !album.isEmpty {
-                        Text(album)
-                            .font(.footnote)
-                            .foregroundStyle(.tertiary)
-                    }
-                    if let track = player.currentTrack {
-                        Button {
-                            model.toggleFavorite(track)
-                        } label: {
-                            Image(systemName: model.isFavorite(track) ? "heart.fill" : "heart")
-                                .font(.title3)
-                                .frame(width: 44, height: 44)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(model.isFavorite(track) ? "Remove from favorites" : "Add to favorites")
-                    }
-                }
+                TrackArtwork(
+                    track: player.currentTrack,
+                    localURL: model.artworkURL(for: player.currentTrack),
+                    cornerRadius: Theme.corner
+                )
+                .frame(maxWidth: 340)
+                .frame(maxWidth: .infinity)
+
+                titleBlock
 
                 if case .failed(let message) = player.state {
-                    Text(message)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .multilineTextAlignment(.center)
-                        .accessibilityLabel("Playback error: \(message)")
+                    errorBlock(message)
                 }
 
-                VStack(spacing: 4) {
-                    Slider(value: positionBinding, in: 0...max(player.duration, 1))
-                        .accessibilityLabel("Playback position")
-                        .accessibilityValue(
-                            "\(formatDuration(player.position)) of \(formatDuration(player.duration))"
-                        )
-                    HStack {
-                        Text(formatDuration(player.position))
-                        Spacer()
-                        Text(formatDuration(player.duration))
-                    }
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                }
+                seekBlock
+                transportBlock
 
-                HStack(spacing: 44) {
-                    Button {
-                        Task { await player.previous() }
-                    } label: {
-                        Image(systemName: "backward.fill")
-                            .font(.title2)
-                    }
-                    .accessibilityLabel("Previous track")
-
-                    playPauseButton
-
-                    Button {
-                        Task { await player.next() }
-                    } label: {
-                        Image(systemName: "forward.fill")
-                            .font(.title2)
-                    }
-                    .accessibilityLabel("Next track")
-                }
-                .buttonStyle(.plain)
-
-                Spacer()
+                Spacer(minLength: 0)
             }
-            .padding()
+            .padding(.horizontal, Theme.screenPadding)
+            .background(Color(white: 0.05).ignoresSafeArea())
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .topBarLeading) {
                     Button("Close", systemImage: "chevron.down") { dismiss() }
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Queue", systemImage: "list.bullet") { isShowingQueue = true }
+                        .disabled(player.queue.isEmpty)
+                }
+            }
+            .sheet(isPresented: $isShowingQueue) {
+                QueueView(model: model)
             }
         }
-        .presentationDragIndicator(.visible)
     }
 
-    private var positionBinding: Binding<Double> {
-        Binding(get: { player.position }, set: { player.seek(to: $0) })
+    private var titleBlock: some View {
+        VStack(spacing: 4) {
+            Text(player.currentTrack?.title ?? "Nothing playing")
+                .font(.title2.weight(.semibold))
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+            Text(player.currentTrack?.displayArtist ?? "")
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            if let album = player.currentTrack?.album, !album.isEmpty {
+                Text(album)
+                    .font(.footnote)
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+            }
+            if let track = player.currentTrack {
+                Button {
+                    model.toggleFavorite(track)
+                } label: {
+                    Image(systemName: model.isFavorite(track) ? "heart.fill" : "heart")
+                        .font(.title3)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(model.isFavorite(track) ? "Remove from favorites" : "Add to favorites")
+            }
+        }
+    }
+
+    private func errorBlock(_ message: String) -> some View {
+        VStack(spacing: 8) {
+            Text(message)
+                .font(.footnote)
+                .foregroundStyle(.red)
+                .multilineTextAlignment(.center)
+                .accessibilityLabel("Playback error: \(message)")
+            Button("Retry") {
+                Task { await player.retry() }
+            }
+            .glassControlStyle()
+        }
+    }
+
+    private var seekBlock: some View {
+        VStack(spacing: 4) {
+            Slider(value: positionBinding, in: 0...max(player.duration, 1))
+                .accessibilityLabel("Playback position")
+                .accessibilityValue(
+                    "\(formatDuration(player.position)) of \(formatDuration(player.duration))"
+                )
+            HStack {
+                Text(formatDuration(player.position))
+                Spacer()
+                Text(formatDuration(player.duration))
+            }
+            .font(.caption.monospacedDigit())
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private var transportBlock: some View {
+        HStack(spacing: 36) {
+            Button {
+                Task { await player.previous() }
+            } label: {
+                Image(systemName: "backward.fill")
+                    .font(.title2)
+                    .frame(width: 56, height: 56)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Previous track")
+
+            playPauseButton
+
+            Button {
+                Task { await player.next() }
+            } label: {
+                Image(systemName: "forward.fill")
+                    .font(.title2)
+                    .frame(width: 56, height: 56)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Next track")
+        }
     }
 
     @ViewBuilder
@@ -104,17 +146,24 @@ struct PlayerView: View {
         if player.state == .loading {
             ProgressView()
                 .controlSize(.large)
-                .frame(width: 64, height: 64)
+                .frame(width: 72, height: 72)
                 .accessibilityLabel("Loading")
         } else {
             Button {
                 Task { await player.togglePlayPause() }
             } label: {
-                Image(systemName: player.isPlaying ? "pause.circle.fill" : "play.circle.fill")
-                    .font(.system(size: 64))
+                Image(systemName: player.isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: 28, weight: .semibold))
+                    .frame(width: 72, height: 72)
+                    .contentShape(Rectangle())
             }
+            .glassControlStyle()
             .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
         }
+    }
+
+    private var positionBinding: Binding<Double> {
+        Binding(get: { player.position }, set: { player.seek(to: $0) })
     }
 }
 #endif

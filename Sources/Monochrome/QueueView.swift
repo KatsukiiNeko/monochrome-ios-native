@@ -4,8 +4,11 @@ import MonochromeCore
 import SwiftUI
 
 struct QueueView: View {
-    let player: PlayerController
+    let model: AppModel
+
     @Environment(\.dismiss) private var dismiss
+
+    private var player: PlayerController { model.player }
 
     var body: some View {
         NavigationStack {
@@ -22,7 +25,11 @@ struct QueueView: View {
                             Button {
                                 Task { await player.jump(to: index) }
                             } label: {
-                                row(track, isCurrent: index == player.queue.currentIndex)
+                                TrackRow(
+                                    track: track,
+                                    localArtworkURL: model.artworkURL(for: track),
+                                    isCurrent: index == player.queue.currentIndex
+                                )
                             }
                             .buttonStyle(.plain)
                             .swipeActions {
@@ -36,6 +43,7 @@ struct QueueView: View {
                             player.moveQueue(from: source, to: destination)
                         }
                     }
+                    .listStyle(.plain)
                 }
             }
             .navigationTitle("Queue")
@@ -48,27 +56,6 @@ struct QueueView: View {
                 }
             }
         }
-    }
-
-    private func row(_ track: Track, isCurrent: Bool) -> some View {
-        HStack(spacing: 12) {
-            if isCurrent {
-                Image(systemName: "speaker.wave.2.fill")
-                    .foregroundStyle(.secondary)
-                    .accessibilityHidden(true)
-            }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(track.title)
-                    .font(.body)
-                Text(track.displayArtist)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-        }
-        .contentShape(Rectangle())
-        .accessibilityElement(children: .combine)
-        .accessibilityHint("Plays this queued track")
     }
 }
 #endif
