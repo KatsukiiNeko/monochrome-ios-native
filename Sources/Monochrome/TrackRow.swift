@@ -17,9 +17,19 @@ struct TrackRow: View {
                 .frame(width: 48, height: 48)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(track.title)
-                    .font(.subheadline.weight(isCurrent ? .semibold : .regular))
-                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(track.title)
+                        .font(.subheadline.weight(isCurrent ? .semibold : .regular))
+                        .lineLimit(1)
+                    // Only tracks whose catalog tier is known get a badge.
+                    if let badge = AudioBadge.text(quality: track.audioQuality) {
+                        QualityBadgeLabel(
+                            text: badge,
+                            spokenText: AudioBadge.accessibilityLabel(quality: track.audioQuality)
+                        )
+                        .layoutPriority(1)
+                    }
+                }
                 Text(track.displayArtist)
                     .font(.caption)
                     .foregroundStyle(.secondary)

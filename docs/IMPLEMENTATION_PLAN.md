@@ -34,7 +34,7 @@ JSON, unavailable track, expiry); one live `L3` check recorded; build green.
 
 Take the largest original icon/logo from the archive branch, store it untouched
 under `Branding/` with `SOURCE.md`, derive only what the platform requires, and
-wire `iconPath` in `the local xtool manifest` after checking xtool's own documentation. If the
+wire `iconPath` in the local xtool manifest after checking xtool's own documentation. If the
 toolchain rejects it, keep the asset and document the blocker.
 
 ## R5 — UI foundation

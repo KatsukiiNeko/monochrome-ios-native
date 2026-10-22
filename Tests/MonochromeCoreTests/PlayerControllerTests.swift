@@ -7,14 +7,16 @@ import Testing
 private final class FakeEngine: PlaybackEngine {
     var onEvent: ((PlaybackEvent) -> Void)?
     private(set) var loadedURLs: [URL] = []
+    private(set) var contentTypes: [String?] = []
     private(set) var playCount = 0
     private(set) var pauseCount = 0
     private(set) var seeks: [Double] = []
     private(set) var stopCount = 0
     var loadError: (any Error)?
 
-    func load(url: URL) async throws {
+    func load(url: URL, contentType: String?) async throws {
         loadedURLs.append(url)
+        contentTypes.append(contentType)
         if let loadError { throw loadError }
     }
 
@@ -50,6 +52,29 @@ private actor FakeResolver: TrackURLResolver {
     func requests() -> [String] { requestedIDs }
 }
 
+/// Serves a canned hit and records what the controller asks to cache.
+private actor FakeCache: AudioCaching {
+    private var hit: CachedAudio?
+    private(set) var storedIDs: [String] = []
+    private(set) var storedURLs: [URL] = []
+
+    func setHit(_ audio: CachedAudio?) { hit = audio }
+
+    func cachedAudio(for track: Track, quality: AudioQuality?) async -> CachedAudio? { hit }
+
+    func store(
+        _ track: Track,
+        quality: AudioQuality?,
+        url: URL,
+        contentType: String?,
+        format: AudioFormat?,
+        duration: Double?
+    ) async {
+        storedIDs.append(track.id)
+        storedURLs.append(url)
+    }
+}
+
 private func track(_ id: String, duration: Double? = nil) -> Track {
     Track(id: id, title: "Track \(id)", durationSeconds: duration, fileName: "\(id).m4a")
 }
@@ -75,6 +100,7 @@ struct PlayerControllerTests {
         #expect(controller.state == .playing)
         #expect(controller.currentTrack?.id == "b")
         #expect(engine.loadedURLs.map(\.lastPathComponent) == ["b.m4a"])
+        #expect(engine.contentTypes == [nil])
         #expect(engine.playCount == 1)
     }
 
@@ -200,7 +226,7 @@ struct PlayerControllerTests {
         await controller.play(tracks: [track("a")], startingAt: 0)
         #expect(controller.duration == 0)
 
-        await controller.handle(.ready(duration: 42))
+        await controller.handle(.ready(duration: 42, format: nil))
 
         #expect(controller.duration == 42)
     }
@@ -310,5 +336,147 @@ struct PlayerControllerTests {
         await controller.next()
 
         #expect(started == ["a", "b"])
+    }
+
+    // MARK: - Repeat modes
+
+    @Test func repeatOneRestartsALocalTrackWithoutReloading() async {
+        let (controller, engine) = makeController()
+        await controller.play(tracks: [track("a")], startingAt: 0)
+        controller.setRepeatMode(.one)
+
+        await controller.handle(.finished)
+
+        #expect(controller.state == .playing)
+        #expect(controller.position == 0)
+        #expect(engine.seeks == [0])
+        #expect(engine.loadedURLs.count == 1)
+    }
+
+    @Test func repeatOneResolvesAStreamAgain() async {
+        let engine = FakeEngine()
+        let resolver = FakeResolver()
+        let controller = PlayerController(engine: engine, resolver: resolver)
+        await controller.play(tracks: [streamTrack("42")], startingAt: 0)
+        controller.setRepeatMode(.one)
+
+        await controller.handle(.finished)
+
+        #expect(controller.state == .playing)
+        #expect(engine.loadedURLs.count == 2)
+        let requests = await resolver.requests()
+        #expect(requests.count == 2)
+    }
+
+    @Test func repeatAllWrapsToTheFirstTrack() async {
+        let (controller, engine) = makeController()
+        await controller.play(tracks: [track("a"), track("b")], startingAt: 1)
+        controller.setRepeatMode(.all)
+
+        await controller.handle(.finished)
+
+        #expect(controller.currentTrack?.id == "a")
+        #expect(engine.loadedURLs.last?.lastPathComponent == "a.m4a")
+    }
+
+    @Test func repeatOffStillAdvances() async {
+        let (controller, _) = makeController()
+        await controller.play(tracks: [track("a"), track("b")], startingAt: 0)
+
+        await controller.handle(.finished)
+
+        #expect(controller.currentTrack?.id == "b")
+    }
+
+    @Test func cycleRepeatModeRunsOffAllOne() {
+        let (controller, _) = makeController()
+        #expect(controller.repeatMode == .off)
+        controller.cycleRepeatMode()
+        #expect(controller.repeatMode == .all)
+        controller.cycleRepeatMode()
+        #expect(controller.repeatMode == .one)
+        controller.cycleRepeatMode()
+        #expect(controller.repeatMode == .off)
+    }
+
+    // MARK: - Audio cache
+
+    @Test func cacheHitPlaysTheLocalFileWithoutResolving() async {
+        let engine = FakeEngine()
+        let resolver = FakeResolver()
+        let cache = FakeCache()
+        let local = URL(fileURLWithPath: "/cache/42.flac")
+        await cache.setHit(
+            CachedAudio(
+                url: local,
+                format: AudioFormat(codec: "flac", bitDepth: 16, sampleRateHz: 44_100),
+                duration: 210,
+                byteSize: 1_024
+            )
+        )
+        let controller = PlayerController(engine: engine, resolver: resolver, cache: cache)
+
+        await controller.play(tracks: [streamTrack("42")], startingAt: 0)
+
+        #expect(controller.state == .playing)
+        #expect(controller.isCurrentFromCache)
+        #expect(engine.loadedURLs == [local])
+        #expect(engine.contentTypes.count == 1)
+        #expect(engine.contentTypes[0] == nil)
+        #expect(await resolver.requests().isEmpty)
+        #expect(controller.format == AudioFormat(codec: "flac", bitDepth: 16, sampleRateHz: 44_100))
+        #expect(controller.duration == 210)
+    }
+
+    @Test func missStartsABackgroundStoreAfterTheItemIsReady() async {
+        let engine = FakeEngine()
+        let resolver = FakeResolver()
+        let cache = FakeCache()
+        let controller = PlayerController(engine: engine, resolver: resolver, cache: cache)
+
+        await controller.play(tracks: [streamTrack("42")], startingAt: 0)
+        await controller.handle(.ready(duration: 100, format: AudioFormat(codec: "flac")))
+        try? await Task.sleep(for: .milliseconds(20))
+
+        #expect(await cache.storedIDs == [Track.remoteIDPrefix + "42"])
+        #expect(controller.isCurrentFromCache == false)
+    }
+
+    @Test func repeatOneReplaysTheCachedFileInPlace() async {
+        let engine = FakeEngine()
+        let resolver = FakeResolver()
+        let cache = FakeCache()
+        let local = URL(fileURLWithPath: "/cache/42.flac")
+        await cache.setHit(CachedAudio(url: local, duration: 200, byteSize: 1_024))
+        let controller = PlayerController(engine: engine, resolver: resolver, cache: cache)
+        await controller.play(tracks: [streamTrack("42")], startingAt: 0)
+        controller.setRepeatMode(.one)
+
+        var lines: [String] = []
+        controller.log = { lines.append($0) }
+
+        await controller.handle(.finished)
+
+        #expect(controller.state == .playing)
+        #expect(engine.seeks == [0])
+        #expect(engine.loadedURLs.count == 1)
+        #expect(await resolver.requests().isEmpty)
+        #expect(lines.contains("loop source=cache"))
+    }
+
+    @Test func switchingTracksClearsTheCacheSourceFlag() async {
+        let engine = FakeEngine()
+        let resolver = FakeResolver()
+        let cache = FakeCache()
+        await cache.setHit(CachedAudio(url: URL(fileURLWithPath: "/cache/1.flac"), byteSize: 10))
+        let controller = PlayerController(engine: engine, resolver: resolver, cache: cache)
+        await controller.play(tracks: [streamTrack("1"), streamTrack("2")], startingAt: 0)
+        #expect(controller.isCurrentFromCache)
+
+        await cache.setHit(nil)
+        await controller.next()
+
+        #expect(controller.currentTrack?.id == Track.remoteIDPrefix + "2")
+        #expect(controller.isCurrentFromCache == false)
     }
 }

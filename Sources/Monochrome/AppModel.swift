@@ -14,14 +14,18 @@ final class AppModel {
     private(set) var isImporting = false
 
     let player: PlayerController
+    let cache: AudioCache
     private(set) var streamingHost: String
     private(set) var isStreamingConfigured: Bool
+    private(set) var cacheSizeBytes = 0
+    var allowsCellularCaching: Bool { cacheSettings.allowsCellular }
 
     private let service: LocalFileService
     private let favoritesStore: FavoritesStore
     private let historyStore: HistoryStore
     private let resolver: DefaultTrackResolver
     private let streamingSettings: StreamingSettings
+    private let cacheSettings: AudioCacheSettings
     private var streamingClient: TracksAPIClient?
     private let mediaDirectory: URL
     private let audioSession: AudioSessionController
@@ -38,10 +42,31 @@ final class AppModel {
             metadataReader: AVAssetMetadataReader()
         )
         let resolver = DefaultTrackResolver(localDirectory: media)
-        let player = PlayerController(engine: AVPlayerEngine(), resolver: resolver)
+        let cacheSettings = AudioCacheSettings()
+        let cacheDirectory = FileManager.default
+            .urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("AudioCache", isDirectory: true)
+        var excluded = cacheDirectory
+        var resourceValues = URLResourceValues()
+        resourceValues.isExcludedFromBackup = true
+        try? excluded.setResourceValues(resourceValues)
+        let cache = AudioCache(
+            directory: cacheDirectory,
+            downloader: URLSessionFileDownloader(allowsCellular: {
+                UserDefaults.standard.bool(forKey: AudioCacheSettings.storageKey)
+            }),
+            allowsExpensiveNetwork: {
+                UserDefaults.standard.bool(forKey: AudioCacheSettings.storageKey)
+            },
+            log: { message in playerLog.notice("\(message, privacy: .public)") }
+        )
+        let player = PlayerController(engine: AVPlayerEngine(), resolver: resolver, cache: cache)
+        player.log = { message in playerLog.notice("\(message, privacy: .public)") }
         let settings = StreamingSettings()
         self.service = service
         self.player = player
+        self.cache = cache
+        self.cacheSettings = cacheSettings
         self.resolver = resolver
         self.streamingSettings = settings
         self.streamingHost = settings.rawValue
@@ -189,6 +214,21 @@ final class AppModel {
         } catch {
             errorMessage = "The track could not be deleted: \(error.localizedDescription)"
         }
+    }
+
+    // MARK: - Cache
+
+    func refreshCacheSize() async {
+        cacheSizeBytes = await cache.sizeBytes()
+    }
+
+    func clearCache() async {
+        await cache.clear()
+        await refreshCacheSize()
+    }
+
+    func setAllowsCellularCaching(_ allowed: Bool) {
+        cacheSettings.setAllowsCellular(allowed)
     }
 
     func clearError() {

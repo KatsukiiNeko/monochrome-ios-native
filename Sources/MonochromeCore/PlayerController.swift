@@ -9,21 +9,46 @@ public final class PlayerController {
     public private(set) var queue = Queue()
     public private(set) var position: Double = 0
     public private(set) var duration: Double = 0
+    /// Parsed format of the current stream; nil until the item is ready.
+    public private(set) var format: AudioFormat?
+    /// Repeat control; `one` restarts the current track at its end.
+    public private(set) var repeatMode: RepeatMode = .off
+    /// True when the engine is playing a file served from the audio cache.
+    public private(set) var isCurrentFromCache = false
 
     /// Called once per successful start; the app uses it to record history.
     public var onTrackStarted: ((Track) -> Void)?
+    /// Technical log sink; the app forwards these to os.Logger.
+    public var log: ((String) -> Void)?
 
     private let engine: any PlaybackEngine
     private let resolver: any TrackURLResolver
+    private let cache: (any AudioCaching)?
     /// One fresh resolution per track after a failure, then the error is shown.
     private var didRetryCurrentTrack = false
+    /// True while the engine holds a file, so a restart needs no network round trip.
+    private var currentItemIsLocal = false
+    /// Stream resolved for the current item, waiting for the parsed format before caching.
+    private var pendingCache: PendingCache?
+
+    private struct PendingCache {
+        var track: Track
+        var quality: AudioQuality?
+        var url: URL
+        var contentType: String?
+    }
 
     public var currentTrack: Track? { queue.current }
     public var isPlaying: Bool { state == .playing }
 
-    public init(engine: any PlaybackEngine, resolver: any TrackURLResolver) {
+    public init(
+        engine: any PlaybackEngine,
+        resolver: any TrackURLResolver,
+        cache: (any AudioCaching)? = nil
+    ) {
         self.engine = engine
         self.resolver = resolver
+        self.cache = cache
         engine.onEvent = { [weak self] event in
             guard let self else { return }
             Task { await self.handle(event) }
@@ -59,6 +84,8 @@ public final class PlayerController {
             engine.stop()
             position = 0
             state = .idle
+            isCurrentFromCache = false
+            currentItemIsLocal = false
         }
     }
 
@@ -110,18 +137,28 @@ public final class PlayerController {
         await loadCurrent()
     }
 
+    public func setRepeatMode(_ mode: RepeatMode) {
+        repeatMode = mode
+    }
+
+    public func cycleRepeatMode() {
+        repeatMode = repeatMode.next
+    }
+
     // MARK: - Engine events
 
     func handle(_ event: PlaybackEvent) async {
         switch event {
-        case .ready(let engineDuration):
+        case .ready(let engineDuration, let engineFormat):
+            if let engineFormat { format = engineFormat }
             if let engineDuration, engineDuration > 0 {
                 duration = engineDuration
             }
+            startCacheStoreIfReady(format: engineFormat, duration: engineDuration ?? duration)
         case .position(let seconds):
             position = seconds
         case .finished:
-            await next()
+            await handleEndOfTrack()
         case .failed(let message):
             // A stream can expire mid-playback; resolve once more before giving up.
             if queue.current?.isStreaming == true, !didRetryCurrentTrack {
@@ -135,29 +172,113 @@ public final class PlayerController {
 
     // MARK: - Internals
 
-    private func loadCurrent(retrying: Bool = false) async {
+    private func startCacheStoreIfReady(format: AudioFormat?, duration: Double) {
+        guard let cache, let pending = pendingCache else { return }
+        pendingCache = nil
+        Task(priority: .utility) {
+            await cache.store(
+                pending.track,
+                quality: pending.quality,
+                url: pending.url,
+                contentType: pending.contentType,
+                format: format,
+                duration: duration
+            )
+        }
+    }
+
+    private func handleEndOfTrack() async {
+        let hasNext = queue.currentIndex.map { $0 + 1 < queue.tracks.count } ?? false
+        let action = EndOfTrackDecision.action(
+            repeatMode: repeatMode,
+            hasNext: hasNext,
+            hasTracks: !queue.isEmpty,
+            itemIsLocal: currentItemIsLocal
+        )
+        switch action {
+        case .advance:
+            await next()
+        case .wrap:
+            guard queue.jump(to: 0) != nil else { return }
+            await loadCurrent()
+        case .replayInPlace:
+            log?(isCurrentFromCache ? "loop source=cache" : "loop source=local-file")
+            engine.seek(to: 0)
+            position = 0
+            engine.play()
+            state = .playing
+        case .reload:
+            await loadCurrent(forLoop: true)
+        case .stop:
+            engine.stop()
+            position = 0
+            state = .idle
+            isCurrentFromCache = false
+            currentItemIsLocal = false
+        }
+    }
+
+    private func loadCurrent(retrying: Bool = false, forLoop: Bool = false) async {
         guard let track = queue.current else {
             engine.stop()
             state = .idle
             position = 0
             duration = 0
+            currentItemIsLocal = false
+            isCurrentFromCache = false
+            pendingCache = nil
             return
         }
         if !retrying { didRetryCurrentTrack = false }
 
         state = .loading
+        format = nil
         position = 0
         duration = track.durationSeconds ?? 0
+        isCurrentFromCache = false
+        pendingCache = nil
+
+        if track.isStreaming, let cache,
+           let cached = await cache.cachedAudio(for: track, quality: track.audioQuality) {
+            do {
+                try await engine.load(url: cached.url, contentType: nil)
+                engine.play()
+                state = .playing
+                format = cached.format
+                if let cachedDuration = cached.duration, cachedDuration > 0 {
+                    duration = cachedDuration
+                }
+                currentItemIsLocal = true
+                isCurrentFromCache = true
+                if forLoop { log?("loop source=cache") }
+                onTrackStarted?(track)
+                return
+            } catch {
+                // A damaged cache entry must not stop playback; resolve the stream instead.
+                log?("cache hit unusable track=\(track.id)")
+            }
+        }
+        if forLoop { log?("loop source=network reason=cache-miss") }
+
         do {
             let url = try await resolver.url(for: track)
-            try await engine.load(url: url)
+            let contentType = await resolver.contentType(for: track)
+            pendingCache = PendingCache(
+                track: track,
+                quality: track.audioQuality,
+                url: url,
+                contentType: contentType
+            )
+            try await engine.load(url: url, contentType: contentType)
             engine.play()
             state = .playing
+            currentItemIsLocal = !track.isStreaming
             onTrackStarted?(track)
         } catch {
+            pendingCache = nil
             if !retrying, track.isStreaming, !didRetryCurrentTrack {
                 didRetryCurrentTrack = true
-                await loadCurrent(retrying: true)
+                await loadCurrent(retrying: true, forLoop: forLoop)
             } else {
                 state = .failed(error.localizedDescription)
             }

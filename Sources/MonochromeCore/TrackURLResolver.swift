@@ -3,6 +3,12 @@ import Foundation
 
 public protocol TrackURLResolver: Sendable {
     func url(for track: Track) async throws -> URL
+    /// Out-of-band MIME type for the resolved source, when it is known.
+    func contentType(for track: Track) async -> String?
+}
+
+extension TrackURLResolver {
+    public func contentType(for track: Track) async -> String? { nil }
 }
 
 public enum TrackResolutionError: LocalizedError, Equatable {
@@ -33,6 +39,15 @@ public actor DefaultTrackResolver: TrackURLResolver {
     /// `nil` means streaming is switched off; local playback keeps working.
     public func useStreamingClient(_ client: TracksAPIClient?) {
         self.client = client
+    }
+
+    /// The catalog serves the lossless tier as native FLAC bytes; the host labels
+    /// them `application/octet-stream` and the URL has no extension, so the type
+    /// has to travel beside the URL.
+    public static let streamContentType = "audio/flac"
+
+    public func contentType(for track: Track) async -> String? {
+        track.isStreaming ? Self.streamContentType : nil
     }
 
     public func url(for track: Track) async throws -> URL {

@@ -29,7 +29,7 @@ checking with the upstream project.
 
 ## Packaging status
 
-`the local xtool manifest` uses `iconPath: Branding/appicon.png`. The schema
+The local xtool manifest uses `iconPath: Branding/appicon.png`. The schema
 (`Sources/PackLib/PackSchema.swift` in xtool 1.22.2's source) accepts
 `iconPath` and requires a `.png` extension, which matches. Packing an `.app`
 needs `xtool dev`, which also installs to a device and is forbidden here, so

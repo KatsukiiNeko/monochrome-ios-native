@@ -19,3 +19,15 @@ xcuserdata/
 
 # macOS
 .DS_Store
+
+# secrets and signing material — never committed
+.env*
+.netrc
+*.p8
+*.p12
+*.pem
+*.key
+*.cer
+*.crt
+*.mobileprovision
+*.provisionprofile

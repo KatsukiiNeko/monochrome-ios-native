@@ -86,14 +86,13 @@ with the FLAC magic bytes.
 
 There is no `xtool build`; the only xtool command that packages an app is
 `xtool dev`, which also installs it, so this repository never runs it. The
-bundle id in `the local xtool manifest` (`com.neko-ngtran.monochrome`) is a personal identifier
-for local device runs; change it before any distribution.
+bundle id in the local xtool project manifest (`com.neko-ngtran.monochrome`) is
+a personal identifier for local device runs; change it before any distribution.
 
 ## Repository layout
 
 ```
 Package.swift              two targets, Swift 6
-the local xtool manifest                  bundle id, Info.plist, icon and logo resources
 Resources/Info.plist       display name, background audio mode
 Branding/                  the web app's icon and logo, unchanged (see SOURCE.md)
 scripts/build.sh           the iOS compile check
@@ -159,7 +158,7 @@ docs/                      audits, toolchain, plan, migration, progress
    small phone.
 5. Background audio, Lock Screen metadata and remote commands after the
    navigation rewrite.
-6. That the Home logo resource (`resources` in `the local xtool manifest`) is packaged, and that
+6. That the Home logo resource (declared in the local xtool manifest) is packaged, and that
    the icon appears on the Home Screen.
 7. Remote artwork over a slow connection (placeholder, then fade).
 8. That shuffling/next/previous keep working while browsing tabs.

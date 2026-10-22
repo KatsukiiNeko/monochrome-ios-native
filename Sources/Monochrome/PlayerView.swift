@@ -32,6 +32,7 @@ struct PlayerView: View {
 
                 seekBlock
                 transportBlock
+                repeatControl
 
                 Spacer(minLength: 0)
             }
@@ -58,6 +59,27 @@ struct PlayerView: View {
                 .font(.title2.weight(.semibold))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
+            // The parsed stream format wins over the tier the catalog declares.
+            HStack(spacing: 6) {
+                if let badge = AudioBadge.text(format: player.format, quality: player.currentTrack?.audioQuality) {
+                    QualityBadgeLabel(
+                        text: badge,
+                        spokenText: AudioBadge.accessibilityLabel(
+                            format: player.format,
+                            quality: player.currentTrack?.audioQuality
+                        )
+                    )
+                }
+                if player.isCurrentFromCache {
+                    Text("Cached")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+                        .accessibilityLabel("Playing from the local cache")
+                }
+            }
             Text(player.currentTrack?.displayArtist ?? "")
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -160,6 +182,21 @@ struct PlayerView: View {
             .glassControlStyle()
             .accessibilityLabel(player.isPlaying ? "Pause" : "Play")
         }
+    }
+
+    private var repeatControl: some View {
+        Button {
+            player.cycleRepeatMode()
+        } label: {
+            Label(player.repeatMode.label, systemImage: player.repeatMode.symbolName)
+                .labelStyle(.iconOnly)
+                .font(.subheadline)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(player.repeatMode == .off ? Color.secondary : Color.primary)
+        .accessibilityLabel(player.repeatMode.label)
     }
 
     private var positionBinding: Binding<Double> {
