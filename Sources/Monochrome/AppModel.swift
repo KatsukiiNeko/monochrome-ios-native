@@ -13,9 +13,14 @@ final class AppModel {
     private(set) var isImporting = false
 
     let player: PlayerController
+    private(set) var streamingHost: String
+    private(set) var isStreamingConfigured: Bool
+
     private let service: LocalFileService
     private let favoritesStore: FavoritesStore
     private let resolver: DefaultTrackResolver
+    private let streamingSettings: StreamingSettings
+    private var streamingClient: TracksAPIClient?
     private let mediaDirectory: URL
     private let audioSession: AudioSessionController
     private let nowPlaying: NowPlayingController
@@ -32,14 +37,59 @@ final class AppModel {
         )
         let resolver = DefaultTrackResolver(localDirectory: media)
         let player = PlayerController(engine: AVPlayerEngine(), resolver: resolver)
+        let settings = StreamingSettings()
         self.service = service
         self.player = player
         self.resolver = resolver
+        self.streamingSettings = settings
+        self.streamingHost = settings.rawValue
+        self.isStreamingConfigured = settings.baseURL != nil
         self.mediaDirectory = media
         self.favoritesStore = FavoritesStore(fileURL: base.appendingPathComponent("favorites.json"))
         // System integration: audio session first, then Lock Screen metadata/commands.
         self.audioSession = AudioSessionController(player: player)
         self.nowPlaying = NowPlayingController(player: player)
+        applyStreamingSettings()
+    }
+
+    // MARK: - Streaming
+
+    /// Rebuilds the client so a changed host takes effect without restarting the app.
+    private func applyStreamingSettings() {
+        let baseURL = streamingSettings.baseURL
+        isStreamingConfigured = baseURL != nil
+        let client = baseURL.map { TracksAPIClient(baseURL: $0) }
+        streamingClient = client
+        Task { await resolver.useStreamingClient(client) }
+    }
+
+    func saveStreamingHost(_ raw: String) -> Bool {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Empty input is a deliberate "streaming off", not an invalid host.
+        if !trimmed.isEmpty, StreamingSettings.baseURL(from: trimmed) == nil {
+            return false
+        }
+        streamingSettings.setBaseURL(trimmed)
+        streamingHost = streamingSettings.rawValue
+        applyStreamingSettings()
+        return true
+    }
+
+    func resetStreamingHost() {
+        streamingSettings.reset()
+        streamingHost = streamingSettings.rawValue
+        applyStreamingSettings()
+    }
+
+    func searchTracks(_ query: String) async throws -> [Track] {
+        guard let streamingClient else { throw TracksAPIError.notConfigured }
+        return try await streamingClient.searchTracks(matching: query)
+    }
+
+    /// Plays a search result with the rest of the results as the queue.
+    func play(_ track: Track, in results: [Track]) async {
+        guard let index = results.firstIndex(where: { $0.id == track.id }) else { return }
+        await player.play(tracks: results, startingAt: index)
     }
 
     func loadTracks() async {

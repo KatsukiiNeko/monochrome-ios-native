@@ -10,6 +10,8 @@ struct ContentView: View {
     @State private var isShowingPlayer = false
     @State private var pendingDeletion: Track?
     @State private var isShowingQueue = false
+    @State private var isShowingSearch = false
+    @State private var isShowingSettings = false
     @State private var favoritesOnly = false
 
     var body: some View {
@@ -37,12 +39,13 @@ struct ContentView: View {
                     .disabled(model.player.queue.isEmpty)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Menu(
-                        "Filter",
-                        systemImage: favoritesOnly
-                            ? "line.3.horizontal.decrease.circle.fill"
-                            : "line.3.horizontal.decrease.circle"
-                    ) {
+                    Menu("More", systemImage: "ellipsis.circle") {
+                        Button("Search online", systemImage: "magnifyingglass") {
+                            isShowingSearch = true
+                        }
+                        Button("Settings", systemImage: "gearshape") {
+                            isShowingSettings = true
+                        }
                         Toggle("Favorites only", isOn: $favoritesOnly)
                     }
                 }
@@ -57,6 +60,16 @@ struct ContentView: View {
             }
             .sheet(isPresented: $isShowingQueue) {
                 QueueView(player: model.player)
+            }
+            .sheet(isPresented: $isShowingSearch) {
+                NavigationStack {
+                    SearchView(model: model)
+                }
+            }
+            .sheet(isPresented: $isShowingSettings) {
+                NavigationStack {
+                    SettingsView(model: model)
+                }
             }
             .fileImporter(
                 isPresented: $isShowingImporter,
