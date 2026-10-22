@@ -2,10 +2,10 @@
 
 ## Status
 
-R7 complete: streaming (search, resolve, play, retry), the web app's icon and
+R8 complete: streaming (search, resolve, play, retry), the web app's icon and
 logo, and the new UI (Home / Search / Library tabs, persistent mini player, Now
-Playing, queue, album and artist sheets) are implemented and committed on
-`feat/online-streaming-and-ui`. Next: R8 regression pass, then R9 integration.
+Playing, queue, album and artist sheets) are implemented, and the full
+regression pass is green. Next: R9 integration.
 
 ## Milestones
 
@@ -19,7 +19,7 @@ Playing, queue, album and artist sheets) are implemented and committed on
 | R5 | UI foundation (glass + tabs) | done | L1 |
 | R6 | mini-player, Now Playing, queue | done | L1 |
 | R7 | Search, Home, Library | done | L1 + L3 live catalog requests |
-| R8 | regression pass | in progress | L1 + L2 rerun |
+| R8 | regression pass | done | L1 + L2 + L3 rerun, all green |
 | R9 | integrate and push `main` | todo | remote ref verified |
 | R10 | handoff | todo | report |
 
@@ -104,3 +104,6 @@ Playing, queue, album and artist sheets) are implemented and committed on
 | `swift test` after favorites/history and the UI | 73 tests in 10 suites, green (L2) |
 | `scripts/build.sh` after the tab shell, Now Playing and search | `Build complete!` (L1) |
 | `file`/`sha256sum` on `Branding/*` | 1024×1024 opaque PNG + SVG sources, hashes recorded in `Branding/SOURCE.md` |
+| `touch Sources/**/*.swift && scripts/build.sh` (R8, forced recompile) | 39 compile steps, `Build complete!` (L1) |
+| `swift test` (R8) | 73 tests in 10 suites, green (L2); baseline was 44 |
+| `MONOCHROME_LIVE=1 swift test --filter LiveTracksAPITests` (R8) | passed in 2.1 s (L3) |
