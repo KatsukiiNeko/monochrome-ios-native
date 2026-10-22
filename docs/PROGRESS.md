@@ -171,4 +171,11 @@ not start playing, and no audio-format badge is shown. Verification so far is
 | # | commit | change | outcome |
 |---|---|---|---|
 | 1 | `707cc9a` | player/audio-session diagnostics | installed; not launched, no app logs |
-| 2 | pending | stream format + item readiness | pending |
+| 2 | `1b008d5` | stream format, item readiness, format badge | installed; not launched, no app logs |
+
+`xtool dev run` builds, provisions, signs, installs and verifies the app, then
+exits without launching it. `idevicesyslog -m monochrome` during the run shows
+installation lines only: no app process, no scene launch, no crash. Device-level
+playback therefore stays unverified (L4 not reached) until the app is opened on
+the phone by hand; `docs/DEVICE_TEST_CHECKLIST.md` covers what to check and how
+to capture the player log.
