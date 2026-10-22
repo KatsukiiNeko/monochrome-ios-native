@@ -203,7 +203,7 @@ struct PlayerControllerTests {
         await controller.play(tracks: [track("a")], startingAt: 0)
         #expect(controller.duration == 0)
 
-        await controller.handle(.ready(duration: 42))
+        await controller.handle(.ready(duration: 42, format: nil))
 
         #expect(controller.duration == 42)
     }

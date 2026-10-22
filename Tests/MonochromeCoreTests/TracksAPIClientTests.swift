@@ -74,6 +74,8 @@ struct TracksAPIClientTests {
         #expect(first.artist == "Daft Punk, Julian Casablancas")
         #expect(first.provider == "monochrome")
         #expect(first.isStreaming)
+        // The endpoint serves one quality tier and the payload states none.
+        #expect(first.audioQuality == .lossless)
         #expect(first.fileName.isEmpty)
         // Milliseconds in the payload, seconds in the model.
         #expect(first.durationSeconds == 337.56)

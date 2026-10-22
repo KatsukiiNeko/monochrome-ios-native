@@ -284,7 +284,10 @@ private struct TrackDTO: Decodable {
             durationSeconds: duration.map { $0 / 1000 },
             provider: "monochrome",
             streamID: trackID,
-            artworkURL: TracksAPIClient.httpsURL(artwork)
+            artworkURL: TracksAPIClient.httpsURL(artwork),
+            // This endpoint serves the lossless tier for every track; the response
+            // carries no quality field, so the tier is a property of the client.
+            audioQuality: .lossless
         )
     }
 }

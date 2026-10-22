@@ -58,6 +58,16 @@ struct PlayerView: View {
                 .font(.title2.weight(.semibold))
                 .multilineTextAlignment(.center)
                 .lineLimit(2)
+            // The parsed stream format wins over the tier the catalog declares.
+            if let badge = AudioBadge.text(format: player.format, quality: player.currentTrack?.audioQuality) {
+                QualityBadgeLabel(
+                    text: badge,
+                    spokenText: AudioBadge.accessibilityLabel(
+                        format: player.format,
+                        quality: player.currentTrack?.audioQuality
+                    )
+                )
+            }
             Text(player.currentTrack?.displayArtist ?? "")
                 .foregroundStyle(.secondary)
                 .lineLimit(1)

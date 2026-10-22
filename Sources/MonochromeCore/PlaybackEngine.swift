@@ -2,7 +2,8 @@
 import Foundation
 
 public enum PlaybackEvent: Equatable, Sendable {
-    case ready(duration: Double?)
+    /// Emitted once the item is ready; `format` is what the decoder parsed.
+    case ready(duration: Double?, format: AudioFormat?)
     case position(Double)
     case finished
     case failed(String)

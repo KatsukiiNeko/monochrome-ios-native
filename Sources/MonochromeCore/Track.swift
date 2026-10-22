@@ -23,6 +23,8 @@ public struct Track: Codable, Equatable, Identifiable, Sendable {
     public var streamID: String?
     /// Remote artwork, used when `artworkFileName` is absent.
     public var artworkURL: URL?
+    /// Quality tier the catalog states for this track, when it states one.
+    public var audioQuality: AudioQuality?
 
     public init(
         id: String = UUID().uuidString,
@@ -35,7 +37,8 @@ public struct Track: Codable, Equatable, Identifiable, Sendable {
         artworkFileName: String? = nil,
         provider: String = Track.localProvider,
         streamID: String? = nil,
-        artworkURL: URL? = nil
+        artworkURL: URL? = nil,
+        audioQuality: AudioQuality? = nil
     ) {
         self.id = id
         self.title = title
@@ -48,11 +51,12 @@ public struct Track: Codable, Equatable, Identifiable, Sendable {
         self.provider = provider
         self.streamID = streamID
         self.artworkURL = artworkURL
+        self.audioQuality = audioQuality
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, title, artist, album, durationSeconds, fileName, importedAt, artworkFileName
-        case provider, streamID, artworkURL
+        case provider, streamID, artworkURL, audioQuality
     }
 
     // Tolerant decoding: a hand-edited or older library.json must not fail the app.
@@ -69,6 +73,7 @@ public struct Track: Codable, Equatable, Identifiable, Sendable {
         provider = try container.decodeIfPresent(String.self, forKey: .provider) ?? Self.localProvider
         streamID = try container.decodeIfPresent(String.self, forKey: .streamID)
         artworkURL = (try? container.decodeIfPresent(URL.self, forKey: .artworkURL)) ?? nil
+        audioQuality = (try? container.decodeIfPresent(AudioQuality.self, forKey: .audioQuality)) ?? nil
     }
 }
 

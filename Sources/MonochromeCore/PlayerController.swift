@@ -9,6 +9,8 @@ public final class PlayerController {
     public private(set) var queue = Queue()
     public private(set) var position: Double = 0
     public private(set) var duration: Double = 0
+    /// Parsed format of the current stream; nil until the item is ready.
+    public private(set) var format: AudioFormat?
 
     /// Called once per successful start; the app uses it to record history.
     public var onTrackStarted: ((Track) -> Void)?
@@ -114,7 +116,8 @@ public final class PlayerController {
 
     func handle(_ event: PlaybackEvent) async {
         switch event {
-        case .ready(let engineDuration):
+        case .ready(let engineDuration, let engineFormat):
+            format = engineFormat
             if let engineDuration, engineDuration > 0 {
                 duration = engineDuration
             }
@@ -146,6 +149,7 @@ public final class PlayerController {
         if !retrying { didRetryCurrentTrack = false }
 
         state = .loading
+        format = nil
         position = 0
         duration = track.durationSeconds ?? 0
         do {

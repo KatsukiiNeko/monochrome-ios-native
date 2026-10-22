@@ -97,8 +97,11 @@ final class AVPlayerEngine: PlaybackEngine {
             switch item.status {
             case .readyToPlay:
                 let duration = item.duration.isNumeric ? item.duration.seconds : nil
-                playerLog.notice("item ready seconds=\(duration ?? -1)")
-                onEvent?(.ready(duration: duration))
+                let format = await audioFormat(of: asset)
+                playerLog.notice(
+                    "item ready seconds=\(duration ?? -1) codec=\(format?.codec ?? "none", privacy: .public) depth=\(format?.bitDepth ?? 0) rate=\(format?.sampleRateHz ?? 0)"
+                )
+                onEvent?(.ready(duration: duration, format: format))
                 return
             case .failed:
                 let error = item.error ?? EngineError.unreadable
@@ -137,6 +140,25 @@ final class AVPlayerEngine: PlaybackEngine {
         playerLog.notice("stopped")
     }
 
+    /// The codec and sample format AVFoundation parsed, not what the URL claimed.
+    private func audioFormat(of asset: AVURLAsset) async -> AudioFormat? {
+        guard let track = try? await asset.loadTracks(withMediaType: .audio).first,
+              let descriptions = try? await track.load(.formatDescriptions),
+              let description = descriptions.first
+        else { return nil }
+        let codec = fourCharacterCode(CMFormatDescriptionGetMediaSubType(description))
+        guard let stream = CMAudioFormatDescriptionGetStreamBasicDescription(description)?.pointee else {
+            return AudioFormat(codec: codec)
+        }
+        let depth = Int(stream.mBitsPerChannel)
+        let rate = Int(stream.mSampleRate)
+        return AudioFormat(
+            codec: codec,
+            bitDepth: depth > 0 ? depth : nil,
+            sampleRateHz: rate > 0 ? rate : nil
+        )
+    }
+
     private func stopObservingItem() {
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         if let failureObserver { NotificationCenter.default.removeObserver(failureObserver) }
@@ -162,6 +184,12 @@ private func describe(_ error: (any Error)?) -> String {
         text += " underlying=\(underlying.domain)/\(underlying.code) \(underlying.localizedDescription)"
     }
     return text
+}
+
+/// FourCC as text, e.g. `flac`; trimming keeps `aac ` and `.mp3` readable.
+private func fourCharacterCode(_ code: FourCharCode) -> String {
+    let bytes: [UInt8] = [24, 16, 8, 0].map { UInt8((code >> $0) & 0xFF) }
+    return String(decoding: bytes, as: UTF8.self)
 }
 
 /// `AVPlayerItemErrorLog` carries the HTTP-level reason behind a -11828.

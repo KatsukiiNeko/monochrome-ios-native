@@ -26,7 +26,7 @@ not start playing, and no audio-format badge is shown. Verification so far is
 | R11 | `dev` branch + device-testing rules | done | remote ref verified, `the contributor rules` updated |
 | R12 | player/audio-session diagnostics | done | L1 build + L2 tests green |
 | R13 | playable stream for AVPlayer | done | L1 build + L2 tests; device run pending |
-| R14 | audio-format badge | in progress | not started |
+| R14 | audio-format badge | done | L1 build + L2 tests |
 
 ## Baseline (R0, imported HEAD)
 
@@ -52,6 +52,11 @@ not start playing, and no audio-format badge is shown. Verification so far is
 - **Device testing is allowed through `xtool dev`** from this repository against
   the connected iPhone, after a green build-only check and green host tests, one
   run at a time with `timeout`. Logs are read with `idevicesyslog` only.
+- **The badge wording is the web app's.** `AudioBadge` maps a tier to the same
+  text the site renders (`js/utils.js`: LOSSLESS → FLAC, HI_RES → HD FLAC,
+  lossy → AAC) and, when the player has parsed the stream, to the real codec and
+  sample format (`FLAC 16/44.1`, `HD 24/96`). Rows show the tier the catalog
+  client declares; Now Playing prefers the parsed format. No badge without data.
 - **Diagnostics use `os.Logger`** with subsystem `com.neko-ngtran.monochrome`
   and categories `player` / `audio-session`, values logged `.public` so
   `idevicesyslog` shows URLs and error domains. Cheap enough to keep
@@ -102,6 +107,11 @@ not start playing, and no audio-format badge is shown. Verification so far is
   the exact device error could not be captured: `xtool dev` installs and signs
   the app on this host, yet does not launch it, and launching by other means is
   not permitted.
+- **Badge wording source.** The catalog response has no quality field; the
+  client declares `LOSSLESS` for this endpoint exactly as the web client does
+  (`js/tracks-api.js`, `audioQuality: 'LOSSLESS'`), and the wording table is
+  unit-tested. The codec shown on Now Playing comes from AVFoundation's parsed
+  format description, never from the URL.
 - **No device logs for the app.** The syslog capture during the install run only
   contains installation lines; there is no `Monochrome[pid]` line, no scene
   launch and no crash report, so the app was not started by the tool.
@@ -153,6 +163,8 @@ not start playing, and no audio-format badge is shown. Verification so far is
 | `timeout 900 idevicesyslog -u <udid> -m monochrome` during the install | install lines only, no app process |
 | `swift test` after the stream-format fix | 74 tests in 10 suites, green (L2) |
 | `scripts/build.sh` after the stream-format fix | `Build complete!` (L1) |
+| `swift test` after the format badge | 81 tests in 11 suites, green (L2) |
+| `scripts/build.sh` after the format badge | `Build complete!` (L1) |
 
 ## Deploy log
 
