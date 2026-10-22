@@ -89,4 +89,32 @@ struct LocalFileServiceTests {
 
         #expect(tracks.map(\.id) == [second.id, first.id])
     }
+
+    @Test func importWritesArtworkAndDeleteRemovesIt() async throws {
+        let artwork = Data([0xFF, 0xD8, 0xFF, 0xE0])
+        let fixture = try makeService(metadata: TrackMetadata(title: "With art", artworkData: artwork))
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+        let source = try makeSourceFile(in: fixture.root, name: "song.flac")
+
+        let track = try await fixture.service.importTrack(from: source, fallbackTitle: nil)
+        let artworkName = try #require(track.artworkFileName)
+        let artworkURL = fixture.service.mediaDirectory.appendingPathComponent(artworkName)
+        #expect(try Data(contentsOf: artworkURL) == artwork)
+
+        try await fixture.service.delete(track)
+
+        #expect(!FileManager.default.fileExists(atPath: artworkURL.path))
+    }
+
+    @Test func importWithoutArtworkLeavesFieldEmpty() async throws {
+        let fixture = try makeService(metadata: TrackMetadata(title: "No art"))
+        defer { try? FileManager.default.removeItem(at: fixture.root) }
+
+        let track = try await fixture.service.importTrack(
+            from: makeSourceFile(in: fixture.root, name: "song.flac"),
+            fallbackTitle: nil
+        )
+
+        #expect(track.artworkFileName == nil)
+    }
 }

@@ -13,10 +13,7 @@ struct PlayerView: View {
         NavigationStack {
             VStack(spacing: 20) {
                 Spacer(minLength: 8)
-                Image(systemName: "waveform")
-                    .font(.system(size: 96, weight: .thin))
-                    .foregroundStyle(.secondary)
-                    .accessibilityHidden(true)
+                ArtworkView(fileURL: model.artworkURL(for: player.currentTrack))
 
                 VStack(spacing: 4) {
                     Text(player.currentTrack?.title ?? "Nothing playing")

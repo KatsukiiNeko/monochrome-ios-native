@@ -29,6 +29,16 @@ public struct LocalFileService: MusicService {
 
         let metadata = await metadataReader.metadata(for: destination)
         let title = metadata?.title?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let artworkFileName: String?
+        if let artworkData = metadata?.artworkData, !artworkData.isEmpty {
+            let name = "\(id).artwork"
+            try artworkData.write(to: mediaDirectory.appendingPathComponent(name), options: .atomic)
+            artworkFileName = name
+        } else {
+            artworkFileName = nil
+        }
+
         let track = Track(
             id: id,
             title: title.flatMap { $0.isEmpty ? nil : $0 }
@@ -37,7 +47,8 @@ public struct LocalFileService: MusicService {
             artist: metadata?.artist ?? "",
             album: metadata?.album ?? "",
             durationSeconds: metadata?.durationSeconds,
-            fileName: fileName
+            fileName: fileName,
+            artworkFileName: artworkFileName
         )
 
         var tracks = try store.load()
@@ -52,5 +63,8 @@ public struct LocalFileService: MusicService {
         try store.save(tracks)
         // A missing file is already the desired state.
         try? FileManager.default.removeItem(at: mediaDirectory.appendingPathComponent(track.fileName))
+        if let artworkFileName = track.artworkFileName {
+            try? FileManager.default.removeItem(at: mediaDirectory.appendingPathComponent(artworkFileName))
+        }
     }
 }

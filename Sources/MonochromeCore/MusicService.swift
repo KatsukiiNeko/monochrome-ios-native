@@ -6,12 +6,20 @@ public struct TrackMetadata: Equatable, Sendable {
     public var artist: String?
     public var album: String?
     public var durationSeconds: Double?
+    public var artworkData: Data?
 
-    public init(title: String? = nil, artist: String? = nil, album: String? = nil, durationSeconds: Double? = nil) {
+    public init(
+        title: String? = nil,
+        artist: String? = nil,
+        album: String? = nil,
+        durationSeconds: Double? = nil,
+        artworkData: Data? = nil
+    ) {
         self.title = title
         self.artist = artist
         self.album = album
         self.durationSeconds = durationSeconds
+        self.artworkData = artworkData
     }
 }
 

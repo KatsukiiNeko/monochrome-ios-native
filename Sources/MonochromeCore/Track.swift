@@ -10,6 +10,8 @@ public struct Track: Codable, Equatable, Identifiable, Sendable {
     /// File name inside the app's managed media directory.
     public var fileName: String
     public var importedAt: Date
+    /// Optional artwork file name (same directory as `fileName`).
+    public var artworkFileName: String?
 
     public init(
         id: String = UUID().uuidString,
@@ -18,7 +20,8 @@ public struct Track: Codable, Equatable, Identifiable, Sendable {
         album: String = "",
         durationSeconds: Double? = nil,
         fileName: String,
-        importedAt: Date = .now
+        importedAt: Date = .now,
+        artworkFileName: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -27,10 +30,11 @@ public struct Track: Codable, Equatable, Identifiable, Sendable {
         self.durationSeconds = durationSeconds
         self.fileName = fileName
         self.importedAt = importedAt
+        self.artworkFileName = artworkFileName
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, title, artist, album, durationSeconds, fileName, importedAt
+        case id, title, artist, album, durationSeconds, fileName, importedAt, artworkFileName
     }
 
     // Tolerant decoding: a hand-edited or older library.json must not fail the app.
@@ -43,6 +47,7 @@ public struct Track: Codable, Equatable, Identifiable, Sendable {
         durationSeconds = try container.decodeIfPresent(Double.self, forKey: .durationSeconds)
         fileName = try container.decodeIfPresent(String.self, forKey: .fileName) ?? ""
         importedAt = try container.decodeIfPresent(Date.self, forKey: .importedAt) ?? .distantPast
+        artworkFileName = try container.decodeIfPresent(String.self, forKey: .artworkFileName)
     }
 }
 

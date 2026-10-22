@@ -11,17 +11,23 @@ struct AVAssetMetadataReader: TrackMetadataReading {
         var title: String?
         var artist: String?
         var album: String?
+        var artworkData: Data?
         // Format-specific tags (FLAC/ID3/iTunes) are searched too, since
         // commonMetadata alone is often empty for FLAC files.
         if let items = try? await asset.load(.metadata) {
             for item in items {
                 guard let key = item.commonKey else { continue }
-                let value = try? await item.load(.stringValue)
                 switch key {
-                case .commonKeyTitle: title = value ?? title
-                case .commonKeyArtist: artist = value ?? artist
-                case .commonKeyAlbumName: album = value ?? album
-                default: break
+                case .commonKeyTitle:
+                    title = (try? await item.load(.stringValue)) ?? title
+                case .commonKeyArtist:
+                    artist = (try? await item.load(.stringValue)) ?? artist
+                case .commonKeyAlbumName:
+                    album = (try? await item.load(.stringValue)) ?? album
+                case .commonKeyArtwork:
+                    artworkData = (try? await item.load(.dataValue)) ?? artworkData
+                default:
+                    break
                 }
             }
         }
@@ -32,7 +38,8 @@ struct AVAssetMetadataReader: TrackMetadataReading {
             title: cleaned(title),
             artist: cleaned(artist),
             album: cleaned(album),
-            durationSeconds: duration.map { $0.seconds }
+            durationSeconds: duration.map { $0.seconds },
+            artworkData: artworkData
         )
     }
 

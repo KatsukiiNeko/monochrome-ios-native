@@ -15,6 +15,7 @@ final class AppModel {
     let player: PlayerController
     private let service: LocalFileService
     private let favoritesStore: FavoritesStore
+    private let mediaDirectory: URL
     private let audioSession: AudioSessionController
     private let nowPlaying: NowPlayingController
 
@@ -33,6 +34,7 @@ final class AppModel {
         }
         self.service = service
         self.player = player
+        self.mediaDirectory = media
         self.favoritesStore = FavoritesStore(fileURL: base.appendingPathComponent("favorites.json"))
         // System integration: audio session first, then Lock Screen metadata/commands.
         self.audioSession = AudioSessionController(player: player)
@@ -96,6 +98,11 @@ final class AppModel {
 
     func report(_ error: Error) {
         errorMessage = error.localizedDescription
+    }
+
+    func artworkURL(for track: Track?) -> URL? {
+        guard let name = track?.artworkFileName else { return nil }
+        return mediaDirectory.appendingPathComponent(name)
     }
 
     // MARK: - Favorites
