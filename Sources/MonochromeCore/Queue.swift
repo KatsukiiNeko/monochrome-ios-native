@@ -57,6 +57,19 @@ public struct Queue: Equatable, Sendable {
         return tracks[index]
     }
 
+    /// `destination` follows Array.move semantics: the index the track would occupy
+    /// before it is lifted out, so moving down shifts by one.
+    public mutating func move(from source: Int, to destination: Int) {
+        guard tracks.indices.contains(source), (0...tracks.count).contains(destination) else { return }
+        let currentID = current?.id
+        let moved = tracks.remove(at: source)
+        let adjusted = destination > source ? destination - 1 : destination
+        tracks.insert(moved, at: min(adjusted, tracks.count))
+        if let currentID {
+            currentIndex = tracks.firstIndex { $0.id == currentID }
+        }
+    }
+
     public mutating func advance() -> Track? {
         guard let cursor = currentIndex, cursor + 1 < tracks.count else { return nil }
         currentIndex = cursor + 1

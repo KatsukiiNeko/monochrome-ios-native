@@ -96,6 +96,10 @@ public final class PlayerController {
         }
     }
 
+    public func moveQueue(from source: Int, to destination: Int) {
+        queue.move(from: source, to: destination)
+    }
+
     // MARK: - Engine events
 
     func handle(_ event: PlaybackEvent) async {

@@ -72,4 +72,31 @@ struct QueueTests {
         queue.append([makeTrack("a")])
         #expect(queue.current?.id == "a")
     }
+
+    @Test func moveKeepsCursorOnSameTrack() {
+        var queue = Queue(tracks: [makeTrack("a"), makeTrack("b"), makeTrack("c")])
+        queue.jump(to: 1)
+
+        queue.move(from: 0, to: 3)
+
+        #expect(queue.tracks.map(\.id) == ["b", "c", "a"])
+        #expect(queue.current?.id == "b")
+    }
+
+    @Test func moveUpShiftsCursorIndex() {
+        var queue = Queue(tracks: [makeTrack("a"), makeTrack("b"), makeTrack("c")])
+        queue.jump(to: 2)
+
+        queue.move(from: 2, to: 0)
+
+        #expect(queue.tracks.map(\.id) == ["c", "a", "b"])
+        #expect(queue.current?.id == "c")
+    }
+
+    @Test func moveIgnoresInvalidIndices() {
+        var queue = Queue(tracks: [makeTrack("a")])
+        queue.move(from: 5, to: 0)
+        queue.move(from: 0, to: 9)
+        #expect(queue.tracks.map(\.id) == ["a"])
+    }
 }

@@ -9,6 +9,7 @@ struct ContentView: View {
     @State private var isShowingImporter = false
     @State private var isShowingPlayer = false
     @State private var pendingDeletion: Track?
+    @State private var isShowingQueue = false
 
     var body: some View {
         NavigationStack {
@@ -26,6 +27,12 @@ struct ContentView: View {
                         isShowingImporter = true
                     }
                 }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Queue", systemImage: "list.bullet") {
+                        isShowingQueue = true
+                    }
+                    .disabled(model.player.queue.isEmpty)
+                }
             }
             .safeAreaInset(edge: .bottom) {
                 if model.player.currentTrack != nil {
@@ -34,6 +41,9 @@ struct ContentView: View {
             }
             .sheet(isPresented: $isShowingPlayer) {
                 PlayerView(player: model.player)
+            }
+            .sheet(isPresented: $isShowingQueue) {
+                QueueView(player: model.player)
             }
             .fileImporter(
                 isPresented: $isShowingImporter,
