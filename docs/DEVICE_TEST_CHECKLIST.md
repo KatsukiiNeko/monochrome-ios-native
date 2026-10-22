@@ -1,8 +1,8 @@
 # Device test checklist
 
-Build under test: `development` at `81a346f`, installed with `xtool dev` on
-the connected iPhone. Playback and the visual result can only be confirmed by a
-person, so tick each item by hand.
+Build under test: `dev`, installed with `xtool dev` on the connected iPhone.
+Playback and the visual result can only be confirmed by a person, so tick each
+item by hand.
 
 ## Playback
 
@@ -21,6 +21,35 @@ person, so tick each item by hand.
       format (for example `FLAC 16/44.1`).
 - [ ] VoiceOver reads the badge (for example "Lossless, FLAC 16/44.1").
 - [ ] A local imported file shows no badge.
+
+## Now-playing bar
+
+- [ ] With a track loaded, the bar is visible on Home, Search and Library,
+      above the tab bar.
+- [ ] Open an album or artist detail screen: the bar stays visible.
+- [ ] The bar shows artwork, title, artist, the format badge, play/pause and a
+      thin progress line.
+- [ ] Tapping the bar opens Now Playing.
+- [ ] With a long list, the last row can be scrolled clear of the bar.
+- [ ] VoiceOver names the play/pause, next, retry and open-player controls.
+
+## Cache and loop
+
+- [ ] Play a catalog track once and wait for it to start; after a few seconds,
+      Settings shows a non-zero cached size.
+- [ ] Play the same track again: Now Playing shows `Cached` beside the badge.
+- [ ] Turn repeat-one on and let the track end: the next pass starts
+      immediately and still shows `Cached`.
+- [ ] Turn on airplane mode, then let that cached track end with repeat-one on:
+      it restarts and keeps playing.
+- [ ] With airplane mode still on, tap a track that is not cached: playback
+      fails with a message and Retry, and the app stays responsive.
+- [ ] Settings, Clear cache: the size returns to zero and the next play streams
+      again.
+- [ ] With Cache over cellular off, playback on cellular still works but the
+      cached size does not grow.
+- [ ] Turn Cache over cellular on, play an uncached track on cellular: the
+      cached size grows.
 
 ## System integration
 
@@ -42,3 +71,8 @@ The player logs its URL, item status, the AVFoundation error domain/code and
 `AVPlayerItemErrorLog` events under subsystem `com.neko-ngtran.monochrome`,
 categories `player` and `audio-session`. A failed start now shows an error with
 a Retry action instead of staying in the loading state.
+
+Cache decisions are logged under the same subsystem with `cache hit`,
+`cache miss`, `cache store`, `cache evict`, and the loop logs
+`loop source=cache` or `loop source=network`. Each line carries the track id,
+so it can be matched to what was on screen.
