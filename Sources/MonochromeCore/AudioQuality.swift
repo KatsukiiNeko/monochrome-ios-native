@@ -22,7 +22,7 @@ public enum AudioQuality: String, Codable, Sendable, CaseIterable {
 }
 
 /// What the player actually parsed from the stream, as reported by AVFoundation.
-public struct AudioFormat: Equatable, Sendable {
+public struct AudioFormat: Equatable, Sendable, Codable {
     /// FourCC or MIME subtype, e.g. `flac`, `aac `, `alac`, `.mp3`.
     public var codec: String
     public var bitDepth: Int?
