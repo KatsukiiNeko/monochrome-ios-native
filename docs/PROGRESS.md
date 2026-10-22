@@ -2,8 +2,7 @@
 
 ## Status
 
-M1 (audits) complete. Next: M2 toolchain spike write-up, then M3 streaming
-feasibility.
+M2 (toolchain audit and spike) complete. Next: M3 streaming feasibility.
 
 ## Milestones
 
@@ -11,7 +10,7 @@ feasibility.
 |---|---|---|---|
 | M0 | safety baseline | done | n/a |
 | M1 | audit upstream + official iOS reference | done | reading only |
-| M2 | toolchain audit and spike | doing | commands run |
+| M2 | toolchain audit and spike | done | commands run |
 | M3 | streaming feasibility | todo | — |
 | M4 | implementation plan | todo | — |
 | M5 | clean the root | todo | — |
