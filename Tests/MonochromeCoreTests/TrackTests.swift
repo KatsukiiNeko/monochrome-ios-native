@@ -1,3 +1,4 @@
+// TrackTests.swift: host tests for the track model's Codable behavior.
 import Foundation
 import Testing
 @testable import MonochromeCore

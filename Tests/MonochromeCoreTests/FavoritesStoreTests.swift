@@ -1,3 +1,4 @@
+// FavoritesStoreTests.swift: host tests for favorites.json persistence.
 import Foundation
 import Testing
 @testable import MonochromeCore

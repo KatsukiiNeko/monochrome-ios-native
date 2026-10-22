@@ -1,3 +1,4 @@
+// DurationFormattingTests.swift: host tests for time formatting.
 import Testing
 @testable import MonochromeCore
 

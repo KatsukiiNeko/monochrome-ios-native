@@ -1,3 +1,4 @@
+// PlayerControllerTests.swift: host tests for playback transitions using a fake engine.
 import Foundation
 import Testing
 @testable import MonochromeCore

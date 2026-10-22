@@ -1,3 +1,4 @@
+// QueueTests.swift: host tests for the queue cursor, removal and reordering.
 import Foundation
 import Testing
 @testable import MonochromeCore

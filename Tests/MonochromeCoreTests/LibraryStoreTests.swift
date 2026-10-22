@@ -1,3 +1,4 @@
+// LibraryStoreTests.swift: host tests for library.json persistence and tolerant decoding.
 import Foundation
 import Testing
 @testable import MonochromeCore
