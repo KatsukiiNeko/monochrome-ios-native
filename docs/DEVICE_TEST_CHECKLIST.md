@@ -37,8 +37,12 @@ item by hand.
 
 - [ ] Open the Search tab: the search field is visible immediately, without
       pulling down.
+- [ ] Scroll the results: the search field stays pinned at the top.
 - [ ] Dismiss the keyboard and return to the tab: the field is still reachable.
 - [ ] The field stays visible on a small and a large device.
+- [ ] Search for a song, tap it, then clear the field: the song appears under
+      Recent searches with its title, artist and artwork.
+- [ ] Relaunch the app: recent searches are still listed.
 
 ## Cache and loop
 

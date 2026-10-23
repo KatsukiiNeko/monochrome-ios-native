@@ -10,6 +10,7 @@ final class AppModel {
     private(set) var tracks: [Track] = []
     private(set) var favorites: [Track] = []
     private(set) var recents: [Track] = []
+    private(set) var searchRecents: [Track] = []
     private(set) var errorMessage: String?
     private(set) var isImporting = false
 
@@ -24,6 +25,7 @@ final class AppModel {
     private let service: LocalFileService
     private let favoritesStore: FavoritesStore
     private let historyStore: HistoryStore
+    private let searchHistoryStore: HistoryStore
     private let resolver: DefaultTrackResolver
     private let streamingSettings: StreamingSettings
     private let cacheSettings: AudioCacheSettings
@@ -75,6 +77,10 @@ final class AppModel {
         self.mediaDirectory = media
         self.favoritesStore = FavoritesStore(fileURL: base.appendingPathComponent("favorites.json"))
         self.historyStore = HistoryStore(fileURL: base.appendingPathComponent("history.json"))
+        self.searchHistoryStore = HistoryStore(
+            fileURL: base.appendingPathComponent("search-history.json"),
+            limit: 20
+        )
         // System integration: audio session first, then Lock Screen metadata/commands.
         self.audioSession = AudioSessionController(player: player)
         self.nowPlaying = NowPlayingController(player: player)
@@ -132,6 +138,11 @@ final class AppModel {
         try await requireClient().artist(id: id)
     }
 
+    /// Keeps the Search tab's empty state useful without a separate history model.
+    func recordSearch(_ track: Track) {
+        searchRecents = (try? searchHistoryStore.record(track)) ?? searchRecents
+    }
+
     private func requireClient() throws -> TracksAPIClient {
         guard let streamingClient else { throw TracksAPIError.notConfigured }
         return streamingClient
@@ -152,6 +163,7 @@ final class AppModel {
         }
         favorites = loadFavorites()
         recents = (try? historyStore.load()) ?? []
+        searchRecents = (try? searchHistoryStore.load()) ?? []
     }
 
     private func loadFavorites() -> [Track] {
