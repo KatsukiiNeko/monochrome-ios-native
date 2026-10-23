@@ -26,12 +26,12 @@ struct MiniPlayerView: View {
     var body: some View {
         if let bar, let track = player.currentTrack {
             VStack(spacing: 0) {
-                HStack(spacing: 8) {
+                HStack(spacing: 4) {
                     openButton(bar, track: track)
                     favoriteButton(track)
                     controls(bar)
                 }
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 8)
                 .padding(.vertical, 8)
 
                 progressBar(bar.progress)
@@ -39,13 +39,14 @@ struct MiniPlayerView: View {
             .background(tint, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+                    .strokeBorder(Theme.onTintSeparator, lineWidth: Theme.hairline)
             }
             .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
             .shadow(color: .black.opacity(0.35), radius: 12, y: 4)
             .padding(.horizontal, 12)
+            .padding(.top, 4)
             .padding(.bottom, 6)
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: tint)
+            .animation(reduceMotion ? nil : Theme.standard, value: tint)
             .task(id: track.id) {
                 tint = Color(await model.artworkTint(for: track))
             }
@@ -66,15 +67,19 @@ struct MiniPlayerView: View {
                     HStack(spacing: 5) {
                         Text(bar.title)
                             .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Theme.primaryText)
+                            .foregroundStyle(Theme.onTintPrimary)
                             .lineLimit(1)
                         if let badge = bar.badgeText, !dynamicTypeSize.isAccessibilitySize {
-                            QualityBadgeLabel(text: badge, spokenText: bar.badgeSpokenText)
+                            QualityBadgeLabel(
+                                text: badge,
+                                spokenText: bar.badgeSpokenText,
+                                onTint: true
+                            )
                         }
                     }
                     Text(bar.failureMessage == nil ? bar.subtitle : "Playback failed")
                         .font(Theme.caption)
-                        .foregroundStyle(Theme.secondaryText)
+                        .foregroundStyle(Theme.onTintSecondary)
                         .lineLimit(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -92,8 +97,8 @@ struct MiniPlayerView: View {
         } label: {
             Image(systemName: model.isFavorite(track) ? "heart.fill" : "heart")
                 .font(.subheadline)
-                .foregroundStyle(Theme.primaryText)
-                .frame(width: 36, height: 44)
+                .foregroundStyle(model.isFavorite(track) ? Theme.onTintAccent : Theme.onTintPrimary)
+                .frame(width: Theme.controlSize, height: Theme.controlSize)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -104,16 +109,16 @@ struct MiniPlayerView: View {
     private func controls(_ bar: NowPlayingBar) -> some View {
         if bar.isLoading {
             ProgressView()
-                .tint(Theme.primaryText)
-                .frame(width: 36, height: 44)
+                .tint(Theme.onTintPrimary)
+                .frame(width: Theme.controlSize, height: Theme.controlSize)
                 .accessibilityLabel("Loading")
         } else if bar.failureMessage != nil {
             Button {
                 Task { await player.retry() }
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .foregroundStyle(Theme.primaryText)
-                    .frame(width: 36, height: 44)
+                    .foregroundStyle(Theme.onTintPrimary)
+                    .frame(width: Theme.controlSize, height: Theme.controlSize)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -123,8 +128,8 @@ struct MiniPlayerView: View {
                 Task { await player.togglePlayPause() }
             } label: {
                 Image(systemName: bar.isPlaying ? "pause.fill" : "play.fill")
-                    .foregroundStyle(Theme.primaryText)
-                    .frame(width: 36, height: 44)
+                    .foregroundStyle(Theme.onTintPrimary)
+                    .frame(width: Theme.controlSize, height: Theme.controlSize)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -135,8 +140,8 @@ struct MiniPlayerView: View {
             Task { await player.next() }
         } label: {
             Image(systemName: "forward.fill")
-                .foregroundStyle(Theme.primaryText)
-                .frame(width: 36, height: 44)
+                .foregroundStyle(Theme.onTintPrimary)
+                .frame(width: Theme.controlSize, height: Theme.controlSize)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -146,9 +151,9 @@ struct MiniPlayerView: View {
     private func progressBar(_ fraction: Double) -> some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
-                Rectangle().fill(Color.white.opacity(0.18))
+                Rectangle().fill(Theme.onTintSeparator)
                 Rectangle()
-                    .fill(Theme.accent)
+                    .fill(Theme.onTintAccent)
                     .frame(width: geometry.size.width * fraction)
             }
         }

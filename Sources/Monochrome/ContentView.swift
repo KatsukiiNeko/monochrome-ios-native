@@ -23,10 +23,12 @@ struct ContentView: View {
                 onOpenLibrary: { tab = .library },
                 onOpenSettings: { isShowingSettings = true }
             )
+            .nowPlayingBarInset(isPresented: isPlayingBarVisible) { miniPlayer }
             .tabItem { Label("Home", systemImage: "house") }
             .tag(AppTab.home)
 
             SearchView(model: model)
+                .nowPlayingBarInset(isPresented: isPlayingBarVisible) { miniPlayer }
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
                 .tag(AppTab.search)
 
@@ -34,10 +36,10 @@ struct ContentView: View {
                 model: model,
                 onOpenSettings: { isShowingSettings = true }
             )
+            .nowPlayingBarInset(isPresented: isPlayingBarVisible) { miniPlayer }
             .tabItem { Label("Library", systemImage: "music.note.list") }
             .tag(AppTab.library)
         }
-        .nowPlayingBarInset(isPresented: isPlayingBarVisible) { miniPlayer }
         .sheet(isPresented: $isShowingPlayer) {
             PlayerView(model: model)
                 .presentationDetents([.large])

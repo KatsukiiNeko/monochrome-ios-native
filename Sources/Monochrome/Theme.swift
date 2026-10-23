@@ -60,7 +60,7 @@ enum Theme {
     static let onTintPrimary = Color.white
     static let onTintSecondary = Color.white.opacity(0.70)
     static let onTintSeparator = Color.white.opacity(0.18)
-    static let onTintAccent = Color.white
+    static let onTintAccent = Color(red: 0.98, green: 0.22, blue: 0.24)
 
     // MARK: Spacing
 
