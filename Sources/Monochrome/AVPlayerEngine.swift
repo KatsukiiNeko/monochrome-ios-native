@@ -8,9 +8,8 @@ import os
 /// One shared logger so device logs can be filtered by subsystem/category.
 let playerLog = Logger(subsystem: "com.neko-ngtran.monochrome", category: "player")
 
-/// AVFoundation's out-of-band MIME key ships in the framework symbol table but is
-/// missing from this SDK's headers, so the documented key string is used directly.
-private let outOfBandMIMETypeKey = "AVURLAssetOutOfBandMIMETypeKey"
+/// AVFoundation's public key for the MIME type of an extensionless resource.
+private let overrideMIMETypeKey = AVURLAssetOverrideMIMETypeKey
 /// Upper bound for the item to become ready; AVFoundation has no timeout of its own.
 private let readinessTimeout = Duration.seconds(20)
 private let readinessPollInterval = Duration.milliseconds(100)
@@ -54,7 +53,7 @@ final class AVPlayerEngine: PlaybackEngine {
         // extension, which leaves AVFoundation unable to pick a parser on its own.
         var options: [String: Any] = [:]
         if let contentType {
-            options[outOfBandMIMETypeKey] = contentType
+            options[overrideMIMETypeKey] = contentType
         }
         let asset = AVURLAsset(url: url, options: options)
 
