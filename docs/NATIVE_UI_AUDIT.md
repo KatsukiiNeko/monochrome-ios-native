@@ -116,9 +116,30 @@ changes are now on `development`:
 | Theme | `ThemePalette` light/dark tokens, WCAG contrast tests, 20 pt cards, 56 pt rows, 16 pt screen padding, 24 pt sections | L1 + host tests |
 | Now Playing | core snapshot and remote-command routing, download/cache source badges | L1 + host tests |
 
-Host tests: 199 tests in 26 suites passed at the last recorded run. The iOS
+Host tests: 211 tests in 26 suites passed at the last recorded run. The iOS
 arm64 build-only check passed after every commit. No device is attached, so no
 screen reached L4 or Human verification.
+
+## Settings simplification pass
+
+Date: 2026-10-23. Current Settings after the storage and endpoint pass:
+
+| section | controls | notes |
+|---|---|---|
+| Appearance | System / Light / Dark picker | persists; every Settings subpage reapplies the preference |
+| Streaming Endpoint | Enable Monochrome toggle, Catalog Endpoint link, Reset Endpoint | reset confirms only when a custom host would be discarded |
+| Cache | Cache Usage, Clear Cache | usage comes from the cache actor's verified entries |
+| Downloads | Manage Downloads | count and total size in the row; manager is also reachable from the Library's Downloaded filter |
+| About | About Monochrome | developer, Apache-2.0 license and music-licensing notice |
+
+Removed from Settings: source capability rows, the YouTube Music companion row,
+the main-page host text field, the five-slot cache meter and cached-song list,
+the cache-over-cellular and clear-on-launch toggles, static playback/Lock Screen
+status rows, and the endpoint/cache/download diagnostic rows. `SourceDetailView`
+is deleted; the endpoint editor is now a small subpage of Settings. The
+underlying cellular-cache and clear-on-launch preferences still exist in
+`AudioCacheSettings` and keep their stored values; only their Settings controls
+were removed.
 
 ### What still needs a person
 

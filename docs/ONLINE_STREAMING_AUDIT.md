@@ -97,9 +97,12 @@ cache entry is protected from eviction. See `Sources/MonochromeCore/AudioCache.s
 
 - Default base `https://tracks.monochrome.st`, the endpoint the shipping web
   client uses.
-- Settings lets the user point at another base URL (for example their own paid
-  HiFi endpoint, as the README's Dev Mode description allows) or clear it, in
-  which case the app shows an explicit “streaming not configured” state.
+- Settings has an explicit Enable Monochrome switch. Turning it off shows an
+  explicit “streaming not configured” state and prevents new catalog or stream
+  requests; local files and permanent downloads still play.
+- The endpoint subpage lets the user point at another base URL (for example
+  their own paid HiFi endpoint, as the README's Dev Mode description allows)
+  and reset to the built-in default without changing other preferences.
 - No credentials are shipped, none are stored, and no secret handling is added.
 - Failover: an ordered list (user base URL first, default second), 10 s
   timeouts, in-session health memory. The upstream has no failover list for
