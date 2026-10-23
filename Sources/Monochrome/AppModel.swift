@@ -18,6 +18,7 @@ final class AppModel {
     let cache: AudioCache
     private(set) var streamingHost: String
     private(set) var isStreamingConfigured: Bool
+    private(set) var appearanceMode: AppearanceMode
     private(set) var cacheSizeBytes = 0
     private(set) var cacheEntryCount = 0
     private(set) var cachedTracks: [CachedTrackSummary] = []
@@ -29,6 +30,7 @@ final class AppModel {
     private let searchHistoryStore: HistoryStore
     private let resolver: DefaultTrackResolver
     private let streamingSettings: StreamingSettings
+    private let appearanceSettings: AppearanceSettings
     private let cacheSettings: AudioCacheSettings
     private var streamingClient: TracksAPIClient?
     private let mediaDirectory: URL
@@ -68,12 +70,15 @@ final class AppModel {
         let player = PlayerController(engine: AVPlayerEngine(), resolver: resolver, cache: cache)
         player.log = { message in playerLog.notice("\(message, privacy: .public)") }
         let settings = StreamingSettings()
+        let appearanceSettings = AppearanceSettings()
         self.service = service
         self.player = player
         self.cache = cache
         self.cacheSettings = cacheSettings
         self.resolver = resolver
         self.streamingSettings = settings
+        self.appearanceSettings = appearanceSettings
+        self.appearanceMode = appearanceSettings.mode
         self.streamingHost = settings.rawValue
         self.isStreamingConfigured = settings.baseURL != nil
         self.mediaDirectory = media
@@ -89,6 +94,13 @@ final class AppModel {
         applyStreamingSettings()
         // One source of truth: every track the player actually starts lands in history.
         player.onTrackStarted = { [weak self] track in self?.record(track) }
+    }
+
+    // MARK: - Appearance
+
+    func setAppearanceMode(_ mode: AppearanceMode) {
+        appearanceSettings.setMode(mode)
+        appearanceMode = mode
     }
 
     // MARK: - Streaming

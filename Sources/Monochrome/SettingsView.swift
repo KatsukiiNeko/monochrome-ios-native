@@ -13,6 +13,23 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section {
+                Picker("Appearance", selection: Binding(
+                    get: { model.appearanceMode },
+                    set: { model.setAppearanceMode($0) }
+                )) {
+                    ForEach(AppearanceMode.allCases) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .accessibilityLabel("Appearance")
+            } header: {
+                Text("Appearance")
+            } footer: {
+                Text("System follows the device setting.")
+            }
+
+            Section {
                 TextField("https://tracks.monochrome.st", text: $host)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()

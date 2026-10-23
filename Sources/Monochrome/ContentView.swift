@@ -61,6 +61,7 @@ struct ContentView: View {
             Text(model.errorMessage ?? "")
         }
         .task { await model.loadTracks() }
+        .preferredColorScheme(model.appearanceMode.colorScheme)
     }
 
     private var isPlayingBarVisible: Bool { model.player.currentTrack != nil }

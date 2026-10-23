@@ -2,56 +2,125 @@
 #if canImport(SwiftUI)
 import MonochromeCore
 import SwiftUI
+import UIKit
 
 enum Theme {
     // MARK: Colors
 
-    /// Near-black base used behind every screen.
-    static let background = Color(white: 0.05)
+    /// Near-black in dark appearance, off-white in light appearance.
+    static let background = adaptive(
+        light: UIColor(white: 0.98, alpha: 1),
+        dark: UIColor(white: 0.02, alpha: 1)
+    )
     /// Default surface for cards, fields and chips.
-    static let surface = Color(white: 0.11)
+    static let surface = adaptive(
+        light: UIColor(white: 0.94, alpha: 1),
+        dark: UIColor(white: 0.07, alpha: 1)
+    )
     /// A surface one step above `surface`.
-    static let elevated = Color(white: 0.16)
-    /// Low-contrast separator lines and progress tracks.
-    static let separator = Color.white.opacity(0.12)
-    static let primaryText = Color.white
-    static let secondaryText = Color.white.opacity(0.66)
-    static let tertiaryText = Color.white.opacity(0.42)
-    /// The app's single accent is white; artwork supplies the only other color.
-    static let accent = Color.white
-    static let destructive = Color.red
+    static let elevated = adaptive(
+        light: .white,
+        dark: UIColor(white: 0.12, alpha: 1)
+    )
+    /// Thin rules and card outlines.
+    static let border = adaptive(
+        light: UIColor.black.withAlphaComponent(0.12),
+        dark: UIColor.white.withAlphaComponent(0.14)
+    )
+    /// Quiet separators and idle progress tracks.
+    static let separator = adaptive(
+        light: UIColor.black.withAlphaComponent(0.09),
+        dark: UIColor.white.withAlphaComponent(0.10)
+    )
+
+    static let primaryText = adaptive(light: .black, dark: .white)
+    static let secondaryText = adaptive(
+        light: UIColor.black.withAlphaComponent(0.60),
+        dark: UIColor.white.withAlphaComponent(0.62)
+    )
+    static let tertiaryText = adaptive(
+        light: UIColor.black.withAlphaComponent(0.42),
+        dark: UIColor.white.withAlphaComponent(0.38)
+    )
+
+    /// The one meaningful accent: selection, progress and active playback state.
+    static let accent = adaptive(
+        light: UIColor(red: 0.69, green: 0.00, blue: 0.06, alpha: 1),
+        dark: UIColor(red: 0.88, green: 0.10, blue: 0.14, alpha: 1)
+    )
+    static let onAccent = Color.white
+    static let accentMuted = accent.opacity(0.18)
+    static let destructive = accent
+
+    /// High-contrast transport surface, independent of the red state accent.
+    static let primaryAction = adaptive(light: .black, dark: .white)
+    static let onPrimaryAction = adaptive(light: .white, dark: .black)
+
+    /// The mini-player card keeps its dark artwork tint in both appearances.
+    static let onTintPrimary = Color.white
+    static let onTintSecondary = Color.white.opacity(0.70)
+    static let onTintSeparator = Color.white.opacity(0.18)
+    static let onTintAccent = Color.white
 
     // MARK: Spacing
 
     static let spacing: CGFloat = 16
     static let tight: CGFloat = 8
-    static let sectionSpacing: CGFloat = 24
+    static let sectionSpacing: CGFloat = 28
     static let screenPadding: CGFloat = 20
     static let rowSpacing: CGFloat = 12
+    static let hairline: CGFloat = 1
 
     // MARK: Radii
 
-    static let corner: CGFloat = 16
-    static let cardRadius: CGFloat = 12
-    static let artworkRadius: CGFloat = 4
-    static let albumRadius: CGFloat = 8
+    static let corner: CGFloat = 12
+    static let cardRadius: CGFloat = 10
+    static let artworkRadius: CGFloat = 2
+    static let albumRadius: CGFloat = 4
     static let tileRadius: CGFloat = 6
-    static let chipRadius: CGFloat = 14
+    static let chipRadius: CGFloat = 5
 
     // MARK: Sizes
 
     static let controlSize: CGFloat = 44
     static let miniArtworkSize: CGFloat = 42
     static let miniPlayerHeight: CGFloat = 64
+    static let iconSize: CGFloat = 18
+    static let sectionMarker: CGFloat = 5
 
     // MARK: Type
 
-    static let screenTitle = Font.largeTitle.bold()
-    static let sectionTitle = Font.title3.bold()
-    static let rowTitle = Font.subheadline.weight(.semibold)
-    static let rowSubtitle = Font.caption
-    static let caption = Font.caption
-    static let time = Font.caption.monospacedDigit()
+    static let screenTitle = Font.system(.largeTitle, design: .default, weight: .bold)
+    static let sectionTitle = Font.system(.title3, design: .default, weight: .semibold)
+    static let title = Font.system(.title2, design: .default, weight: .bold)
+    static let rowTitle = Font.system(.subheadline, design: .default, weight: .semibold)
+    static let rowSubtitle = Font.system(.caption, design: .default)
+    static let caption = Font.system(.caption, design: .default)
+    static let technical = Font.system(.caption, design: .monospaced, weight: .medium)
+    static let micro = Font.system(.caption2, design: .monospaced, weight: .semibold)
+    static let time = Font.system(.caption, design: .monospaced, weight: .medium)
+
+    // MARK: Motion
+
+    static let quick = Animation.easeOut(duration: 0.18)
+    static let standard = Animation.easeInOut(duration: 0.28)
+
+    private static func adaptive(light: UIColor, dark: UIColor) -> Color {
+        Color(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark ? dark : light
+        })
+    }
+}
+
+extension AppearanceMode {
+    /// `nil` restores the system appearance.
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: nil
+        case .light: .light
+        case .dark: .dark
+        }
+    }
 }
 
 extension Color {
