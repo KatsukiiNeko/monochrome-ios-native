@@ -127,7 +127,7 @@ Date: 2026-10-23. Current Settings after the storage and endpoint pass:
 | section | controls | notes |
 |---|---|---|
 | Appearance | System / Light / Dark picker | persists; every Settings subpage reapplies the preference |
-| Streaming Endpoint | Enable Monochrome toggle, Catalog Endpoint link, Reset Endpoint | reset confirms only when a custom host would be discarded |
+| Streaming Endpoint | Enable Endpoint toggle, Catalog Endpoint link, Reset Endpoint | reset confirms only when a custom host would be discarded |
 | Cache | Cache Usage, Clear Cache | usage comes from the cache actor's verified entries |
 | Downloads | Manage Downloads | count and total size in the row; manager is also reachable from the Library's Downloaded filter |
 | About | About Monochrome | developer, Apache-2.0 license and music-licensing notice |

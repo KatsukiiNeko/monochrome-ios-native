@@ -71,7 +71,7 @@ public enum TracksAPIError: LocalizedError, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .notConfigured: "Monochrome is disabled. Enable it in Settings to use the catalog."
+        case .notConfigured: "The endpoint is switched off. Enable it in Settings to use the catalog."
         case .httpStatus(let code): "The music service answered with HTTP \(code)."
         case .unavailable(let reason): "The music service is unreachable. \(reason)"
         case .invalidPayload: "The music service returned data this app cannot read."

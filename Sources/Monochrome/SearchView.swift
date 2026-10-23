@@ -167,7 +167,7 @@ struct SearchView: View {
             ContentUnavailableView {
                 Label("Streaming is off", systemImage: "antenna.radiowaves.left.and.right.slash")
             } description: {
-                Text("Enable Monochrome in Settings to search the catalog.")
+                Text("Enable the endpoint in Settings to search the catalog.")
             }
         } else if let errorMessage {
             ContentUnavailableView {

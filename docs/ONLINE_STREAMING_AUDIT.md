@@ -97,7 +97,7 @@ cache entry is protected from eviction. See `Sources/MonochromeCore/AudioCache.s
 
 - Default base `https://tracks.monochrome.st`, the endpoint the shipping web
   client uses.
-- Settings has an explicit Enable Monochrome switch. Turning it off shows an
+- Settings has an explicit Enable Endpoint switch. Turning it off shows an
   explicit “streaming not configured” state and prevents new catalog or stream
   requests; local files and permanent downloads still play.
 - The endpoint subpage lets the user point at another base URL (for example

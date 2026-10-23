@@ -20,7 +20,7 @@ public enum TrackResolutionError: LocalizedError, Equatable {
         case .missingFile(let title):
             "The audio file for “\(title)” is missing."
         case .notStreamable(let title):
-            "“\(title)” cannot be streamed. Enable Monochrome in Settings, then retry."
+            "“\(title)” cannot be streamed. Enable the endpoint in Settings, then retry."
         }
     }
 }

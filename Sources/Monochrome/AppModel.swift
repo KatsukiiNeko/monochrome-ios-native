@@ -381,7 +381,7 @@ final class AppModel {
             return
         }
         guard !track.isStreaming || isStreamingConfigured else {
-            errorMessage = "Enable Monochrome in Settings to download catalog tracks."
+            errorMessage = "Enable the endpoint in Settings to download catalog tracks."
             return
         }
         Task { await performDownload(track) }

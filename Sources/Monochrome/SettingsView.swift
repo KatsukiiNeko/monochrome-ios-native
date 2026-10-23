@@ -85,7 +85,7 @@ struct SettingsView: View {
                     set: { model.setMonochromeEnabled($0) }
                 )
             ) {
-                settingsLabel(icon: "dot.radiowaves.left.and.right", title: "Enable Monochrome")
+                settingsLabel(icon: "dot.radiowaves.left.and.right", title: "Enable Endpoint")
             }
             .tint(Theme.accent)
 
