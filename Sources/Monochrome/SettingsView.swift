@@ -50,6 +50,7 @@ struct SettingsView: View {
                 try? await Task.sleep(for: .seconds(2))
                 guard !Task.isCancelled else { break }
                 await model.refreshCacheSize()
+                await model.refreshDownloads()
             }
         }
         .confirmationDialog(
