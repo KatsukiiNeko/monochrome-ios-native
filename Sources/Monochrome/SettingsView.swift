@@ -78,7 +78,7 @@ struct SettingsView: View {
             // A download can finish while this sheet is open; keep the row current.
             while !Task.isCancelled {
                 await model.refreshCacheSize()
-                try? await Task.sleep(for: .seconds(1))
+                try? await Task.sleep(for: .milliseconds(250))
             }
         }
     }
