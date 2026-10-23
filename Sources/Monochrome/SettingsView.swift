@@ -21,6 +21,8 @@ struct SettingsView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .listRowBackground(Theme.surface)
+        .listRowSeparatorTint(Theme.separator)
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
@@ -53,7 +55,7 @@ struct SettingsView: View {
     // MARK: - Appearance
 
     private var appearanceSection: some View {
-        Section("Appearance") {
+        Section {
             Picker(
                 "Theme",
                 selection: Binding(
@@ -66,7 +68,10 @@ struct SettingsView: View {
                 }
             }
             .pickerStyle(.segmented)
+            .tint(Theme.accent)
             .accessibilityLabel("Appearance")
+        } header: {
+            TechnicalSectionHeader(title: "Appearance")
         }
     }
 
@@ -75,26 +80,33 @@ struct SettingsView: View {
     private var streamingSection: some View {
         Section {
             Toggle(
-                "Enable Monochrome",
                 isOn: Binding(
                     get: { model.isMonochromeEnabled },
                     set: { model.setMonochromeEnabled($0) }
                 )
-            )
+            ) {
+                settingsLabel(icon: "dot.radiowaves.left.and.right", title: "Enable Monochrome")
+            }
             .tint(Theme.accent)
 
             NavigationLink {
                 StreamingEndpointView(model: model)
             } label: {
-                LabeledContent("Catalog Endpoint", value: endpointValue)
+                settingsLabel(icon: "link", title: "Catalog Endpoint", value: endpointValue)
             }
 
-            Button("Reset Endpoint", role: .destructive) {
+            Button(role: .destructive) {
                 if model.hasCustomStreamingEndpoint {
                     isConfirmingEndpointReset = true
                 } else {
                     model.resetStreamingEndpoint()
                 }
+            } label: {
+                settingsLabel(
+                    icon: "arrow.counterclockwise",
+                    title: "Reset Endpoint",
+                    destructive: true
+                )
             }
             .confirmationDialog(
                 "Reset the catalog endpoint?",
@@ -115,7 +127,7 @@ struct SettingsView: View {
                     .foregroundStyle(Theme.destructive)
             }
         } header: {
-            Text("Streaming Endpoint")
+            TechnicalSectionHeader(title: "Streaming Endpoint")
         } footer: {
             Text("Monochrome supplies the online catalog and streaming. Local files and downloads stay available when it is off.")
         }
@@ -125,10 +137,22 @@ struct SettingsView: View {
 
     private var cacheSection: some View {
         Section {
-            LabeledContent("Cache Usage", value: byteText(model.cacheSizeBytes))
+            HStack(spacing: 10) {
+                TechnicalIcon(name: "internaldrive")
+                Text("Cache Usage")
+                    .font(Theme.listRowTitle)
+                    .foregroundStyle(Theme.primaryText)
+                Spacer(minLength: 8)
+                TechnicalLabel(text: byteText(model.cacheSizeBytes), color: Theme.primaryText)
+            }
+            .frame(minHeight: Theme.rowMinHeight)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Cache Usage, \(byteText(model.cacheSizeBytes))")
 
-            Button("Clear Cache", role: .destructive) {
+            Button(role: .destructive) {
                 isConfirmingClearCache = true
+            } label: {
+                settingsLabel(icon: "trash", title: "Clear Cache", destructive: true)
             }
             .confirmationDialog(
                 "Clear the temporary cache?",
@@ -143,7 +167,7 @@ struct SettingsView: View {
                 Text("Temporary playback files are removed. Downloads and imported music are not affected.")
             }
         } header: {
-            Text("Cache")
+            TechnicalSectionHeader(title: "Cache")
         } footer: {
             Text("Temporary files used for playback. Clearing the cache never removes permanent files.")
         }
@@ -152,25 +176,50 @@ struct SettingsView: View {
     // MARK: - Downloads
 
     private var downloadsSection: some View {
-        Section("Downloads") {
+        Section {
             NavigationLink {
                 DownloadsView(model: model)
             } label: {
-                LabeledContent("Manage Downloads", value: downloadsValue)
+                settingsLabel(icon: "arrow.down.circle", title: "Manage Downloads", value: downloadsValue)
             }
+        } header: {
+            TechnicalSectionHeader(title: "Downloads")
         }
     }
 
     // MARK: - About
 
     private var aboutSection: some View {
-        Section("About") {
+        Section {
             NavigationLink {
                 AboutView(model: model)
             } label: {
-                Text("About Monochrome")
+                settingsLabel(icon: "info.circle", title: "About Monochrome")
+            }
+        } header: {
+            TechnicalSectionHeader(title: "About")
+        }
+    }
+
+    // MARK: - Row building blocks
+
+    private func settingsLabel(
+        icon: String,
+        title: String,
+        value: String? = nil,
+        destructive: Bool = false
+    ) -> some View {
+        HStack(spacing: 10) {
+            TechnicalIcon(name: icon, destructive: destructive)
+            Text(title)
+                .font(Theme.listRowTitle)
+                .foregroundStyle(destructive ? Theme.destructive : Theme.primaryText)
+            Spacer(minLength: 8)
+            if let value {
+                TechnicalLabel(text: value, color: Theme.secondaryText)
             }
         }
+        .frame(minHeight: Theme.rowMinHeight)
     }
 
     // MARK: - Actions and values
@@ -219,7 +268,7 @@ private struct StreamingEndpointView: View {
                     .onChange(of: host) { _, _ in errorMessage = nil }
                     .accessibilityLabel("Catalog endpoint")
             } header: {
-                Text("Address")
+                TechnicalSectionHeader(title: "Address")
             } footer: {
                 Text(
                     errorMessage
@@ -229,14 +278,26 @@ private struct StreamingEndpointView: View {
             }
 
             Section {
-                Button("Use Built-in Endpoint") {
+                Button {
                     host = StreamingSettings.defaultBaseURL.absoluteString
                     save()
+                } label: {
+                    HStack(spacing: 10) {
+                        TechnicalIcon(name: "arrow.uturn.backward")
+                        Text("Use Built-in Endpoint")
+                            .font(Theme.listRowTitle)
+                            .foregroundStyle(Theme.primaryText)
+                    }
+                    .frame(minHeight: Theme.rowMinHeight)
                 }
+            } header: {
+                TechnicalSectionHeader(title: "Default")
             }
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .listRowBackground(Theme.surface)
+        .listRowSeparatorTint(Theme.separator)
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle("Catalog Endpoint")
         .navigationBarTitleDisplayMode(.inline)

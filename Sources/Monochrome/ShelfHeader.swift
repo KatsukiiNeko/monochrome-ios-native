@@ -4,6 +4,7 @@ import SwiftUI
 
 struct ShelfHeader: View {
     let title: String
+    var meta: String?
     var actionTitle: String?
     var action: (() -> Void)?
 
@@ -11,15 +12,19 @@ struct ShelfHeader: View {
         HStack(alignment: .center, spacing: 8) {
             Rectangle()
                 .fill(Theme.accent)
-                .frame(width: Theme.sectionMarker, height: 14)
+                .frame(width: Theme.sectionMarker, height: Theme.markerHeight)
                 .accessibilityHidden(true)
 
             Text(title)
-                .font(Theme.sectionTitle)
+                .font(Theme.shelfTitle)
                 .foregroundStyle(Theme.primaryText)
                 .accessibilityAddTraits(.isHeader)
 
             Spacer(minLength: 8)
+
+            if let meta {
+                TechnicalLabel(text: meta)
+            }
 
             if let actionTitle, let action {
                 Button(actionTitle, action: action)

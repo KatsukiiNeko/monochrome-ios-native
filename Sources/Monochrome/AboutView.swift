@@ -14,13 +14,17 @@ struct AboutView: View {
         List {
             Section {
                 LabeledContent("Project", value: "Monochrome")
-                LabeledContent("Version", value: versionText)
+                LabeledContent("Version") {
+                    Text(versionText)
+                        .font(Theme.value)
+                        .foregroundStyle(Theme.secondaryText)
+                }
                 Link("Repository", destination: Self.repositoryURL)
                 Text("A native SwiftUI client derived from the open-source Monochrome music player. No account, analytics or tracking SDK is included.")
                     .font(.footnote)
                     .foregroundStyle(Theme.secondaryText)
             } header: {
-                Text("Developer")
+                TechnicalSectionHeader(title: "Developer")
             }
 
             Section {
@@ -30,7 +34,7 @@ struct AboutView: View {
                     LicenseNoticeView(model: model)
                 }
             } header: {
-                Text("License")
+                TechnicalSectionHeader(title: "License")
             }
 
             Section {
@@ -42,11 +46,13 @@ struct AboutView: View {
                     MusicLicensingView(model: model)
                 }
             } header: {
-                Text("Music Licensing")
+                TechnicalSectionHeader(title: "Music Licensing")
             }
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .listRowBackground(Theme.surface)
+        .listRowSeparatorTint(Theme.separator)
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle("About")
         .navigationBarTitleDisplayMode(.inline)
@@ -71,20 +77,26 @@ private struct LicenseNoticeView: View {
 
     var body: some View {
         List {
-            Section("Upstream") {
+            Section {
                 Text("This product is a derivative work of the Monochrome music player, Copyright 2026 Monochrome Team, licensed under the Apache License, Version 2.0.")
                     .fixedSize(horizontal: false, vertical: true)
                 Link("Monochrome on GitHub", destination: Self.upstreamURL)
+            } header: {
+                TechnicalSectionHeader(title: "Upstream")
             }
 
-            Section("This Repository") {
+            Section {
                 Text("The Swift/SwiftUI implementation under Sources/ and Tests/ is new work by this repository's contributors and is distributed under the same Apache License 2.0.")
                     .fixedSize(horizontal: false, vertical: true)
                 Link("Apache License 2.0", destination: Self.apacheURL)
+            } header: {
+                TechnicalSectionHeader(title: "Repository")
             }
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .listRowBackground(Theme.surface)
+        .listRowSeparatorTint(Theme.separator)
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle("Attribution")
         .navigationBarTitleDisplayMode(.inline)
@@ -106,12 +118,16 @@ private struct MusicLicensingView: View {
                 Text("Availability of a track through the catalog does not by itself establish permission to download, redistribute or publicly perform it. Permanent downloads keep a local copy of the stream the catalog serves; they do not transfer rights.")
                 Text("You are responsible for complying with the terms of the services you use and with applicable copyright and other laws.")
                 Text("Third-party services and their catalogs can change, restrict or remove content at any time.")
+            } header: {
+                TechnicalSectionHeader(title: "Notice")
             } footer: {
                 Text("This notice is general information, not legal advice.")
             }
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
+        .listRowBackground(Theme.surface)
+        .listRowSeparatorTint(Theme.separator)
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle("Music Licensing")
         .navigationBarTitleDisplayMode(.inline)

@@ -48,7 +48,7 @@ struct QueueView: View {
                                     isCurrent: true
                                 )
                             } header: {
-                                sectionHeader("Now playing")
+                                TechnicalSectionHeader(title: "Now Playing")
                             }
                         }
 
@@ -83,7 +83,7 @@ struct QueueView: View {
                                 }
                             }
                         } header: {
-                            sectionHeader("Next in queue")
+                            TechnicalSectionHeader(title: "Next in Queue")
                         }
                     }
                     .listStyle(.plain)
@@ -110,14 +110,5 @@ struct QueueView: View {
         }
     }
 
-    private func sectionHeader(_ title: String) -> some View {
-        HStack(spacing: 6) {
-            Rectangle()
-                .fill(Theme.accent)
-                .frame(width: 4, height: 10)
-                .accessibilityHidden(true)
-            TechnicalLabel(text: title)
-        }
-    }
 }
 #endif

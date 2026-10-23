@@ -37,56 +37,65 @@ struct LibraryView: View {
                         NavigationLink {
                             DownloadsView(model: model)
                         } label: {
-                            LabeledContent(
-                                "Manage Downloads",
-                                value: model.completedDownloads.count == 1
-                                    ? "1 song"
-                                    : "\(model.completedDownloads.count) songs"
-                            )
-                            .font(Theme.rowTitle)
+                            HStack(spacing: 10) {
+                                TechnicalIcon(name: "arrow.down.circle")
+                                Text("Manage Downloads")
+                                    .font(Theme.listRowTitle)
+                                    .foregroundStyle(Theme.primaryText)
+                                Spacer(minLength: 8)
+                                TechnicalLabel(
+                                    text: model.completedDownloads.count == 1
+                                        ? "1 SONG"
+                                        : "\(model.completedDownloads.count) SONGS"
+                                )
+                            }
                         }
                     }
 
-                    ForEach(rows) { track in
-                        Button {
-                            Task { await model.play(track, in: rows) }
-                        } label: {
-                            TrackRow(
-                                track: track,
-                                localArtworkURL: model.artworkURL(for: track),
-                                isCurrent: model.player.currentTrack?.id == track.id,
-                                showsFavorite: true,
-                                isFavorite: model.isFavorite(track)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .swipeActions(edge: .leading) {
-                            Button(
-                                model.isFavorite(track) ? "Unfavorite" : "Favorite",
-                                systemImage: model.isFavorite(track) ? "heart.slash" : "heart"
-                            ) {
-                                model.toggleFavorite(track)
+                    Section {
+                        ForEach(rows) { track in
+                            Button {
+                                Task { await model.play(track, in: rows) }
+                            } label: {
+                                TrackRow(
+                                    track: track,
+                                    localArtworkURL: model.artworkURL(for: track),
+                                    isCurrent: model.player.currentTrack?.id == track.id,
+                                    showsFavorite: true,
+                                    isFavorite: model.isFavorite(track)
+                                )
                             }
-                        }
-                        .swipeActions {
-                            if track.provider == Track.localProvider {
-                                Button("Delete", role: .destructive) {
-                                    pendingDeletion = track
-                                }
-                            } else if track.source.supportsDownloads {
-                                if let item = model.downloads.first(where: {
-                                    $0.track.id == track.id && $0.state == .completed
-                                }) {
-                                    Button("Remove", role: .destructive) {
-                                        pendingDownloadRemoval = item
-                                    }
-                                } else {
-                                    Button("Download", systemImage: "arrow.down.circle") {
-                                        model.startDownload(track)
-                                    }
+                            .buttonStyle(.plain)
+                            .swipeActions(edge: .leading) {
+                                Button(
+                                    model.isFavorite(track) ? "Unfavorite" : "Favorite",
+                                    systemImage: model.isFavorite(track) ? "heart.slash" : "heart"
+                                ) {
+                                    model.toggleFavorite(track)
                                 }
                             }
+                            .swipeActions {
+                                if track.provider == Track.localProvider {
+                                    Button("Delete", role: .destructive) {
+                                        pendingDeletion = track
+                                    }
+                                } else if track.source.supportsDownloads {
+                                    if let item = model.downloads.first(where: {
+                                        $0.track.id == track.id && $0.state == .completed
+                                    }) {
+                                        Button("Remove", role: .destructive) {
+                                            pendingDownloadRemoval = item
+                                        }
+                                    } else {
+                                        Button("Download", systemImage: "arrow.down.circle") {
+                                            model.startDownload(track)
+                                        }
+                                    }
+                                }
+                            }
                         }
+                    } header: {
+                        TechnicalSectionHeader(title: filter.title, meta: trackCountText)
                     }
                 }
                 .listStyle(.plain)
@@ -166,6 +175,11 @@ struct LibraryView: View {
                 Text("The offline copy is deleted. You can download it again later.")
             }
         }
+    }
+
+    private var trackCountText: String {
+        guard !rows.isEmpty else { return "EMPTY" }
+        return rows.count == 1 ? "1 TRACK" : "\(rows.count) TRACKS"
     }
 
     private var filterChips: some View {

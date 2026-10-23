@@ -57,6 +57,11 @@ struct ReleaseDetailView: View {
                             .buttonStyle(.plain)
                         }
                     }
+                } header: {
+                    TechnicalSectionHeader(
+                        title: "Tracks",
+                        meta: detail.map { "\($0.tracks.count) TRACKS" }
+                    )
                 }
             }
             .listStyle(.plain)
@@ -133,7 +138,7 @@ struct ArtistDetailView: View {
 
                 if let detail {
                     if !detail.topTracks.isEmpty {
-                        Section("Top tracks") {
+                        Section {
                             ForEach(detail.topTracks) { track in
                                 Button {
                                     Task { await model.play(track, in: detail.topTracks) }
@@ -145,10 +150,15 @@ struct ArtistDetailView: View {
                                 }
                                 .buttonStyle(.plain)
                             }
+                        } header: {
+                            TechnicalSectionHeader(
+                                title: "Top Tracks",
+                                meta: "\(detail.topTracks.count) TRACKS"
+                            )
                         }
                     }
                     if !detail.releases.isEmpty {
-                        Section("Albums") {
+                        Section {
                             ForEach(detail.releases) { release in
                                 Button {
                                     selectedRelease = release
@@ -178,6 +188,11 @@ struct ArtistDetailView: View {
                                 }
                                 .buttonStyle(.plain)
                             }
+                        } header: {
+                            TechnicalSectionHeader(
+                                title: "Albums",
+                                meta: "\(detail.releases.count) RELEASES"
+                            )
                         }
                     }
                 }

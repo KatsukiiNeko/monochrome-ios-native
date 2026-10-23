@@ -36,10 +36,12 @@ struct DownloadsView: View {
             }
 
             if !active.isEmpty {
-                Section("In Progress") {
+                Section {
                     ForEach(active) { item in
                         activeRow(item)
                     }
+                } header: {
+                    TechnicalSectionHeader(title: "In Progress")
                 }
             }
 
@@ -49,17 +51,16 @@ struct DownloadsView: View {
                 }
             } header: {
                 if !completed.isEmpty {
-                    HStack {
-                        Text("Downloaded")
-                        Spacer()
-                        Text(byteText(model.downloadsBytes))
-                            .foregroundStyle(Theme.secondaryText)
-                    }
+                    TechnicalSectionHeader(
+                        title: "Downloaded",
+                        meta: byteText(model.downloadsBytes)
+                    )
                 }
             }
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .listRowSeparatorTint(Theme.separator)
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle("Downloads")
         .navigationBarTitleDisplayMode(.inline)
