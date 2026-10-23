@@ -24,12 +24,19 @@ public final class PlayerController {
     private let engine: any PlaybackEngine
     private let resolver: any TrackURLResolver
     private let cache: (any AudioCaching)?
+    private let now: @Sendable () -> Date
+    /// A download may be cancelled only while the track has just started.
+    private static let skipCancellationWindow: TimeInterval = 10
     /// One fresh resolution per track after a failure, then the error is shown.
     private var didRetryCurrentTrack = false
     /// True while the engine holds a file, so a restart needs no network round trip.
     private var currentItemIsLocal = false
     /// Stream resolved for the current item, waiting for the parsed format before caching.
     private var pendingCache: PendingCache?
+    /// When the current item started, used to decide whether skipping should cancel its cache.
+    private var playbackStartedAt: Date?
+    /// The track whose background download belongs to the current item.
+    private var cacheDownloadTrack: Track?
 
     private struct PendingCache {
         var track: Track
@@ -44,11 +51,13 @@ public final class PlayerController {
     public init(
         engine: any PlaybackEngine,
         resolver: any TrackURLResolver,
-        cache: (any AudioCaching)? = nil
+        cache: (any AudioCaching)? = nil,
+        now: @escaping @Sendable () -> Date = { .now }
     ) {
         self.engine = engine
         self.resolver = resolver
         self.cache = cache
+        self.now = now
         engine.onEvent = { [weak self] event in
             guard let self else { return }
             Task { await self.handle(event) }
@@ -81,6 +90,9 @@ public final class PlayerController {
         if queue.advance() != nil {
             await loadCurrent()
         } else {
+            await cancelCacheDownloadIfSkippedEarly()
+            playbackStartedAt = nil
+            cacheDownloadTrack = nil
             engine.stop()
             position = 0
             state = .idle
@@ -175,6 +187,11 @@ public final class PlayerController {
     private func startCacheStoreIfReady(format: AudioFormat?, duration: Double) {
         guard let cache, let pending = pendingCache else { return }
         pendingCache = nil
+        guard pending.track.id == queue.current?.id else {
+            log?("cache skip track=\(pending.track.id) reason=stale")
+            return
+        }
+        cacheDownloadTrack = pending.track
         Task(priority: .utility) {
             await cache.store(
                 pending.track,
@@ -185,6 +202,20 @@ public final class PlayerController {
                 duration: duration
             )
         }
+    }
+
+    /// Skips cancel the download only while the track is still starting; later skips
+    /// let it finish so a track played for a while still becomes a cache hit.
+    private func cancelCacheDownloadIfSkippedEarly() async {
+        guard let cache, let track = cacheDownloadTrack else { return }
+        // Retrying or looping the same track is not a skip.
+        if queue.current?.id == track.id { return }
+        let started = playbackStartedAt ?? now()
+        let elapsed = now().timeIntervalSince(started)
+        cacheDownloadTrack = nil
+        guard elapsed < Self.skipCancellationWindow else { return }
+        log?("cache cancel track=\(track.id) reason=skipped elapsed=\(Int(elapsed))")
+        await cache.cancelDownload(for: track, quality: track.audioQuality, reason: "skipped")
     }
 
     private func handleEndOfTrack() async {
@@ -219,6 +250,8 @@ public final class PlayerController {
     }
 
     private func loadCurrent(retrying: Bool = false, forLoop: Bool = false) async {
+        await cancelCacheDownloadIfSkippedEarly()
+        playbackStartedAt = nil
         guard let track = queue.current else {
             engine.stop()
             state = .idle
@@ -250,6 +283,7 @@ public final class PlayerController {
                 }
                 currentItemIsLocal = true
                 isCurrentFromCache = true
+                playbackStartedAt = now()
                 if forLoop { log?("loop source=cache") }
                 onTrackStarted?(track)
                 return
@@ -273,6 +307,7 @@ public final class PlayerController {
             engine.play()
             state = .playing
             currentItemIsLocal = !track.isStreaming
+            playbackStartedAt = now()
             onTrackStarted?(track)
         } catch {
             pendingCache = nil
