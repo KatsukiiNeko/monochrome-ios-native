@@ -16,6 +16,14 @@ public struct Queue: Equatable, Sendable {
     }
 
     public var isEmpty: Bool { tracks.isEmpty }
+    public var canAdvance: Bool {
+        guard let currentIndex else { return false }
+        return currentIndex + 1 < tracks.count
+    }
+    public var canRewind: Bool {
+        guard let currentIndex else { return false }
+        return currentIndex > 0
+    }
 
     public mutating func replace(with tracks: [Track], startingAt index: Int) {
         self.tracks = tracks

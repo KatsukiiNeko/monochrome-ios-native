@@ -53,11 +53,13 @@ struct AudioCacheTests {
     private func makeCache(
         directory: URL,
         downloader: FakeDownloader,
+        entryLimit: Int = AudioCache.defaultEntryLimit,
         sizeLimitBytes: Int = AudioCache.defaultSizeLimitBytes
     ) -> AudioCache {
         AudioCache(
             directory: directory,
             downloader: downloader,
+            entryLimit: entryLimit,
             sizeLimitBytes: sizeLimitBytes,
             minimumFreeSpaceBytes: 0
         )
@@ -292,6 +294,66 @@ struct AudioCacheTests {
         #expect(entry.title == nil)
         #expect(entry.artist == nil)
         #expect(entry.artworkURL == nil)
+        #expect(entry.createdAt == .distantPast)
+    }
+
+    @Test func loadedEntryIsNeverEvicted() async throws {
+        let directory = temporaryDirectory()
+        let cache = makeCache(directory: directory, downloader: FakeDownloader(), entryLimit: 2)
+        let first = streamTrack("1")
+        await store(cache, first)
+        await cache.protect(track: first, quality: .lossless)
+
+        for id in 2...6 {
+            await store(cache, streamTrack(String(id)))
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+
+        #expect(await cache.entryCount() == 2)
+        #expect(await cache.cachedAudio(for: first, quality: .lossless) != nil)
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    @Test func equalTimestampsUseCreationTimeThenKey() async throws {
+        let directory = temporaryDirectory()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let stamp = Date(timeIntervalSince1970: 100)
+        for (id, name) in [("stream:2", "stream_2-lossless"), ("stream:1", "stream_1-lossless")] {
+            try Data(repeating: 3, count: 32).write(
+                to: directory.appendingPathComponent("\(name).flac")
+            )
+            let entry = AudioCacheEntry(
+                trackID: id,
+                quality: "lossless",
+                fileName: "\(name).flac",
+                byteSize: 32,
+                lastUsedAt: stamp,
+                createdAt: stamp
+            )
+            let data = try JSONEncoder().encode(entry)
+            try data.write(to: directory.appendingPathComponent("\(name).json"))
+        }
+
+        let cache = makeCache(directory: directory, downloader: FakeDownloader(), entryLimit: 1)
+        await cache.reconcile()
+
+        // Same use/creation time: the lexicographically smallest track id goes first.
+        #expect(await cache.cachedAudio(for: streamTrack("2"), quality: .lossless) != nil)
+        #expect(await cache.cachedAudio(for: streamTrack("1"), quality: .lossless) == nil)
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    @Test func clearOnLaunchPreferencePersistsAndDefaultsOff() {
+        let suite = "AudioCacheSettingsTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AudioCacheSettings(defaults: defaults)
+
+        #expect(settings.clearOnLaunch == false)
+        settings.setClearOnLaunch(true)
+        #expect(AudioCacheSettings(defaults: defaults).clearOnLaunch)
+        settings.setClearOnLaunch(false)
+        #expect(AudioCacheSettings(defaults: defaults).clearOnLaunch == false)
     }
 
     @Test func downloaderFailureLeavesNothingBehind() async throws {
@@ -306,6 +368,106 @@ struct AudioCacheTests {
         let files = (try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? []
         #expect(files.isEmpty)
         try? FileManager.default.removeItem(at: directory)
+    }
+
+    @Test func sixEntriesEvictTheLeastRecentlyUsedOne() async throws {
+        let directory = temporaryDirectory()
+        let cache = makeCache(directory: directory, downloader: FakeDownloader())
+        let tracks = (1...6).map { streamTrack(String($0)) }
+
+        for track in tracks.prefix(5) {
+            await store(cache, track)
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        // Touch track 1 so track 2 becomes the least recently used.
+        #expect(await cache.cachedAudio(for: tracks[0], quality: .lossless) != nil)
+        try? await Task.sleep(for: .milliseconds(10))
+        await store(cache, tracks[5])
+
+        #expect(await cache.entryCount() == AudioCache.defaultEntryLimit)
+        #expect(await cache.cachedAudio(for: tracks[0], quality: .lossless) != nil)
+        #expect(await cache.cachedAudio(for: tracks[1], quality: .lossless) == nil)
+        #expect(await cache.cachedAudio(for: tracks[5], quality: .lossless) != nil)
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    @Test func playingSixInOrderEvictsTheFirstAndKeepsTwoThroughSix() async throws {
+        let directory = temporaryDirectory()
+        let cache = makeCache(directory: directory, downloader: FakeDownloader())
+        let tracks = (1...6).map { streamTrack(String($0)) }
+
+        for track in tracks {
+            await store(cache, track)
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(await cache.entryCount() == 5)
+        #expect(await cache.cachedAudio(for: tracks[0], quality: .lossless) == nil)
+        for track in tracks[1...] {
+            #expect(await cache.cachedAudio(for: track, quality: .lossless) != nil)
+        }
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    @Test func reconcileRemovesInterruptedAndOrphanedFiles() async throws {
+        let directory = temporaryDirectory()
+        let cache = makeCache(directory: directory, downloader: FakeDownloader())
+        let track = streamTrack()
+        await store(cache, track)
+
+        try Data(repeating: 1, count: 8).write(
+            to: directory.appendingPathComponent("orphan.flac.uuid.partial")
+        )
+        try Data(repeating: 2, count: 8).write(
+            to: directory.appendingPathComponent("orphan.flac")
+        )
+        try Data("not json".utf8).write(
+            to: directory.appendingPathComponent("orphan.json")
+        )
+
+        await cache.reconcile()
+
+        let files = Set((try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? [])
+        #expect(!files.contains { $0.hasSuffix(".partial") })
+        #expect(!files.contains("orphan.flac"))
+        #expect(!files.contains("orphan.json"))
+        #expect(await cache.cachedAudio(for: track, quality: .lossless) != nil)
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    @Test func reconcileAppliesTheEntryLimitToExistingCache() async throws {
+        let directory = temporaryDirectory()
+        let downloader = FakeDownloader()
+        let large = makeCache(directory: directory, downloader: downloader, entryLimit: 6)
+        for id in 1...6 {
+            await store(large, streamTrack(String(id)))
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(await large.entryCount() == 6)
+
+        let limited = makeCache(directory: directory, downloader: downloader, entryLimit: 5)
+        await limited.reconcile()
+
+        #expect(await limited.entryCount() == 5)
+        #expect(await limited.cachedAudio(for: streamTrack("1"), quality: .lossless) == nil)
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    @Test func clearingTheTemporaryCacheLeavesPermanentStorageAlone() async throws {
+        let root = temporaryDirectory()
+        let cacheDirectory = root.appendingPathComponent("AudioCache", isDirectory: true)
+        let permanentDirectory = root.appendingPathComponent("Permanent", isDirectory: true)
+        try FileManager.default.createDirectory(at: permanentDirectory, withIntermediateDirectories: true)
+        let permanent = permanentDirectory.appendingPathComponent("saved.flac")
+        try Data(repeating: 5, count: 64).write(to: permanent)
+
+        let cache = makeCache(directory: cacheDirectory, downloader: FakeDownloader())
+        await store(cache, streamTrack())
+        await cache.clear()
+
+        #expect(FileManager.default.fileExists(atPath: permanent.path))
+        #expect(await cache.entryCount() == 0)
+        try? FileManager.default.removeItem(at: root)
     }
 }
 

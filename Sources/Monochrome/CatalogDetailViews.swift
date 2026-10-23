@@ -57,6 +57,11 @@ struct ReleaseDetailView: View {
                             .buttonStyle(.plain)
                         }
                     }
+                } header: {
+                    TechnicalSectionHeader(
+                        title: "Tracks",
+                        meta: detail.map { "\($0.tracks.count) TRACKS" }
+                    )
                 }
             }
             .listStyle(.plain)
@@ -66,6 +71,7 @@ struct ReleaseDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
+                        .foregroundStyle(Theme.primaryText)
                 }
             }
             .task { await load() }
@@ -118,7 +124,7 @@ struct ArtistDetailView: View {
                             if let image = phase.image {
                                 image.resizable().scaledToFill()
                             } else {
-                                Circle().fill(Color(white: 0.14))
+                                Circle().fill(Theme.elevated)
                             }
                         }
                         .frame(width: 88, height: 88)
@@ -132,7 +138,7 @@ struct ArtistDetailView: View {
 
                 if let detail {
                     if !detail.topTracks.isEmpty {
-                        Section("Top tracks") {
+                        Section {
                             ForEach(detail.topTracks) { track in
                                 Button {
                                     Task { await model.play(track, in: detail.topTracks) }
@@ -144,10 +150,15 @@ struct ArtistDetailView: View {
                                 }
                                 .buttonStyle(.plain)
                             }
+                        } header: {
+                            TechnicalSectionHeader(
+                                title: "Top Tracks",
+                                meta: "\(detail.topTracks.count) TRACKS"
+                            )
                         }
                     }
                     if !detail.releases.isEmpty {
-                        Section("Albums") {
+                        Section {
                             ForEach(detail.releases) { release in
                                 Button {
                                     selectedRelease = release
@@ -177,6 +188,11 @@ struct ArtistDetailView: View {
                                 }
                                 .buttonStyle(.plain)
                             }
+                        } header: {
+                            TechnicalSectionHeader(
+                                title: "Albums",
+                                meta: "\(detail.releases.count) RELEASES"
+                            )
                         }
                     }
                 }
@@ -188,6 +204,7 @@ struct ArtistDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
+                        .foregroundStyle(Theme.primaryText)
                 }
             }
             .task { await load() }

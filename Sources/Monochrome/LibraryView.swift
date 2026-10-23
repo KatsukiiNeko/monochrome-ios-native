@@ -1,4 +1,4 @@
-// LibraryView.swift: imported files and favorites, with import and delete.
+// LibraryView.swift: library filters, sort, pinned favorites and imported files.
 #if canImport(SwiftUI)
 import MonochromeCore
 import SwiftUI
@@ -6,43 +6,126 @@ import UniformTypeIdentifiers
 
 struct LibraryView: View {
     let model: AppModel
-    var onOpenPlayer: () -> Void
     var onOpenSettings: () -> Void
 
-    @State private var scope: Scope = .imported
+    @State private var filter: LibraryFilter = .all
+    @State private var sort: LibrarySort = .recent
     @State private var isShowingImporter = false
     @State private var pendingDeletion: Track?
+    @State private var pendingDownloadRemoval: DownloadItem?
 
-    private enum Scope: String, CaseIterable, Identifiable {
-        case imported = "Imported"
-        case favorites = "Favorites"
-
-        var id: String { rawValue }
+    private var rows: [Track] {
+        LibraryQuery.rows(
+            tracks: model.tracks,
+            favorites: model.favorites,
+            downloads: model.completedDownloads.map(\.track),
+            filter: filter,
+            sort: sort
+        )
     }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                Picker("Source", selection: $scope) {
-                    ForEach(Scope.allCases) { scope in
-                        Text(scope.rawValue).tag(scope)
+                filterChips
+                favoritesPinnedRow
+                    .padding(.horizontal, Theme.screenPadding)
+                    .padding(.bottom, 8)
+
+                List {
+                    if filter == .downloaded, !model.completedDownloads.isEmpty {
+                        NavigationLink {
+                            DownloadsView(model: model)
+                        } label: {
+                            HStack(spacing: 10) {
+                                TechnicalIcon(name: "arrow.down.circle")
+                                Text("Manage Downloads")
+                                    .font(Theme.listRowTitle)
+                                    .foregroundStyle(Theme.primaryText)
+                                Spacer(minLength: 8)
+                                TechnicalLabel(
+                                    text: model.completedDownloads.count == 1
+                                        ? "1 SONG"
+                                        : "\(model.completedDownloads.count) SONGS"
+                                )
+                            }
+                        }
+                    }
+
+                    Section {
+                        ForEach(rows) { track in
+                            Button {
+                                Task { await model.play(track, in: rows) }
+                            } label: {
+                                TrackRow(
+                                    track: track,
+                                    localArtworkURL: model.artworkURL(for: track),
+                                    isCurrent: model.player.currentTrack?.id == track.id,
+                                    showsFavorite: true,
+                                    isFavorite: model.isFavorite(track)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .swipeActions(edge: .leading) {
+                                Button(
+                                    model.isFavorite(track) ? "Unfavorite" : "Favorite",
+                                    systemImage: model.isFavorite(track) ? "heart.slash" : "heart"
+                                ) {
+                                    model.toggleFavorite(track)
+                                }
+                            }
+                            .swipeActions {
+                                if track.provider == Track.localProvider {
+                                    Button("Delete", role: .destructive) {
+                                        pendingDeletion = track
+                                    }
+                                } else if track.source.supportsDownloads {
+                                    if let item = model.downloads.first(where: {
+                                        $0.track.id == track.id && $0.state == .completed
+                                    }) {
+                                        Button("Remove", role: .destructive) {
+                                            pendingDownloadRemoval = item
+                                        }
+                                    } else {
+                                        Button("Download", systemImage: "arrow.down.circle") {
+                                            model.startDownload(track)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } header: {
+                        TechnicalSectionHeader(title: filter.title, meta: trackCountText)
                     }
                 }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, Theme.screenPadding)
-                .padding(.bottom, 8)
-
-                content
+                .listStyle(.plain)
+                .listRowSeparatorTint(Theme.separator)
+                .scrollContentBackground(.hidden)
+                .overlay {
+                    if model.isImporting {
+                        ProgressView("Importing…")
+                            .padding()
+                            .glassSurface(cornerRadius: Theme.cardRadius)
+                    } else if rows.isEmpty {
+                        emptyState
+                    }
+                }
             }
+            .background(Theme.background.ignoresSafeArea())
             .navigationTitle("Library")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    sortMenu
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button("Import audio files", systemImage: "plus") {
                         isShowingImporter = true
                     }
+                    .foregroundStyle(Theme.primaryText)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Settings", systemImage: "gearshape") { onOpenSettings() }
+                        .foregroundStyle(Theme.primaryText)
                 }
             }
             .fileImporter(
@@ -74,96 +157,133 @@ struct LibraryView: View {
             } message: {
                 Text("This removes the app's copy. The original file in Files is untouched.")
             }
+            .confirmationDialog(
+                "Remove “\(pendingDownloadRemoval?.track.title ?? "this download")”?",
+                isPresented: Binding(
+                    get: { pendingDownloadRemoval != nil },
+                    set: { if !$0 { pendingDownloadRemoval = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Remove download", role: .destructive) {
+                    guard let item = pendingDownloadRemoval else { return }
+                    pendingDownloadRemoval = nil
+                    Task { await model.removeDownload(item) }
+                }
+                Button("Cancel", role: .cancel) { pendingDownloadRemoval = nil }
+            } message: {
+                Text("The offline copy is deleted. You can download it again later.")
+            }
         }
+    }
+
+    private var trackCountText: String {
+        guard !rows.isEmpty else { return "EMPTY" }
+        return rows.count == 1 ? "1 TRACK" : "\(rows.count) TRACKS"
+    }
+
+    private var filterChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(LibraryFilter.allCases) { option in
+                    Chip(title: option.title, isSelected: filter == option) {
+                        filter = option
+                    }
+                }
+            }
+            .padding(.horizontal, Theme.screenPadding)
+            .padding(.vertical, 8)
+        }
+    }
+
+    private var favoritesPinnedRow: some View {
+        Button {
+            filter = .favorites
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "heart.fill")
+                    .font(.headline)
+                    .foregroundStyle(Theme.accent)
+                    .frame(width: 48, height: 48)
+                    .background(Theme.elevated, in: RoundedRectangle(cornerRadius: Theme.tileRadius))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Favorites")
+                        .font(Theme.rowTitle)
+                        .foregroundStyle(Theme.primaryText)
+                    TechnicalLabel(
+                        text: model.favorites.count == 1 ? "1 song" : "\(model.favorites.count) songs"
+                    )
+                }
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(Theme.tertiaryText)
+            }
+            .padding(8)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                    .stroke(Theme.border, lineWidth: Theme.hairline)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Favorites, \(model.favorites.count) songs")
+        .accessibilityHint("Shows favorite tracks")
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            Picker("Sort", selection: $sort) {
+                ForEach(LibrarySort.allCases) { option in
+                    Text(option.title).tag(option)
+                }
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+                .foregroundStyle(Theme.primaryText)
+        }
+        .accessibilityLabel("Sort library")
+        .accessibilityValue(sort.title)
     }
 
     @ViewBuilder
-    private var content: some View {
-        switch scope {
-        case .imported: importedList
-        case .favorites: favoritesList
-        }
-    }
-
-    private var importedList: some View {
-        List {
-            ForEach(model.tracks) { track in
-                Button {
-                    Task { await model.play(track, in: model.tracks) }
-                } label: {
-                    TrackRow(
-                        track: track,
-                        localArtworkURL: model.artworkURL(for: track),
-                        isCurrent: model.player.currentTrack?.id == track.id,
-                        showsFavorite: true,
-                        isFavorite: model.isFavorite(track)
-                    )
-                }
-                .buttonStyle(.plain)
-                .swipeActions(edge: .leading) {
-                    Button(
-                        model.isFavorite(track) ? "Unfavorite" : "Favorite",
-                        systemImage: model.isFavorite(track) ? "heart.slash" : "heart"
-                    ) {
-                        model.toggleFavorite(track)
-                    }
-                }
-                .swipeActions {
-                    Button("Delete", role: .destructive) {
-                        pendingDeletion = track
-                    }
-                }
+    private var emptyState: some View {
+        switch filter {
+        case .all:
+            ContentUnavailableView {
+                Label("No music yet", systemImage: "music.note.list")
+            } description: {
+                Text("Import audio files from the Files app, or search the catalog.")
+            } actions: {
+                Button("Import audio files") { isShowingImporter = true }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.primaryAction)
             }
-        }
-        .listStyle(.plain)
-        .overlay {
-            if model.isImporting {
-                ProgressView("Importing…")
-                    .padding()
-                    .glassSurface(cornerRadius: 12)
-            } else if model.tracks.isEmpty {
-                ContentUnavailableView {
-                    Label("No music yet", systemImage: "music.note.list")
-                } description: {
-                    Text("Import audio files from the Files app, or search the catalog.")
-                } actions: {
-                    Button("Import audio files") { isShowingImporter = true }
-                        .buttonStyle(.borderedProminent)
-                }
+        case .favorites:
+            ContentUnavailableView {
+                Label("No favorites yet", systemImage: "heart")
+            } description: {
+                Text("Tap the heart in the player, or swipe a track to the right.")
             }
-        }
-    }
-
-    private var favoritesList: some View {
-        List {
-            ForEach(model.favorites) { track in
-                Button {
-                    Task { await model.play(track, in: model.favorites) }
-                } label: {
-                    TrackRow(
-                        track: track,
-                        localArtworkURL: model.artworkURL(for: track),
-                        isCurrent: model.player.currentTrack?.id == track.id,
-                        showsFavorite: true,
-                        isFavorite: true
-                    )
-                }
-                .buttonStyle(.plain)
-                .swipeActions {
-                    Button("Unfavorite", systemImage: "heart.slash", role: .destructive) {
-                        model.toggleFavorite(track)
-                    }
-                }
+        case .downloaded:
+            ContentUnavailableView {
+                Label("No downloads yet", systemImage: "arrow.down.circle")
+            } description: {
+                Text("Download a song from its menu to keep it available offline.")
             }
-        }
-        .listStyle(.plain)
-        .overlay {
-            if model.favorites.isEmpty {
-                ContentUnavailableView {
-                    Label("No favorites yet", systemImage: "heart")
-                } description: {
-                    Text("Tap the heart in the player, or swipe a track to the right.")
-                }
+        case .local:
+            ContentUnavailableView {
+                Label("No local files", systemImage: "folder")
+            } description: {
+                Text("Import audio files from the Files app.")
+            } actions: {
+                Button("Import audio files") { isShowingImporter = true }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.primaryAction)
             }
         }
     }

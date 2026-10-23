@@ -10,18 +10,36 @@ struct TrackRow: View {
     var showsFavorite = false
     var isFavorite = false
     var showsDuration = true
+    /// Overrides the default artist subtitle, e.g. "Song · Artist" in search.
+    var subtitle: String?
+    var showsKind = false
+
+    private var rowSubtitle: String {
+        if let subtitle { return subtitle }
+        return showsKind ? "Song · \(track.displayArtist)" : track.displayArtist
+    }
 
     var body: some View {
-        HStack(spacing: 12) {
-            TrackArtwork(track: track, localURL: localArtworkURL, cornerRadius: 6)
-                .frame(width: 48, height: 48)
+        HStack(spacing: Theme.rowSpacing) {
+            TrackArtwork(
+                track: track,
+                localURL: localArtworkURL,
+                cornerRadius: Theme.artworkRadius
+            )
+            .frame(width: 52, height: 52)
 
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 5) {
+                    if isCurrent {
+                        Image(systemName: "speaker.wave.2.fill")
+                            .font(.caption2)
+                            .foregroundStyle(Theme.accent)
+                            .accessibilityLabel("Now playing")
+                    }
                     Text(track.title)
-                        .font(.subheadline.weight(isCurrent ? .semibold : .regular))
+                        .font(Theme.rowTitle)
+                        .foregroundStyle(Theme.primaryText)
                         .lineLimit(1)
-                    // Only tracks whose catalog tier is known get a badge.
                     if let badge = AudioBadge.text(quality: track.audioQuality) {
                         QualityBadgeLabel(
                             text: badge,
@@ -30,9 +48,9 @@ struct TrackRow: View {
                         .layoutPriority(1)
                     }
                 }
-                Text(track.displayArtist)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(rowSubtitle)
+                    .font(Theme.rowSubtitle)
+                    .foregroundStyle(Theme.secondaryText)
                     .lineLimit(1)
             }
 
@@ -41,13 +59,13 @@ struct TrackRow: View {
             if showsFavorite, isFavorite {
                 Image(systemName: "heart.fill")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Theme.accent)
                     .accessibilityLabel("Favorite")
             }
             if showsDuration, let duration = track.durationSeconds {
                 Text(formatDuration(duration))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .font(Theme.time)
+                    .foregroundStyle(Theme.secondaryText)
             }
         }
         .contentShape(Rectangle())

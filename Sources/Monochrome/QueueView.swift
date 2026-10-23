@@ -1,4 +1,4 @@
-// QueueView.swift: inspect, jump around, reorder and remove queued tracks.
+// QueueView.swift: current track and upcoming queue with jump, reorder and remove.
 #if canImport(SwiftUI)
 import MonochromeCore
 import SwiftUI
@@ -9,6 +9,25 @@ struct QueueView: View {
     @Environment(\.dismiss) private var dismiss
 
     private var player: PlayerController { model.player }
+
+    private struct Entry: Identifiable {
+        let index: Int
+        let track: Track
+        var id: Int { index }
+    }
+
+    private var upcoming: [Entry] {
+        guard let current = player.queue.currentIndex else { return [] }
+        let start = current + 1
+        guard start < player.queue.tracks.count else { return [] }
+        return (start..<player.queue.tracks.count).map { index in
+            Entry(index: index, track: player.queue.tracks[index])
+        }
+    }
+
+    private var upcomingStart: Int {
+        (player.queue.currentIndex ?? 0) + 1
+    }
 
     var body: some View {
         NavigationStack {
@@ -21,41 +40,75 @@ struct QueueView: View {
                     )
                 } else {
                     List {
-                        ForEach(Array(player.queue.tracks.enumerated()), id: \.element.id) { index, track in
-                            Button {
-                                Task { await player.jump(to: index) }
-                            } label: {
+                        if let current = player.queue.current {
+                            Section {
                                 TrackRow(
-                                    track: track,
-                                    localArtworkURL: model.artworkURL(for: track),
-                                    isCurrent: index == player.queue.currentIndex
+                                    track: current,
+                                    localArtworkURL: model.artworkURL(for: current),
+                                    isCurrent: true
                                 )
-                            }
-                            .buttonStyle(.plain)
-                            .swipeActions {
-                                Button("Remove", role: .destructive) {
-                                    Task { await player.removeTrack(at: index) }
-                                }
+                            } header: {
+                                TechnicalSectionHeader(title: "Now Playing")
                             }
                         }
-                        .onMove { offsets, destination in
-                            guard let source = offsets.first else { return }
-                            player.moveQueue(from: source, to: destination)
+
+                        Section {
+                            if upcoming.isEmpty {
+                                Text("Nothing else is queued.")
+                                    .font(Theme.rowSubtitle)
+                                    .foregroundStyle(Theme.secondaryText)
+                            } else {
+                                ForEach(upcoming) { entry in
+                                    Button {
+                                        Task { await player.jump(to: entry.index) }
+                                    } label: {
+                                        TrackRow(
+                                            track: entry.track,
+                                            localArtworkURL: model.artworkURL(for: entry.track)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .swipeActions {
+                                        Button("Remove", role: .destructive) {
+                                            Task { await player.removeTrack(at: entry.index) }
+                                        }
+                                    }
+                                }
+                                .onMove { offsets, destination in
+                                    guard let source = offsets.first else { return }
+                                    player.moveQueue(
+                                        from: source + upcomingStart,
+                                        to: destination + upcomingStart
+                                    )
+                                }
+                            }
+                        } header: {
+                            TechnicalSectionHeader(title: "Next in Queue")
                         }
                     }
                     .listStyle(.plain)
+                    .listRowSeparatorTint(Theme.separator)
+                    .scrollContentBackground(.hidden)
+                    .tint(Theme.accent)
                 }
             }
+            .background(Theme.background.ignoresSafeArea())
             .navigationTitle("Queue")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    EditButton()
+                    if !upcoming.isEmpty {
+                        EditButton()
+                    }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
+                        .foregroundStyle(Theme.primaryText)
                 }
             }
+            .preferredColorScheme(model.appearanceMode.colorScheme)
         }
     }
+
 }
 #endif

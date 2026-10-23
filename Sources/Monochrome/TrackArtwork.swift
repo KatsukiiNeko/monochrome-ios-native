@@ -31,7 +31,7 @@ struct TrackArtwork: View {
 private struct ArtworkPlaceholder: View {
     var body: some View {
         Rectangle()
-            .fill(Color(white: 0.14))
+            .fill(Theme.elevated)
             .overlay {
                 Image(systemName: "music.note")
                     .font(.title3)

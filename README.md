@@ -37,24 +37,25 @@ The app includes Home, Search, and Library tabs; a persistent mini-player; a ful
 | Streaming | Resolve a playable track URL at playback time and retry resolution once after a playback failure. |
 | Playback | Play/pause, seeking, next/previous, queue management, and repeat modes. |
 | Library | Local library, favorites, and recently played history persisted on-device. |
-| Audio cache | On-disk cache with LRU eviction and a 500 MB cap; caching over cellular is opt-in. |
+| Permanent downloads | User-chosen songs are saved under Application Support/Downloads and play offline until removed. Downloads are separate from the temporary cache and imported files. |
+| Audio cache | A five-song rolling on-disk LRU buffer. Playing songs 1–5 keeps all five; playing song 6 evicts song 1, so songs 2–6 still start from cache without re-streaming. Cellular caching stays off by default. Cache cleanup never touches downloads or imported files. |
 | Audio metadata | Displays the detected audio format and quality where available. |
-| iOS integration | Background audio, Now Playing metadata, Lock Screen controls, remote commands, interruption handling, and route-change handling. |
-| Preferences | Configure the streaming host or disable online streaming to use local audio only. |
+| iOS integration | Background audio, Now Playing metadata with album and artwork, Lock Screen controls, remote commands, interruption handling, and route-change handling. |
+| Preferences | System/Light/Dark appearance, an Enable Endpoint on/off switch, endpoint reset, cache usage and clearing, download management, and project/licensing information. |
 | Privacy | No account system, analytics, or tracking SDK. No credentials are embedded in the source. |
 
-Lyrics, cloud playlists, account login, and cross-device synchronization are not implemented.
+Monochrome downloads are available because the upstream web client downloads the same progressive FLAC stream (`js/api.js:3050`, `js/downloads.js:348`). That is capability evidence, not a content licence: the rights caveat below still applies. The YouTube Music companion source has no server configured in this build and never downloads. Lyrics, cloud playlists, account login, and cross-device synchronization are not implemented. See [`docs/SOURCES.md`](docs/SOURCES.md).
 
 ## Verification
 
-The maintainer has completed the physical-device test checklist and reports successful results. The app has also been compiled and its portable core test suite has been run on Linux.
+The maintainer completed the physical-device test checklist for the earlier UI pass and reports successful results. The current downloads, five-song cache, settings and Now Playing changes were compiled and host-tested, but not installed or run on a device.
 
 | Level | Meaning | Status |
 |---|---|---|
 | **L1 — Compile** | Swift sources compile for the target platform. | Passed |
-| **L2 — Unit tests** | Portable core behavior is tested on Linux. | Passed: 113 tests across 14 suites at the last recorded run. |
+| **L2 — Unit tests** | Portable core behavior is tested on Linux. | Passed: 212 tests across 26 suites at the last recorded run. |
 | **L3 — Live service** | Catalog search and stream resolution are checked against the live catalog. | Passed in the recorded live-service checks; the opt-in live test is not run by default. |
-| **L4 — Physical device** | Playback and iOS-specific behavior are checked on a real iPhone. | Passed according to the completed maintainer device checklist. |
+| **L4 — Physical device** | Playback and iOS-specific behavior are checked on a real iPhone. | Passed for the earlier UI pass; the current settings/cache/Now Playing changes are not device-validated. |
 
 CI runs the portable `swift test` suite. It does **not** run the live catalog test, build/sign an IPA, or install the app on a device. The iOS cross-compile check remains a separate local step because this workflow does not provision Apple's Darwin SDK.
 
@@ -70,7 +71,9 @@ The documented endpoint provides **FLAC, 16-bit / 44.1 kHz lossless audio**. It 
 
 The native client uses HTTPS and a truthful `User-Agent`; it does not spoof `Origin` or `Referer`, include credentials, or call the token-gated `/api/v2/track/` endpoint. The API client contains multi-host failover support and tests, but the current app wiring configures a single host; automatic user-host-to-default-host failover should not be considered an active app feature until that wiring is added.
 
-In Settings, you can configure a different HTTPS host (for example, your own instance or a supported paid endpoint) or clear the host to disable online streaming while retaining local playback.
+In Settings, **Enable Endpoint** switches the online catalog and streaming on or off while retaining local playback. The catalog endpoint can be pointed at another HTTPS host (for example, your own instance or a supported paid endpoint) and reset to the built-in default without changing appearance, downloads, favorites or history.
+
+“Hi-Fi” in this app is a quality label, not a separate catalogue or provider: the catalog path exposes one lossless tier (FLAC 16-bit / 44.1 kHz). YouTube Music has no authorized integration here; it is a companion-server design with no default URL. Permanent downloads store the same progressive FLAC stream the app plays, and the temporary cache is a separate disposable buffer.
 
 ### Content and distribution notice
 
@@ -127,7 +130,7 @@ Package.swift                    Swift package and targets
 Resources/Info.plist             App display name and background audio capability
 Branding/                        Upstream icon and logo attribution
 scripts/build.sh                 Linux iOS compile check
-Sources/MonochromeCore/          Portable models, stores, API client, cache, and player state
+Sources/MonochromeCore/          Portable models, stores, API client, cache, downloads, and player state
 Sources/Monochrome/              SwiftUI interface and iOS audio integration
 Tests/MonochromeCoreTests/        Unit tests and JSON fixtures
 docs/                            Streaming, toolchain, migration, and device-test notes

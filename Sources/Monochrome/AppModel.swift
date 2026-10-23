@@ -16,12 +16,19 @@ final class AppModel {
 
     let player: PlayerController
     let cache: AudioCache
+    let downloadStore: DownloadStore
     private(set) var streamingHost: String
+    /// The catalog is usable: enabled and pointed at a valid host.
     private(set) var isStreamingConfigured: Bool
+    private(set) var isMonochromeEnabled: Bool
+    private(set) var streamingSettingsError: String?
+    private(set) var appearanceMode: AppearanceMode
     private(set) var cacheSizeBytes = 0
     private(set) var cacheEntryCount = 0
     private(set) var cachedTracks: [CachedTrackSummary] = []
-    var allowsCellularCaching: Bool { cacheSettings.allowsCellular }
+    private(set) var downloads: [DownloadItem] = []
+    private(set) var downloadsMetadataError: String?
+    private(set) var isRefreshingDownloads = false
 
     private let service: LocalFileService
     private let favoritesStore: FavoritesStore
@@ -29,11 +36,16 @@ final class AppModel {
     private let searchHistoryStore: HistoryStore
     private let resolver: DefaultTrackResolver
     private let streamingSettings: StreamingSettings
+    private let appearanceSettings: AppearanceSettings
     private let cacheSettings: AudioCacheSettings
     private var streamingClient: TracksAPIClient?
     private let mediaDirectory: URL
     private let audioSession: AudioSessionController
     private let nowPlaying: NowPlayingController
+    private let artworkTints = ArtworkTintStore()
+    /// Cache cleanup is launch-only; import/delete reloads must not touch a download.
+    private var didReconcileCache = false
+    private var didReconcileDownloads = false
 
     init() {
         let base = FileManager.default
@@ -47,6 +59,8 @@ final class AppModel {
         )
         let resolver = DefaultTrackResolver(localDirectory: media)
         let cacheSettings = AudioCacheSettings()
+        // Temporary cache only. Permanent user files live in Application Support
+        // and must never be moved under this directory.
         let cacheDirectory = FileManager.default
             .urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("AudioCache", isDirectory: true)
@@ -64,30 +78,64 @@ final class AppModel {
             },
             log: { message in playerLog.notice("\(message, privacy: .public)") }
         )
-        let player = PlayerController(engine: AVPlayerEngine(), resolver: resolver, cache: cache)
+        // Permanent downloads live beside the library, not under Caches.
+        let downloadsDirectory = base.appendingPathComponent("Downloads", isDirectory: true)
+        try? FileManager.default.createDirectory(at: downloadsDirectory, withIntermediateDirectories: true)
+        var excludedDownloads = downloadsDirectory
+        var downloadValues = URLResourceValues()
+        downloadValues.isExcludedFromBackup = true
+        try? excludedDownloads.setResourceValues(downloadValues)
+        let downloadStore = DownloadStore(
+            directory: downloadsDirectory,
+            downloader: URLSessionFileDownloader(allowsCellular: { true }),
+            log: { message in playerLog.notice("\(message, privacy: .public)") }
+        )
+        let player = PlayerController(
+            engine: AVPlayerEngine(),
+            resolver: resolver,
+            cache: cache,
+            downloads: downloadStore
+        )
         player.log = { message in playerLog.notice("\(message, privacy: .public)") }
         let settings = StreamingSettings()
+        let appearanceSettings = AppearanceSettings()
         self.service = service
         self.player = player
         self.cache = cache
+        self.downloadStore = downloadStore
         self.cacheSettings = cacheSettings
         self.resolver = resolver
         self.streamingSettings = settings
+        self.appearanceSettings = appearanceSettings
+        self.appearanceMode = appearanceSettings.mode
         self.streamingHost = settings.rawValue
         self.isStreamingConfigured = settings.baseURL != nil
+        self.isMonochromeEnabled = settings.isEnabled
         self.mediaDirectory = media
         self.favoritesStore = FavoritesStore(fileURL: base.appendingPathComponent("favorites.json"))
         self.historyStore = HistoryStore(fileURL: base.appendingPathComponent("history.json"))
         self.searchHistoryStore = HistoryStore(
             fileURL: base.appendingPathComponent("search-history.json"),
-            limit: 20
+            limit: 10
         )
         // System integration: audio session first, then Lock Screen metadata/commands.
         self.audioSession = AudioSessionController(player: player)
-        self.nowPlaying = NowPlayingController(player: player)
+        self.nowPlaying = NowPlayingController(player: player) { track in
+            if let name = track.artworkFileName, !name.isEmpty {
+                return media.appendingPathComponent(name)
+            }
+            return track.artworkURL
+        }
         applyStreamingSettings()
         // One source of truth: every track the player actually starts lands in history.
         player.onTrackStarted = { [weak self] track in self?.record(track) }
+    }
+
+    // MARK: - Appearance
+
+    func setAppearanceMode(_ mode: AppearanceMode) {
+        appearanceSettings.setMode(mode)
+        appearanceMode = mode
     }
 
     // MARK: - Streaming
@@ -96,27 +144,49 @@ final class AppModel {
     private func applyStreamingSettings() {
         let baseURL = streamingSettings.baseURL
         isStreamingConfigured = baseURL != nil
+        isMonochromeEnabled = streamingSettings.isEnabled
         let client = baseURL.map { TracksAPIClient(baseURL: $0) }
         streamingClient = client
         Task { await resolver.useStreamingClient(client) }
     }
 
+    var hasCustomStreamingEndpoint: Bool {
+        streamingSettings.hasCustomEndpoint
+    }
+
+    /// Disabling removes the client immediately, so search, playback resolution
+    /// and download resolution all fail until the catalog is enabled again.
+    func setMonochromeEnabled(_ enabled: Bool) {
+        streamingSettings.setEnabled(enabled)
+        applyStreamingSettings()
+        streamingSettingsError = streamingSettings.isEnabled == enabled
+            ? nil
+            : "The streaming preference could not be saved."
+        if !enabled, player.currentTrack?.isStreaming == true, player.isPlaying {
+            // The resolved stream keeps fetching while it plays, so pause remote
+            // playback when the catalog is switched off. The queue is preserved.
+            Task { await player.togglePlayPause() }
+        }
+    }
+
     func saveStreamingHost(_ raw: String) -> Bool {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        // Empty input is a deliberate "streaming off", not an invalid host.
-        if !trimmed.isEmpty, StreamingSettings.baseURL(from: trimmed) == nil {
-            return false
-        }
+        guard StreamingSettings.baseURL(from: trimmed) != nil else { return false }
         streamingSettings.setBaseURL(trimmed)
         streamingHost = streamingSettings.rawValue
         applyStreamingSettings()
+        streamingSettingsError = nil
         return true
     }
 
-    func resetStreamingHost() {
+    /// Restores only the endpoint. Appearance, cache, downloads and history are untouched.
+    func resetStreamingEndpoint() {
         streamingSettings.reset()
         streamingHost = streamingSettings.rawValue
         applyStreamingSettings()
+        streamingSettingsError = streamingSettings.configuredBaseURL == StreamingSettings.defaultBaseURL
+            ? nil
+            : "The endpoint could not be reset."
     }
 
     func searchTracks(_ query: String) async throws -> [Track] {
@@ -166,6 +236,20 @@ final class AppModel {
     }
 
     func loadTracks() async {
+        // Launch is the safe boundary for interrupted-write and orphan cleanup.
+        if !didReconcileCache {
+            if cacheSettings.clearOnLaunch {
+                await cache.clear()
+            } else {
+                await cache.reconcile()
+            }
+            didReconcileCache = true
+        }
+        if !didReconcileDownloads {
+            await downloadStore.reconcile()
+            didReconcileDownloads = true
+        }
+        downloadsMetadataError = await downloadStore.metadataError()
         do {
             tracks = try await service.allTracks()
         } catch {
@@ -175,6 +259,8 @@ final class AppModel {
         favorites = loadFavorites()
         recents = (try? historyStore.load()) ?? []
         searchRecents = (try? searchHistoryStore.load()) ?? []
+        await refreshCacheSize()
+        await refreshDownloads()
     }
 
     private func loadFavorites() -> [Track] {
@@ -271,8 +357,80 @@ final class AppModel {
         await refreshCacheSize()
     }
 
-    func setAllowsCellularCaching(_ allowed: Bool) {
-        cacheSettings.setAllowsCellular(allowed)
+    // MARK: - Permanent downloads
+
+    var completedDownloads: [DownloadItem] {
+        downloads.filter { $0.state == .completed }
+    }
+
+    var downloadsBytes: Int {
+        completedDownloads.reduce(0) { $0 + ($1.record?.byteSize ?? 0) }
+    }
+
+    func isDownloaded(_ track: Track) -> Bool {
+        completedDownloads.contains { $0.track.id == track.id }
+    }
+
+    func downloadState(for track: Track) -> DownloadState? {
+        downloads.first { $0.track.id == track.id }?.state
+    }
+
+    func startDownload(_ track: Track) {
+        guard track.source.supportsDownloads else {
+            errorMessage = track.source.downloadUnavailableReason
+            return
+        }
+        guard !track.isStreaming || isStreamingConfigured else {
+            errorMessage = "Enable the endpoint in Settings to download catalog tracks."
+            return
+        }
+        Task { await performDownload(track) }
+    }
+
+    private func performDownload(_ track: Track) async {
+        do {
+            let url = try await resolver.url(for: track)
+            let contentType = await resolver.contentType(for: track)
+            let poll = Task {
+                while !Task.isCancelled {
+                    await refreshDownloads()
+                    try? await Task.sleep(for: .milliseconds(300))
+                }
+            }
+            defer {
+                poll.cancel()
+                Task { await refreshDownloads() }
+            }
+            try await downloadStore.download(
+                track: track,
+                url: url,
+                contentType: contentType,
+                format: nil,
+                duration: track.durationSeconds
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        await refreshDownloads()
+    }
+
+    func refreshDownloads() async {
+        isRefreshingDownloads = true
+        downloads = await downloadStore.items()
+        downloadsMetadataError = await downloadStore.metadataError()
+        isRefreshingDownloads = false
+    }
+
+    @discardableResult
+    func removeDownload(_ item: DownloadItem) async -> Bool {
+        do {
+            try await downloadStore.remove(id: item.id)
+            await refreshDownloads()
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
     }
 
     func clearError() {
@@ -286,6 +444,11 @@ final class AppModel {
     func artworkURL(for track: Track?) -> URL? {
         guard let name = track?.artworkFileName else { return nil }
         return mediaDirectory.appendingPathComponent(name)
+    }
+
+    func artworkTint(for track: Track?) async -> ArtworkTintColor {
+        guard let track else { return .neutral }
+        return await artworkTints.tint(for: track, localURL: artworkURL(for: track))
     }
 
     // MARK: - Favorites

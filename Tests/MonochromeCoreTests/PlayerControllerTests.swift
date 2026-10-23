@@ -57,10 +57,14 @@ private actor FakeCache: AudioCaching {
     private var hit: CachedAudio?
     private(set) var storedIDs: [String] = []
     private(set) var storedURLs: [URL] = []
+    private(set) var lookups = 0
 
     func setHit(_ audio: CachedAudio?) { hit = audio }
 
-    func cachedAudio(for track: Track, quality: AudioQuality?) async -> CachedAudio? { hit }
+    func cachedAudio(for track: Track, quality: AudioQuality?) async -> CachedAudio? {
+        lookups += 1
+        return hit
+    }
 
     func store(
         _ track: Track,
@@ -73,6 +77,14 @@ private actor FakeCache: AudioCaching {
         storedIDs.append(track.id)
         storedURLs.append(url)
     }
+}
+
+private actor FakeDownloads: DownloadedAudioProviding {
+    private var file: DownloadedAudio?
+
+    func setFile(_ audio: DownloadedAudio?) { file = audio }
+
+    func downloadedFile(for track: Track) async -> DownloadedAudio? { file }
 }
 
 private func track(_ id: String, duration: Double? = nil) -> Track {
@@ -90,6 +102,80 @@ struct PlayerControllerTests {
         let engine = FakeEngine()
         let controller = PlayerController(engine: engine, resolver: resolver)
         return (controller, engine)
+    }
+
+    @Test func downloadIsPreferredOverCacheAndNetwork() async {
+        let engine = FakeEngine()
+        let resolver = FakeResolver()
+        let cache = FakeCache()
+        await cache.setHit(CachedAudio(url: URL(fileURLWithPath: "/cache/a.flac")))
+        let downloads = FakeDownloads()
+        await downloads.setFile(DownloadedAudio(
+            url: URL(fileURLWithPath: "/downloads/a.flac"),
+            format: AudioFormat(codec: "flac"),
+            duration: 123,
+            byteSize: 99
+        ))
+        let controller = PlayerController(
+            engine: engine,
+            resolver: resolver,
+            cache: cache,
+            downloads: downloads
+        )
+
+        await controller.play(tracks: [streamTrack("a")], startingAt: 0)
+
+        #expect(engine.loadedURLs.map(\.lastPathComponent) == ["a.flac"])
+        #expect(engine.loadedURLs.first?.deletingLastPathComponent().lastPathComponent == "downloads")
+        #expect(controller.isCurrentFromDownload)
+        #expect(!controller.isCurrentFromCache)
+        #expect(controller.duration == 123)
+        #expect(await resolver.requests().isEmpty)
+        #expect(await cache.lookups == 0)
+    }
+
+    @Test func cacheIsPreferredOverNetworkWhenNoDownloadExists() async {
+        let engine = FakeEngine()
+        let resolver = FakeResolver()
+        let cache = FakeCache()
+        await cache.setHit(CachedAudio(url: URL(fileURLWithPath: "/cache/a.flac")))
+        let downloads = FakeDownloads()
+        let controller = PlayerController(
+            engine: engine,
+            resolver: resolver,
+            cache: cache,
+            downloads: downloads
+        )
+
+        await controller.play(tracks: [streamTrack("a")], startingAt: 0)
+
+        #expect(engine.loadedURLs.map(\.lastPathComponent) == ["a.flac"])
+        #expect(engine.loadedURLs.first?.deletingLastPathComponent().lastPathComponent == "cache")
+        #expect(controller.isCurrentFromCache)
+        #expect(!controller.isCurrentFromDownload)
+        #expect(await resolver.requests().isEmpty)
+        #expect(await cache.lookups == 1)
+    }
+
+    @Test func networkIsUsedWhenNeitherStoreHasTheTrack() async {
+        let engine = FakeEngine()
+        let resolver = FakeResolver()
+        let cache = FakeCache()
+        let downloads = FakeDownloads()
+        let controller = PlayerController(
+            engine: engine,
+            resolver: resolver,
+            cache: cache,
+            downloads: downloads
+        )
+
+        await controller.play(tracks: [streamTrack("a")], startingAt: 0)
+
+        #expect(engine.loadedURLs.map(\.lastPathComponent) == ["stream:a"])
+        #expect(!controller.isCurrentFromCache)
+        #expect(!controller.isCurrentFromDownload)
+        #expect(await resolver.requests().count == 1)
+        #expect(await cache.lookups == 1)
     }
 
     @Test func playLoadsAndStartsSelectedTrack() async {

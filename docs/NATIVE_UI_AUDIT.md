@@ -1,122 +1,222 @@
-# Native UI audit and plan
+# Native UI audit and redesign direction
 
-Date: 2026-10-22. Audit of the SwiftUI layer as imported, plus what the installed
-SDK actually offers. Nothing here was rendered; visual results are L1 at most.
+Date: 2026-10-23. Source audit before the Nothing-inspired visual pass. No
+screen was rendered; visual results remain L1 unless a person inspects them.
 
-## What exists today
+## Actual current state
 
-| screen | file | state |
+| screen / component | file | state |
 |---|---|---|
-| Library | `Sources/Monochrome/ContentView.swift` | one flat `List` of imported files, favorites-only toggle, import/delete, queue button |
-| Mini player | `MiniPlayerView.swift` | title + play/pause + next above the list, no artwork, no progress |
-| Now Playing | `PlayerView.swift` | sheet with a fixed 280-pt artwork block, transport and seek |
-| Queue | `QueueView.swift` | sheet listing the queue with reorder/jump/remove |
-| Artwork | `ArtworkView.swift` | embedded-artwork reader for local files |
+| App entry | `Sources/Monochrome/App.swift` | `@main`; appearance comes from `AppearanceSettings`, not a forced scheme |
+| Shell | `Sources/Monochrome/ContentView.swift` | `AppTab` (no `Tab` shadowing); player is a large sheet; one mini-player inset on the `TabView` |
+| Mini player | `Sources/Monochrome/MiniPlayerView.swift` | floating artwork-tinted card, favorite, play/pause, next, progress, retry |
+| Now Playing | `Sources/Monochrome/PlayerView.swift` | tinted background, chevron, artwork, favorite, scrubber, transport, queue, badge, AirPlay |
+| Queue | `Sources/Monochrome/QueueView.swift` | medium/large sheet; now playing and upcoming; jump, reorder, remove |
+| Home | `Sources/Monochrome/HomeView.swift` | greeting, logo, quick-access grid, Listen again, Your favorites, empty state |
+| Search | `Sources/Monochrome/SearchView.swift` | pinned field, persisted recents, result-type chips, top result, rows, menus |
+| Library | `Sources/Monochrome/LibraryView.swift` | All/Favorites/Downloaded/Local chips, sort menu, pinned Favorites, import, download and local delete |
+| Album and artist | `Sources/Monochrome/CatalogDetailViews.swift` | detail sheets with real catalog data |
+| Settings | `Sources/Monochrome/SettingsView.swift` | appearance, host, downloads, five-slot cache meter, cached-song list, Done only |
+| Shared row | `Sources/Monochrome/TrackRow.swift` | artwork, title, artist, badge, favorite marker, duration |
+| Shared artwork | `Sources/Monochrome/TrackArtwork.swift` | remote image, local embedded image, placeholder |
+| Tokens | `Sources/Monochrome/Theme.swift` | adaptive palette from `ThemePalette`, spacing, radii, type, glass helper |
+| Downloads | `Sources/Monochrome/DownloadsView.swift` | permanent offline files, play, remove with confirmation |
+| Source detail | `Sources/Monochrome/SourceDetailView.swift` | real capability matrix, configuration and companion limitation |
+| Dot matrix | `Sources/Monochrome/DotMatrixView.swift` | 5×7 numerals and five-slot cache meter |
+| Bar model | `Sources/MonochromeCore/NowPlayingBar.swift` | derived title, subtitle, badge, progress, loading/failure |
 
-Gaps against the brief:
+## Confirmed findings
 
-- No tab shell, no Home, no Search. Everything is one library list.
-- No online content anywhere: rows show file-imported tracks only.
-- Mini player has no artwork, no progress, no glass, and lives in a
-  `safeAreaInset` on the single screen — it disappears with navigation changes.
-- Now Playing uses a fixed 280-pt frame instead of `containerRelativeFrame` and
-  breaks on small phones and with large Dynamic Type.
-- No design tokens: paddings, radii and type are inline and inconsistent.
-- No app icon (the xtool manifest has no `iconPath`, no asset catalog), no logo
-  anywhere in the UI.
-- No empty/error state for anything online, because nothing online exists.
+1. The old `Tab` shadowing and `.fullScreenCover` presentation are already fixed.
+2. The mini-player inset is applied once to the `TabView`, but the card can
+   visually sit over tab content because the inset is not propagated reliably to
+   the child scroll views. The inset needs to live with each tab's root while
+   sharing one mini-player definition.
+3. `App.swift` forces dark appearance. The custom `Theme` colors are also
+   dark-only, so light appearance is not a real variant yet.
+4. The palette has no semantic accent token beyond white. Nothing-inspired
+   hierarchy needs one restrained accent for selection, progress and active
+   playback state.
+5. The shared components use large radii and soft card treatment. The visual
+   language should move to tighter geometry, hairline rules, technical labels
+   and monospaced metadata.
+6. `HomeView` no longer hardcodes its background and no longer accepts an unused
+   player closure.
+7. The existing core helpers for tint, quick access, search partitioning and
+   library filtering/sorting are already tested and should be reused.
 
-## What the installed SDK actually provides
+## Design rules for this pass
 
-Checked in
-`…/iPhoneOS27.1.sdk/System/Library/Frameworks/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface`.
+- Monochrome chrome, one restrained red accent for state and progress.
+- Near-black or off-white backgrounds; one or two neutral surface levels.
+- Tight artwork radii, 10–12 pt cards, hairline dividers, no pill-heavy UI.
+- System typography with monospaced numerals and compact uppercase micro-labels.
+- Small red square/dot markers and short rules communicate structure and state.
+- Artwork color stays limited to the mini-player and Now Playing background.
+- Native tab bars, navigation bars, sheets and safe areas remain intact.
+- Motion is short and disabled or reduced under Reduce Motion.
+- No fake telemetry, recommendations, quality claims or unimplemented controls.
 
-| API | found | availability |
+## Target per screen
+
+| screen | target |
+|---|---|
+| Shell | Home/Search/Library tabs; one mini-player definition; reliable bottom inset on each tab; large player sheet |
+| Mini player | compact tinted surface, 42 pt artwork, title/artist, real badge, favorite, play/pause, next, 2 pt progress |
+| Now Playing | tinted dark or intentional light treatment, chevron, technical source caption, large artwork, scrubber, transport, queue, badge, AirPlay |
+| Queue | medium/large sheet; current then upcoming; jump, reorder and remove only |
+| Home | technical greeting, two-column quick access, Listen again, Your favorites, real empty state |
+| Search | pinned field, recent searches, returned-type chips, top result, shared rows, real menus |
+| Library | filter chips, sort menu, pinned Favorites, import, shared rows, real empty states |
+| Settings | host, appearance, downloads and cache controls; one Done action; no Save |
+| Shared | `Chip`, `ShelfHeader`, `ArtworkTile`, `TrackRow`, `RoundPlayButton`, `Scrubber`, badge |
+
+## Needs eyes on a device
+
+Every screen below is L1 until a person looks at it. The visual result cannot be
+verified from a Linux build.
+
+1. Shell: the mini-player stays above the tab bar on every tab and after
+   dismissing a modal detail sheet, and the last scroll row clears it.
+2. Mini player: tint changes with artwork, text stays readable over bright
+   artwork, and controls remain 44 pt.
+3. Now Playing: sheet swipes down, artwork fits a 4.7-inch screen, scrubber seeks,
+   tint fades cleanly in dark and light.
+4. Queue: medium detent is usable, reorder handles work.
+5. Home: grid tiles and shelves align; long titles truncate without pushing
+   controls.
+6. Search: chips fit on one line, top result and rows share spacing, keyboard
+   does not cover results.
+7. Library: chips and sort menu fit, pinned Favorites does not duplicate rows.
+8. All screens at the largest Dynamic Type size, with Reduce Motion and Reduce
+   Transparency enabled.
+9. System, Light and Dark appearances remain legible across sheets, alerts,
+   navigation bars and the mini-player.
+
+## Implementation status
+
+The baseline table above records the state before this pass. The following
+changes are now on `development`:
+
+| area | change | verification |
 |---|---|---|
-| `glassEffect` | **no** | not in this SDK |
-| `GlassEffectContainer` | **no** | not in this SDK |
-| `glassEffectID` | **no** | not in this SDK |
-| `.buttonStyle(.glass)` / `GlassButtonStyle` | yes | iOS 26.0 |
-| `tabViewBottomAccessory` | yes | iOS 26.0 (the `isEnabled:` overload is **26.1**) |
-| `tabViewBottomAccessoryPlacement` | yes | iOS 26.0 |
-| `tabBarMinimizeBehavior` | yes | iOS 26.0 |
-| `Tab(_:image:value:)` typed tabs | yes | **iOS 18.0** |
-| `TabRole.search` | yes | iOS 18.0 |
-| `matchedTransitionSource` | yes | iOS 18.0 |
-| `navigationTransition` | yes | iOS 18.0 |
+| Theme | adaptive light/dark colors, red state accent, high-contrast transport tokens, tight radii, technical type and motion tokens | L1 |
+| Appearance | persisted System/Light/Dark preference in Settings, applied at the app boundary | L1 + host tests |
+| Shared components | rectangular chips, marked section headers, bordered artwork, red active-state rows, high-contrast play button, thin scrubber, technical badges | L1 |
+| Shell | one mini-player definition applied to each tab root so scroll content is inset on every tab | L1 |
+| Mini player | dark artwork-tinted surface with white text, 44 pt controls, red progress and favorite state | L1 |
+| Now Playing | artwork-derived background with an intentional light treatment, technical source caption, bordered artwork, accent repeat marker, queue, badge, cache and AirPlay | L1 |
+| Queue | medium/large sheet, marked section headers, real jump/reorder/remove | L1 |
+| Home | technical greeting, two-column quick access, marked shelves, active-track marker, separators | L1 |
+| Search | focused-field accent, marked top result, result-type chips, separated rows and recents | L1 |
+| Library | marked favorites row, accent heart, filter chips, download swipe, sort and separators | L1 |
+| Downloads | permanent store under Application Support, explicit removal, no cache overlap | L1 + host tests |
+| Source detail | Monochrome and YouTube Music capability screens; no fake setup controls | L1 |
+| Cache | five-song rolling LRU, protected loaded entry, clear-on-launch opt-in, five-dot meter and dot-matrix numerals | L1 + host tests |
+| Theme | `ThemePalette` light/dark tokens, WCAG contrast tests, 20 pt cards, 56 pt rows, 16 pt screen padding, 24 pt sections | L1 + host tests |
+| Now Playing | core snapshot and remote-command routing, download/cache source badges | L1 + host tests |
 
-Package deployment target is **iOS 17.0** and stays there. Consequences:
+Host tests: 212 tests in 26 suites passed at the last recorded run. The iOS
+arm64 build-only check passed after every commit. No device is attached, so no
+screen reached L4 or Human verification.
 
-1. `glassEffect`, `GlassEffectContainer` and `glassEffectID` cannot be used at
-   all — they do not exist in this SDK. No guessing, no shim under those names.
-2. Typed `Tab` and `TabRole.search` need iOS 18, so the tab shell uses the
-   classic `TabView` + `.tabItem`, which works on 17 and renders with Liquid
-   Glass on 26 (system components adopt the new design when built with this
-   SDK).
-3. `tabViewBottomAccessory` is iOS 26-only, and its `isEnabled:` overload is
-   26.1. The mini player uses that overload behind `#available(iOS 26.1, *)`,
-   and a `safeAreaInset` bar on everything older.
-4. `.buttonStyle(.glass)` is iOS 26-only. It is applied through **one**
-   `glassControlStyle()` helper with a `.bordered` fallback, honoring
-   `accessibilityReduceTransparency`.
+## Settings simplification pass
 
-So the honest Liquid Glass story for this repo: glass arrives through the
-system tab bar, navigation bars, toolbars and sheets on iOS 26, plus one
-`.glass` button style on the Now Playing transport. Everything else uses
-system materials. We never paint opaque backgrounds over system chrome.
+Date: 2026-10-23. Current Settings after the storage and endpoint pass:
 
-## Design decisions
-
-- **Palette:** near-black background (`Color(white: 0.05)`), primary text white,
-  secondary `white.opacity(0.6)`, one accent derived from the artwork. No
-  gradients, no neon, no Spotify green.
-- **Type:** SF Pro via semantic styles only (`.largeTitle`, `.headline`,
-  `.subheadline`, `.caption`), so Dynamic Type works. Durations use
-  `.monospacedDigit()`.
-- **Spacing scale:** 4 / 8 / 12 / 16 / 24 / 32 as `CGFloat` constants in one
-  `Theme` enum.
-- **Artwork:** `AsyncImage` for remote URLs, existing `ArtworkView` for local
-  files, and a single missing-artwork placeholder (SF Symbol on a neutral
-  fill). Artwork never gets a glass overlay.
-- **Navigation:** `TabView` with Home, Search, Library. Each tab owns a
-  `NavigationStack`. Navigating never touches `PlayerController`, which stays
-  the single source of truth.
-- **Now Playing:** full-screen cover (not a sheet) from the mini player.
-  Artwork sized with `containerRelativeFrame`, controls in one glass cluster on
-  iOS 26, materials below.
-- **Queue:** sheet from Now Playing; reorder/remove only where the player
-  supports it (it does: `Queue` has move/remove).
-- **Logo:** the web app's own icon/logo, unchanged, in the Home header.
-
-## Needs eyes on a device (cannot be verified here)
-
-1. Does `AVPlayer` accept `application/octet-stream` FLAC from the tracks host?
-   This is the single biggest unknown; if it refuses, playback needs a
-   different tier or a server that sets `audio/flac`.
-2. Mini player placement on iOS 26 devices with `tabViewBottomAccessory`, and
-   that it does not cover list content on iOS 17 (fallback path).
-3. Glass legibility over bright artwork, and with Reduce Transparency enabled.
-4. Artwork layout at the largest accessibility text sizes and on a 4.7" screen.
-5. Safe areas during scrolling, especially the mini player over a tab bar that
-   minimizes on scroll.
-6. Remote artwork loading over a slow connection (placeholder then fade).
-7. Haptics/animations timing — none were added beyond system defaults.
-8. Background audio + lock-screen controls after the navigation rewrite.
-
-## What shipped (R5–R7)
-
-| screen | file | data source |
+| section | controls | notes |
 |---|---|---|
-| Shell: Home / Search / Library tabs + mini player | `ContentView.swift`, `Theme.swift` | player + model only |
-| Home: greeting, recently played, favorites | `HomeView.swift` | `HistoryStore`, favorites |
-| Search: tracks, albums, artists (debounced, cancellable) | `SearchView.swift` | catalog API |
-| Album detail | `CatalogDetailViews.swift` | `/releases/{id}` |
-| Artist detail: top tracks + albums | `CatalogDetailViews.swift` | `/artists/{id}` |
-| Library: imported files and favorites, import/delete | `LibraryView.swift` | local files + favorites |
-| Now Playing: artwork, seek, transport, favorite, retry | `PlayerView.swift` | `PlayerController` |
-| Queue: jump, reorder, remove | `QueueView.swift` | `PlayerController` |
-| Shared row / artwork | `TrackRow.swift`, `TrackArtwork.swift` | local or remote |
+| Appearance | System / Light / Dark picker | persists; every Settings subpage reapplies the preference |
+| Streaming Endpoint | Enable Endpoint toggle, Catalog Endpoint link, Reset Endpoint | reset confirms only when a custom host would be discarded |
+| Cache | Cache Usage, Clear Cache | usage comes from the cache actor's verified entries |
+| Downloads | Manage Downloads | count and total size in the row; manager is also reachable from the Library's Downloaded filter |
+| About | About Monochrome | developer, Apache-2.0 license and music-licensing notice |
 
-Deliberately absent: shuffle, repeat, lyrics, playlists, accounts, downloads and
-offline caching — the player does not implement them, and fake controls were
-ruled out. `ArtworkView.swift` was removed; `TrackArtwork.swift` replaces it.
+Removed from Settings: source capability rows, the YouTube Music companion row,
+the main-page host text field, the five-slot cache meter and cached-song list,
+the cache-over-cellular and clear-on-launch toggles, static playback/Lock Screen
+status rows, and the endpoint/cache/download diagnostic rows. `SourceDetailView`
+is deleted; the endpoint editor is now a small subpage of Settings. The
+underlying cellular-cache and clear-on-launch preferences still exist in
+`AudioCacheSettings` and keep their stored values; only their Settings controls
+were removed.
+
+## Nothing OS visual restoration
+
+Date: 2026-10-23. This pass restores the technical visual layer without
+reopening the simplified Settings hierarchy.
+
+### What the history showed
+
+- `d5ef2f9` established the adaptive monochrome system: 10 pt cards, 20 pt
+  screen padding, 28 pt section spacing, an 18 pt icon token and monospaced
+  technical labels.
+- `12fc29b` removed the unused `title`, `spacing` and `tight` tokens.
+- `331dd5e` raised `cardRadius` from 10 to 20, reduced screen padding to 16 and
+  section spacing to 24, and raised the row minimum to 56 while adding the cache
+  meter and dot-matrix numerals.
+- `f2204ba` used that language in the Settings cards; `1ed0aae` moved Settings
+  to the simplified native list and removed its last use of `DotMatrixText`,
+  leaving the renderer in the tree but unused.
+
+The functional work from `dfcca6d` through `161c049` is retained: the endpoint
+switch, endpoint reset, five-entry cache, permanent downloads and simplified
+Settings information architecture are unchanged.
+
+### References consulted
+
+| source | observed evidence | how it was used |
+|---|---|---|
+| [`fontsinuse.com/uses/59510/nothing-phone`](https://fontsinuse.com/uses/59510/nothing-phone) | Documents NDot, NType 82 and NType 82 Mono, created with Colophon Foundry and used across Nothing packaging, web and phone UI; cites 1980s mainframe type as the origin. | Confirms that dot-matrix display type and monospaced utility type are part of the real identity. It is a third-party typography record, not a layout specification. |
+| [`intl.nothing.tech`](https://intl.nothing.tech/) | The official marketing surface uses black/white product naming, dot-matrix product identifiers and very little colour. | Used only for high-level palette and display-type signals. This is a marketing site, not the Nothing OS interface contract. |
+| [`wallpaper.com/tech/nothing-design-team-interview`](https://www.wallpaper.com/tech/nothing-design-team-interview) | Nothing's design team describes restraint, material honesty, tactility and obsessive detail. | Informed the decision to keep surfaces flat, radii tight and decorative elements functional. It is an interview, not a token reference. |
+| [`shadcn.io/design/nothing`](https://www.shadcn.io/design/nothing) | A third-party, explicitly unofficial DESIGN.md analysis of nothing.tech: monochrome palette, uppercase mono labels, dot-matrix display type, 6/8 pt radii and hairlines. | Used as a supporting interpretation of the public site, never as an official specification. The page itself states Nothing has not reviewed or endorsed it. |
+
+Observed from those sources: monochrome-first surfaces, dot-matrix display type,
+uppercase monospaced utility labels, tight corner radii and fine rules.
+Interpreted for this app: a 5×7 dot renderer for structural labels, 10 pt cards,
+20 pt screen padding, 28 pt sections and a single restrained red state accent.
+No Nothing font, logo, icon or asset is copied or redistributed.
+
+### Applied system
+
+- `Theme` restores the compact geometry: 10 pt cards, 20 pt screen padding,
+  28 pt section spacing, 52 pt row minimum and a 28 pt icon tile.
+- `DotMatrixLabel` gates the custom 5×7 renderer by Dynamic Type and available
+  width, falling back to the scalable monospaced label. The glyph table now
+  covers the full uppercase alphabet, digits, space, slash, colon, dash and
+  period; tests cover every glyph.
+- `TechnicalSectionHeader` (marker + dot-matrix label + optional numeric meta)
+  and `TechnicalIcon` are shared by Settings, About, Downloads, Queue, Library
+  and catalog detail lists.
+- Home uses the dot-matrix wordmark, a hairline under the greeting and numeric
+  shelf metadata. Now Playing uses a dot-matrix section label, album metadata,
+  a queue-position numeral and a dimmed artwork tint. The mini-player keeps its
+  artwork tint with tighter geometry and typography.
+- System font remains the reading face for track titles, descriptions and
+  controls. The display face is limited to short structural labels and numbers.
+- `Theme.destructive` is now a separate text-safe red token; the palette test
+  requires at least 4.5:1 against both background and surface in each mode.
+
+### What still needs a person
+
+1. The mini-player inset must be checked on each tab and on pushed detail
+   screens; SwiftUI safe-area behavior cannot be observed from the build host.
+2. The light appearance is new. Check every surface, sheet, toolbar, alert and
+   the artwork tint for contrast in both appearances.
+3. Check the red accent is limited to selection, progress and active state, and
+   that the primary play button still reads as the strongest control.
+4. Check large Dynamic Type and VoiceOver traversal on the shared rows, chips,
+   top result, transport controls and queue.
+5. Check the mini-player text against bright artwork; the tint is clamped but
+   only a device can confirm the final contrast.
+6. Check the dot-matrix labels at default, large and accessibility Dynamic Type
+   sizes, and on a 320 pt-wide device. `ViewThatFits` should fall back to the
+   monospaced label before any header clips.
+7. Check the technical Settings rows, icons, section headers, separators and
+   row backgrounds in Light, Dark and System appearance, including the pushed
+   endpoint, downloads and About pages.
+8. Check the dimmed Now Playing tint, the album metadata and the queue-position
+   numeral against dark and bright artwork.
+9. Check the sticky Library section header and the Home shelf metadata do not
+   crowd the filter chips or truncate track titles.

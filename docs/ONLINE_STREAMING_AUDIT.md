@@ -66,19 +66,43 @@ Facts that shape the client:
 - The repository carries **no terms of service, no content licence and no
   rights statement**. Its `license` file covers the source code (Apache-2.0)
   only, which says nothing about the audio.
-- Keeping this as a personal build and distributing an app that streams the
-  catalog are different acts. Do not publish it to TestFlight, the App Store or
-  a public release without resolving that yourself.
+- The upstream web client has a user-facing download path: `downloadTrack`
+  resolves the same FLAC URL, reads the body to a Blob, and saves it
+  (`js/api.js:3050,3196-3231`; `js/downloads.js:348`). This is capability
+  evidence for the source, not a content licence. The native app therefore
+  offers permanent downloads for Monochrome, refuses HLS/DASH/encrypted
+  formats, and keeps the rights caveat below in force.
+- Keeping this as a personal build and distributing an app that streams or
+  downloads the catalog are different acts. Do not publish it to TestFlight,
+  the App Store or a public release without resolving that yourself.
 - `INSTANCES.md` starts by saying it is outdated, so it is not a reliable
   contract for any host.
+
+## Two offline stores
+
+The app keeps two separate stores with different roots and lifetimes:
+
+| store | root | lifetime | used by playback |
+|---|---|---|---|
+| Permanent downloads | `Application Support/Downloads` | until the user removes it; excluded from backup | first, before the cache and network |
+| Temporary cache | `Caches/AudioCache` | five-song rolling LRU; clear-on-launch is opt-in | second, before network |
+
+Playing six distinct songs in order leaves songs 2–6 in the cache: song 6
+evicts the least recently used entry (song 1). Cache cleanup never deletes a
+download, and a download is never registered in the cache. The currently loaded
+cache entry is protected from eviction. See `Sources/MonochromeCore/AudioCache.swift`,
+`Sources/MonochromeCore/DownloadStore.swift` and `Sources/MonochromeCore/PlayerController.swift`.
 
 ## Decision: Path A, with the base URL configurable (covers A′)
 
 - Default base `https://tracks.monochrome.st`, the endpoint the shipping web
   client uses.
-- Settings lets the user point at another base URL (for example their own paid
-  HiFi endpoint, as the README's Dev Mode description allows) or clear it, in
-  which case the app shows an explicit “streaming not configured” state.
+- Settings has an explicit Enable Endpoint switch. Turning it off shows an
+  explicit “streaming not configured” state and prevents new catalog or stream
+  requests; local files and permanent downloads still play.
+- The endpoint subpage lets the user point at another base URL (for example
+  their own paid HiFi endpoint, as the README's Dev Mode description allows)
+  and reset to the built-in default without changing other preferences.
 - No credentials are shipped, none are stored, and no secret handling is added.
 - Failover: an ordered list (user base URL first, default second), 10 s
   timeouts, in-session health memory. The upstream has no failover list for

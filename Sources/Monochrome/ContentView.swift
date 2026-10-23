@@ -1,15 +1,15 @@
-// ContentView.swift: the app shell — three tabs, one mini player, one full-screen player.
+// ContentView.swift: the app shell — three tabs, one mini player, one player sheet.
 #if canImport(SwiftUI)
 import MonochromeCore
 import SwiftUI
 
 struct ContentView: View {
     @State private var model = AppModel()
-    @State private var tab: Tab = .home
+    @State private var tab: AppTab = .home
     @State private var isShowingPlayer = false
     @State private var isShowingSettings = false
 
-    private enum Tab: Hashable {
+    private enum AppTab: Hashable {
         case home
         case search
         case library
@@ -19,36 +19,41 @@ struct ContentView: View {
         TabView(selection: $tab) {
             HomeView(
                 model: model,
-                onOpenPlayer: { isShowingPlayer = true },
                 onOpenSearch: { tab = .search },
                 onOpenLibrary: { tab = .library },
                 onOpenSettings: { isShowingSettings = true }
             )
             .nowPlayingBarInset(isPresented: isPlayingBarVisible) { miniPlayer }
             .tabItem { Label("Home", systemImage: "house") }
-            .tag(Tab.home)
+            .tag(AppTab.home)
 
             SearchView(model: model)
                 .nowPlayingBarInset(isPresented: isPlayingBarVisible) { miniPlayer }
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
-                .tag(Tab.search)
+                .tag(AppTab.search)
 
             LibraryView(
                 model: model,
-                onOpenPlayer: { isShowingPlayer = true },
                 onOpenSettings: { isShowingSettings = true }
             )
             .nowPlayingBarInset(isPresented: isPlayingBarVisible) { miniPlayer }
             .tabItem { Label("Library", systemImage: "music.note.list") }
-            .tag(Tab.library)
+            .tag(AppTab.library)
         }
-        .fullScreenCover(isPresented: $isShowingPlayer) {
+        .tint(Theme.accent)
+        .sheet(isPresented: $isShowingPlayer) {
             PlayerView(model: model)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.hidden)
+                .presentationBackground(Theme.background)
+                .preferredColorScheme(model.appearanceMode.colorScheme)
         }
         .sheet(isPresented: $isShowingSettings) {
             NavigationStack {
                 SettingsView(model: model)
             }
+            .presentationBackground(Theme.background)
+            .preferredColorScheme(model.appearanceMode.colorScheme)
         }
         .alert(
             "Something went wrong",
@@ -62,6 +67,7 @@ struct ContentView: View {
             Text(model.errorMessage ?? "")
         }
         .task { await model.loadTracks() }
+        .preferredColorScheme(model.appearanceMode.colorScheme)
     }
 
     private var isPlayingBarVisible: Bool { model.player.currentTrack != nil }

@@ -2,7 +2,74 @@
 
 Build under test: `development`, installed with `xtool dev` on the connected iPhone.
 Playback and the visual result can only be confirmed by a person, so tick each
-item by hand.
+item by hand. The build host cannot render SwiftUI; every visual item below is
+unverified until someone looks at the screen.
+
+## Nothing-inspired visual language
+
+- [ ] The chrome is monochrome; artwork is the only source of expressive colour.
+- [ ] The red accent appears only on selection, progress, favorites and active
+      playback state, not on every button or heading.
+- [ ] The primary play/pause control is the strongest control on Now Playing.
+- [ ] Section markers, hairline rules and monospaced time/metadata read as
+      structure, not decoration.
+- [ ] No fake signal meters, telemetry, recommendations, quality claims or
+      unimplemented controls are visible.
+- [ ] Tiles, rows and artwork use the tighter radii; no screen reads as a stack
+      of large rounded cards.
+- [ ] Long titles truncate cleanly and controls keep their alignment.
+
+## Appearance
+
+- [ ] Open Settings and switch Appearance between System, Light and Dark; the
+      open sheet changes immediately, without closing or reopening it.
+- [ ] The appearance choice survives relaunching the app.
+- [ ] System follows the device appearance after changing it in iOS Settings.
+- [ ] Light appearance keeps text, separators, chips, fields and the mini-player
+      readable; dark appearance keeps the same hierarchy.
+- [ ] The mini-player tint and Now Playing background remain legible in both
+      appearances.
+- [ ] Native tab bars, navigation bars, sheets, alerts and menus stay coherent
+      with the selected appearance.
+- [ ] The toolbar logo remains visible in light and dark appearance; it is
+      rendered as a template from the existing asset.
+
+## Layout and navigation
+
+- [ ] The mini-player is a floating card above the tab bar on Home, Search and
+      Library, including after scrolling to the end of each list.
+- [ ] Opening an album or artist detail sheet covers the bar; dismiss the sheet
+      and confirm the bar is still in place.
+- [ ] The card tint follows the current artwork and remains readable; the
+      favorite, play/pause and next controls work.
+- [ ] Tapping the card opens Now Playing; swiping down or tapping the chevron
+      closes it.
+- [ ] Home shows a two-column quick-access grid, Listen again and Your
+      favorites; the last row scrolls clear of the mini-player.
+- [ ] Search chips appear only for returned types; Top result, songs, albums and
+      artists sections open or play the right item.
+- [ ] Library chips and sort menu work; the pinned Favorites row and local-file
+      rows do not duplicate each other.
+- [ ] At the largest Dynamic Type size the quick-access grid becomes one column
+      and no control is clipped.
+- [ ] With Reduce Motion on, the artwork scale and tint changes do not animate.
+- [ ] With Reduce Transparency on, the glass fallback stays solid and readable.
+- [ ] VoiceOver order matches the visual order on Home, Search, Library and Now
+      Playing.
+
+## Now Playing and queue
+
+- [ ] The chevron and a downward swipe both dismiss Now Playing.
+- [ ] The source caption uses the real album when present and “Now playing”
+      otherwise.
+- [ ] Artwork fits without clipping on a 4.7-inch screen and at large text.
+- [ ] The idle scrubber is thin; dragging makes it easier to grab, and seeking
+      moves playback to the expected position.
+- [ ] Repeat shows a visible marker in addition to the accent colour; repeat-one
+      is unambiguous.
+- [ ] The queue sheet opens at medium and large detents; jump, reorder and
+      remove affect playback order as expected.
+- [ ] Format, Cached and AirPlay appear only when their real state exists.
 
 ## Playback
 
@@ -26,7 +93,8 @@ item by hand.
 
 - [ ] With a track loaded, the bar is visible on Home, Search and Library,
       above the tab bar.
-- [ ] Open an album or artist detail screen: the bar stays visible.
+- [ ] Open an album or artist detail sheet: it covers the bar; dismiss it and
+      confirm the bar returns.
 - [ ] The bar shows artwork, title, artist, the format badge, play/pause and a
       thin progress line.
 - [ ] Tapping the bar opens Now Playing.
@@ -48,6 +116,59 @@ item by hand.
 - [ ] Tap Clear all: the Recent searches section disappears, and it stays empty
       after relaunching.
 
+## Search results
+
+- [ ] Chips appear only for result types the service returned, and the selected
+      chip is visibly distinct without relying on colour alone.
+- [ ] Top result plays a song or opens the album/artist it names.
+- [ ] Song, album and artist sections use the shared rows and artwork, with no
+      invented metadata.
+- [ ] Rows with menus expose only actions the app implements.
+- [ ] The pinned field keeps focus styling and remains usable while results
+      load, fail or are empty.
+- [ ] At large text sizes the chips scroll horizontally and rows do not clip.
+
+## Library
+
+- [ ] All, Favorites and Local chips filter the real collection.
+- [ ] The sort menu changes the visible order and keeps the selection.
+- [ ] The pinned Favorites row shows the actual count and opens the filtered
+      list.
+- [ ] Import audio files opens the Files picker and imported tracks appear.
+- [ ] Local rows offer deletion; catalog rows do not.
+- [ ] Empty states are explicit for each filter.
+- [ ] The mini-player does not cover the last library row.
+
+## Accessibility
+
+- [ ] Largest Dynamic Type: Home, Search, Library, Now Playing, queue and
+      Settings remain usable without clipped controls.
+- [ ] VoiceOver traversal follows visual order; chips announce selected state;
+      active playback, favorite and repeat states are spoken.
+- [ ] Reduce Motion disables the artwork scale, tint and scrubber transitions.
+- [ ] Reduce Transparency keeps floating surfaces solid and readable.
+- [ ] Interactive targets are at least 44 pt where practical.
+- [ ] Controls are not obscured by the mini-player, tab bar or safe areas.
+
+## Permanent downloads
+
+- [ ] Search for a catalog track and choose Download from its menu. Settings →
+      Downloads shows it while downloading and then as a completed offline song.
+- [ ] Play the downloaded track, enable airplane mode, then play it again: it
+      starts and Now Playing shows `Downloaded`.
+- [ ] Delete the app's temporary cache: the downloaded song still plays offline.
+- [ ] Remove the download from Library, Search or Settings: the row disappears,
+      the file is gone, and the song streams again when online.
+- [ ] Start three downloads quickly: no more than two transfer at once and the
+      third waits rather than failing.
+- [ ] Interrupt a download by force-quitting the app; reopen it: no partial file
+      appears as a completed download and the record is repaired.
+- [ ] With the YouTube Music companion source unconfigured, no download action
+      is offered for it.
+- [ ] Check a downloaded track after relaunching the app: it is still listed and
+      still plays offline.
+- [ ] Check the Downloads list and Settings show the same count and byte total.
+
 ## Cache and loop
 
 - [ ] Play song A for a few seconds, then song B, then A again and B again.
@@ -57,12 +178,21 @@ item by hand.
 - [ ] Play a catalog track once and wait for it to start; after a few seconds,
       Settings shows a non-zero cached size.
 - [ ] Keep Settings open while a track finishes downloading: the song count and
-      size update on the next open, not while the sheet stays open.
-- [ ] Open Settings with two cached songs: both are listed under Cached songs
+      size update while the sheet stays open.
+- [ ] Open Settings with two cached songs: both are listed under Cached now
       with title, artist and size.
 - [ ] Tap the trash button on one cached song: only that row disappears, the
       count drops by one, and the other cached song still starts instantly.
 - [ ] Play the deleted song again: it downloads again and returns to the list.
+- [ ] Play songs 1, 2, 3, 4, 5 in order: Settings shows five cached songs.
+      Play song 6: the cache still shows five, song 1 is gone, and songs 2–6
+      start from cache without re-streaming.
+- [ ] With airplane mode on, play song 2 through song 6: all five start.
+- [ ] Clear the temporary cache: permanent downloads and imported files in
+      Library still play offline.
+- [ ] Turn on Clear on launch, relaunch the app: the temporary cache is empty
+      and permanent downloads remain.
+- [ ] Turn Clear on launch off, relaunch the app: valid cache entries survive.
 - [ ] Play the same track again: Now Playing shows `Cached` beside the badge.
 - [ ] Turn repeat-one on and let the track end: the next pass starts
       immediately and still shows `Cached`.
@@ -79,11 +209,15 @@ item by hand.
 
 ## System integration
 
-- [ ] Lock the screen: playback continues and the Lock Screen shows the track.
-- [ ] Lock Screen play/pause and next/previous work.
+- [ ] Lock the screen: playback continues and the Lock Screen shows the track,
+      album and artwork when the track has artwork.
+- [ ] Lock Screen play/pause, seek and next/previous work.
 - [ ] Switch to another app: playback continues (the audio session is
       `.playback`).
-- [ ] Pull down Control Center: the Now Playing tile shows the same track.
+- [ ] Pull down Control Center: the Now Playing tile shows the same track and
+      playback state.
+- [ ] An interruption (for example a call) resumes only if audio was playing
+      before it began.
 
 ## If something fails
 
