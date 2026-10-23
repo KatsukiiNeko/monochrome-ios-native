@@ -116,7 +116,7 @@ changes are now on `development`:
 | Theme | `ThemePalette` light/dark tokens, WCAG contrast tests, 20 pt cards, 56 pt rows, 16 pt screen padding, 24 pt sections | L1 + host tests |
 | Now Playing | core snapshot and remote-command routing, download/cache source badges | L1 + host tests |
 
-Host tests: 211 tests in 26 suites passed at the last recorded run. The iOS
+Host tests: 212 tests in 26 suites passed at the last recorded run. The iOS
 arm64 build-only check passed after every commit. No device is attached, so no
 screen reached L4 or Human verification.
 
@@ -141,6 +141,63 @@ underlying cellular-cache and clear-on-launch preferences still exist in
 `AudioCacheSettings` and keep their stored values; only their Settings controls
 were removed.
 
+## Nothing OS visual restoration
+
+Date: 2026-10-23. This pass restores the technical visual layer without
+reopening the simplified Settings hierarchy.
+
+### What the history showed
+
+- `d5ef2f9` established the adaptive monochrome system: 10 pt cards, 20 pt
+  screen padding, 28 pt section spacing, an 18 pt icon token and monospaced
+  technical labels.
+- `12fc29b` removed the unused `title`, `spacing` and `tight` tokens.
+- `331dd5e` raised `cardRadius` from 10 to 20, reduced screen padding to 16 and
+  section spacing to 24, and raised the row minimum to 56 while adding the cache
+  meter and dot-matrix numerals.
+- `f2204ba` used that language in the Settings cards; `1ed0aae` moved Settings
+  to the simplified native list and removed its last use of `DotMatrixText`,
+  leaving the renderer in the tree but unused.
+
+The functional work from `dfcca6d` through `161c049` is retained: the endpoint
+switch, endpoint reset, five-entry cache, permanent downloads and simplified
+Settings information architecture are unchanged.
+
+### References consulted
+
+| source | observed evidence | how it was used |
+|---|---|---|
+| [`fontsinuse.com/uses/59510/nothing-phone`](https://fontsinuse.com/uses/59510/nothing-phone) | Documents NDot, NType 82 and NType 82 Mono, created with Colophon Foundry and used across Nothing packaging, web and phone UI; cites 1980s mainframe type as the origin. | Confirms that dot-matrix display type and monospaced utility type are part of the real identity. It is a third-party typography record, not a layout specification. |
+| [`intl.nothing.tech`](https://intl.nothing.tech/) | The official marketing surface uses black/white product naming, dot-matrix product identifiers and very little colour. | Used only for high-level palette and display-type signals. This is a marketing site, not the Nothing OS interface contract. |
+| [`wallpaper.com/tech/nothing-design-team-interview`](https://www.wallpaper.com/tech/nothing-design-team-interview) | Nothing's design team describes restraint, material honesty, tactility and obsessive detail. | Informed the decision to keep surfaces flat, radii tight and decorative elements functional. It is an interview, not a token reference. |
+| [`shadcn.io/design/nothing`](https://www.shadcn.io/design/nothing) | A third-party, explicitly unofficial DESIGN.md analysis of nothing.tech: monochrome palette, uppercase mono labels, dot-matrix display type, 6/8 pt radii and hairlines. | Used as a supporting interpretation of the public site, never as an official specification. The page itself states Nothing has not reviewed or endorsed it. |
+
+Observed from those sources: monochrome-first surfaces, dot-matrix display type,
+uppercase monospaced utility labels, tight corner radii and fine rules.
+Interpreted for this app: a 5×7 dot renderer for structural labels, 10 pt cards,
+20 pt screen padding, 28 pt sections and a single restrained red state accent.
+No Nothing font, logo, icon or asset is copied or redistributed.
+
+### Applied system
+
+- `Theme` restores the compact geometry: 10 pt cards, 20 pt screen padding,
+  28 pt section spacing, 52 pt row minimum and a 28 pt icon tile.
+- `DotMatrixLabel` gates the custom 5×7 renderer by Dynamic Type and available
+  width, falling back to the scalable monospaced label. The glyph table now
+  covers the full uppercase alphabet, digits, space, slash, colon, dash and
+  period; tests cover every glyph.
+- `TechnicalSectionHeader` (marker + dot-matrix label + optional numeric meta)
+  and `TechnicalIcon` are shared by Settings, About, Downloads, Queue, Library
+  and catalog detail lists.
+- Home uses the dot-matrix wordmark, a hairline under the greeting and numeric
+  shelf metadata. Now Playing uses a dot-matrix section label, album metadata,
+  a queue-position numeral and a dimmed artwork tint. The mini-player keeps its
+  artwork tint with tighter geometry and typography.
+- System font remains the reading face for track titles, descriptions and
+  controls. The display face is limited to short structural labels and numbers.
+- `Theme.destructive` is now a separate text-safe red token; the palette test
+  requires at least 4.5:1 against both background and surface in each mode.
+
 ### What still needs a person
 
 1. The mini-player inset must be checked on each tab and on pushed detail
@@ -153,3 +210,13 @@ were removed.
    top result, transport controls and queue.
 5. Check the mini-player text against bright artwork; the tint is clamped but
    only a device can confirm the final contrast.
+6. Check the dot-matrix labels at default, large and accessibility Dynamic Type
+   sizes, and on a 320 pt-wide device. `ViewThatFits` should fall back to the
+   monospaced label before any header clips.
+7. Check the technical Settings rows, icons, section headers, separators and
+   row backgrounds in Light, Dark and System appearance, including the pushed
+   endpoint, downloads and About pages.
+8. Check the dimmed Now Playing tint, the album metadata and the queue-position
+   numeral against dark and bright artwork.
+9. Check the sticky Library section header and the Home shelf metadata do not
+   crowd the filter chips or truncate track titles.

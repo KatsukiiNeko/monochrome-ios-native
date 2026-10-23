@@ -53,7 +53,7 @@ The maintainer completed the physical-device test checklist for the earlier UI p
 | Level | Meaning | Status |
 |---|---|---|
 | **L1 — Compile** | Swift sources compile for the target platform. | Passed |
-| **L2 — Unit tests** | Portable core behavior is tested on Linux. | Passed: 211 tests across 26 suites at the last recorded run. |
+| **L2 — Unit tests** | Portable core behavior is tested on Linux. | Passed: 212 tests across 26 suites at the last recorded run. |
 | **L3 — Live service** | Catalog search and stream resolution are checked against the live catalog. | Passed in the recorded live-service checks; the opt-in live test is not run by default. |
 | **L4 — Physical device** | Playback and iOS-specific behavior are checked on a real iPhone. | Passed for the earlier UI pass; the current settings/cache/Now Playing changes are not device-validated. |
 
