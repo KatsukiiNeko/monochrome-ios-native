@@ -7,12 +7,17 @@ struct QualityBadgeLabel: View {
     var spokenText: String?
 
     var body: some View {
-        Text(text)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(.secondary)
+        Text(text.uppercased())
+            .font(Theme.micro)
+            .tracking(0.4)
+            .foregroundStyle(Theme.secondaryText)
             .padding(.horizontal, 5)
-            .padding(.vertical, 1)
-            .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+            .padding(.vertical, 2)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: 3, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 3, style: .continuous)
+                    .stroke(Theme.border, lineWidth: Theme.hairline)
+            }
             .accessibilityLabel(spokenText ?? text)
             .accessibilityAddTraits(.isStaticText)
     }

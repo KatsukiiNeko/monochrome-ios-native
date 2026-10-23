@@ -33,7 +33,7 @@ struct TrackRow: View {
                     if isCurrent {
                         Image(systemName: "speaker.wave.2.fill")
                             .font(.caption2)
-                            .foregroundStyle(Theme.primaryText)
+                            .foregroundStyle(Theme.accent)
                             .accessibilityLabel("Now playing")
                     }
                     Text(track.title)
@@ -59,7 +59,7 @@ struct TrackRow: View {
             if showsFavorite, isFavorite {
                 Image(systemName: "heart.fill")
                     .font(.caption)
-                    .foregroundStyle(Theme.secondaryText)
+                    .foregroundStyle(Theme.accent)
                     .accessibilityLabel("Favorite")
             }
             if showsDuration, let duration = track.durationSeconds {

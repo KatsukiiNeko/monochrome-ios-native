@@ -20,6 +20,10 @@ struct ArtworkTile: View {
                     cornerRadius: Theme.albumRadius
                 )
                 .frame(width: width, height: width)
+                .overlay {
+                    RoundedRectangle(cornerRadius: Theme.albumRadius, style: .continuous)
+                        .stroke(Theme.border, lineWidth: Theme.hairline)
+                }
 
                 Text(track.title)
                     .font(Theme.rowTitle)
