@@ -15,6 +15,7 @@ struct SearchView: View {
     @State private var filter: SearchResultKind = .all
     @State private var selectedRelease: RemoteRelease?
     @State private var selectedArtist: RemoteArtist?
+    @FocusState private var isSearchFocused: Bool
 
     var body: some View {
         NavigationStack {
@@ -41,6 +42,7 @@ struct SearchView: View {
                 .task(id: query) { await runSearch() }
             }
             .background(Theme.background.ignoresSafeArea())
+            .tint(Theme.accent)
             .navigationTitle("Search")
             .sheet(item: $selectedRelease) { release in
                 ReleaseDetailView(model: model, release: release)
@@ -56,11 +58,13 @@ struct SearchView: View {
     private var searchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(Theme.secondaryText)
+                .foregroundStyle(isSearchFocused ? Theme.accent : Theme.secondaryText)
             TextField("Songs, artists, albums", text: $query)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .submitLabel(.search)
+                .focused($isSearchFocused)
+                .tint(Theme.accent)
                 .accessibilityLabel("Search songs, artists and albums")
             if !query.isEmpty {
                 Button {
@@ -76,6 +80,10 @@ struct SearchView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                .stroke(isSearchFocused ? Theme.accent : Theme.border, lineWidth: Theme.hairline)
+        }
     }
 
     private var trimmedQuery: String {
@@ -168,14 +176,14 @@ struct SearchView: View {
             ForEach(0..<6, id: \.self) { _ in
                 HStack(spacing: Theme.rowSpacing) {
                     RoundedRectangle(cornerRadius: Theme.artworkRadius)
-                        .fill(Theme.elevated)
+                        .fill(Theme.surface)
                         .frame(width: 52, height: 52)
                     VStack(alignment: .leading, spacing: 6) {
                         RoundedRectangle(cornerRadius: 3)
-                            .fill(Theme.elevated)
+                            .fill(Theme.surface)
                             .frame(width: 180, height: 12)
                         RoundedRectangle(cornerRadius: 3)
-                            .fill(Theme.elevated)
+                            .fill(Theme.surface)
                             .frame(width: 120, height: 10)
                     }
                     Spacer()
@@ -192,7 +200,14 @@ struct SearchView: View {
             ShelfHeader(title: "Recent searches", actionTitle: "Clear all") {
                 model.clearSearchRecents()
             }
-            ForEach(model.searchRecents) { track in
+            ForEach(Array(model.searchRecents.enumerated()), id: \.element.id) { index, track in
+                if index > 0 {
+                    Rectangle()
+                        .fill(Theme.separator)
+                        .frame(height: Theme.hairline)
+                        .padding(.leading, 64)
+                        .accessibilityHidden(true)
+                }
                 HStack(spacing: 8) {
                     Button {
                         play(track, in: model.searchRecents)
@@ -235,9 +250,7 @@ struct SearchView: View {
 
     private func topResult(_ track: Track) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Top result")
-                .font(Theme.sectionTitle)
-                .foregroundStyle(Theme.primaryText)
+            ShelfHeader(title: "Top result")
             Button {
                 play(track, in: sections.tracks)
             } label: {
@@ -268,7 +281,11 @@ struct SearchView: View {
                         .accessibilityHidden(true)
                 }
                 .padding(10)
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius))
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                        .stroke(Theme.border, lineWidth: Theme.hairline)
+                }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -279,9 +296,7 @@ struct SearchView: View {
 
     private func topResult(_ release: RemoteRelease) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Top result")
-                .font(Theme.sectionTitle)
-                .foregroundStyle(Theme.primaryText)
+            ShelfHeader(title: "Top result")
             Button {
                 selectedRelease = release
             } label: {
@@ -314,7 +329,11 @@ struct SearchView: View {
                         .foregroundStyle(Theme.tertiaryText)
                 }
                 .padding(10)
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius))
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                        .stroke(Theme.border, lineWidth: Theme.hairline)
+                }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -325,9 +344,7 @@ struct SearchView: View {
 
     private func topResult(_ artist: RemoteArtist) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Top result")
-                .font(Theme.sectionTitle)
-                .foregroundStyle(Theme.primaryText)
+            ShelfHeader(title: "Top result")
             Button {
                 selectedArtist = artist
             } label: {
@@ -360,7 +377,11 @@ struct SearchView: View {
                         .foregroundStyle(Theme.tertiaryText)
                 }
                 .padding(10)
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius))
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                        .stroke(Theme.border, lineWidth: Theme.hairline)
+                }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -372,7 +393,14 @@ struct SearchView: View {
     private var tracksSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             ShelfHeader(title: "Songs")
-            ForEach(sections.tracks) { track in
+            ForEach(Array(sections.tracks.enumerated()), id: \.element.id) { index, track in
+                if index > 0 {
+                    Rectangle()
+                        .fill(Theme.separator)
+                        .frame(height: Theme.hairline)
+                        .padding(.leading, 64)
+                        .accessibilityHidden(true)
+                }
                 HStack(spacing: 0) {
                     Button {
                         play(track, in: sections.tracks)
