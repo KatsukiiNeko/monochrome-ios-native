@@ -105,14 +105,14 @@ struct PlayerView: View {
     private var background: some View {
         LinearGradient(
             colors: [
-                colorScheme == .light ? tint.opacity(0.18) : tint,
+                colorScheme == .light ? tint.opacity(0.12) : tint.opacity(0.60),
                 Theme.background
             ],
             startPoint: .top,
             endPoint: .center
         )
         .ignoresSafeArea()
-        .animation(reduceMotion ? nil : Theme.standard, value: tint)
+        .animation(reduceMotion ? nil : Theme.artwork, value: tint)
     }
 
     private var topBar: some View {
@@ -131,12 +131,16 @@ struct PlayerView: View {
 
             Spacer(minLength: 0)
 
-            HStack(spacing: 6) {
+            HStack(spacing: 7) {
                 Rectangle()
                     .fill(Theme.accent)
                     .frame(width: 4, height: 4)
                     .accessibilityHidden(true)
-                TechnicalLabel(text: sourceCaption)
+                DotMatrixLabel(
+                    text: "Now Playing",
+                    color: Theme.secondaryText,
+                    dotSize: 1.5
+                )
             }
 
             Spacer(minLength: 0)
@@ -163,11 +167,14 @@ struct PlayerView: View {
         .padding(.horizontal, Theme.screenPadding)
     }
 
-    private var sourceCaption: String {
-        if let album = player.currentTrack?.album, !album.isEmpty {
-            return "Playing from \(album)"
-        }
-        return "Now playing"
+    private var albumCaption: String? {
+        guard let album = player.currentTrack?.album, !album.isEmpty else { return nil }
+        return album
+    }
+
+    private var queuePosition: String? {
+        guard let index = player.queue.currentIndex, !player.queue.isEmpty else { return nil }
+        return "\(index + 1)/\(player.queue.tracks.count)"
     }
 
     private var artwork: some View {
@@ -184,7 +191,7 @@ struct PlayerView: View {
         }
         .shadow(color: .black.opacity(0.35), radius: 24, y: 12)
         .scaleEffect(player.isPlaying || reduceMotion ? 1 : 0.96)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: player.isPlaying)
+        .animation(reduceMotion ? nil : Theme.artwork, value: player.isPlaying)
         .padding(.top, 8)
     }
 
@@ -200,6 +207,10 @@ struct PlayerView: View {
                     .font(.subheadline)
                     .foregroundStyle(Theme.secondaryText)
                     .lineLimit(1)
+                if let albumCaption {
+                    TechnicalLabel(text: albumCaption)
+                        .padding(.top, 2)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -316,6 +327,15 @@ struct PlayerView: View {
                 .accessibilityHidden(true)
 
             HStack(spacing: 12) {
+                if let queuePosition {
+                    DotMatrixLabel(
+                        text: queuePosition,
+                        color: Theme.secondaryText,
+                        dotSize: 1.4
+                    )
+                    .accessibilityLabel("Track \(queuePosition) in the queue")
+                }
+
                 if !player.queue.isEmpty {
                     Button {
                         isShowingQueue = true

@@ -42,7 +42,7 @@ struct MiniPlayerView: View {
                     .strokeBorder(Theme.onTintSeparator, lineWidth: Theme.hairline)
             }
             .clipShape(RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
-            .shadow(color: .black.opacity(0.35), radius: 12, y: 4)
+            .shadow(color: .black.opacity(0.28), radius: 8, y: 2)
             .padding(.horizontal, 12)
             .padding(.top, 4)
             .padding(.bottom, 6)
@@ -66,7 +66,7 @@ struct MiniPlayerView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 5) {
                         Text(bar.title)
-                            .font(.subheadline.weight(.semibold))
+                            .font(Theme.rowTitle)
                             .foregroundStyle(Theme.onTintPrimary)
                             .lineLimit(1)
                         if let badge = bar.badgeText, !dynamicTypeSize.isAccessibilitySize {
@@ -78,7 +78,7 @@ struct MiniPlayerView: View {
                         }
                     }
                     Text(bar.failureMessage == nil ? bar.subtitle : "Playback failed")
-                        .font(Theme.caption)
+                        .font(Theme.rowSubtitle)
                         .foregroundStyle(Theme.onTintSecondary)
                         .lineLimit(1)
                 }

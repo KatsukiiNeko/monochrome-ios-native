@@ -54,13 +54,17 @@ struct HomeView: View {
     }
 
     private var greeting: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 8) {
                 Rectangle()
                     .fill(Theme.accent)
-                    .frame(width: 5, height: 5)
+                    .frame(width: 4, height: 4)
                     .accessibilityHidden(true)
-                TechnicalLabel(text: "Monochrome")
+                DotMatrixLabel(
+                    text: "Monochrome",
+                    color: Theme.primaryText,
+                    dotSize: 2.0
+                )
             }
             Text(Self.greeting(for: .now))
                 .font(Theme.screenTitle)
@@ -68,6 +72,11 @@ struct HomeView: View {
             Text("Pick up where you left off.")
                 .font(.subheadline)
                 .foregroundStyle(Theme.secondaryText)
+            Rectangle()
+                .fill(Theme.separator)
+                .frame(height: Theme.hairline)
+                .padding(.top, 10)
+                .accessibilityHidden(true)
         }
         .padding(.top, 8)
     }
@@ -88,7 +97,10 @@ struct HomeView: View {
 
     private var quickAccessGrid: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ShelfHeader(title: "Quick access")
+            ShelfHeader(
+                title: "Quick access",
+                meta: quickAccess.count == 1 ? "1 TRACK" : "\(quickAccess.count) TRACKS"
+            )
 
             LazyVGrid(columns: gridColumns, spacing: 8) {
                 ForEach(quickAccess) { track in
@@ -151,7 +163,10 @@ struct HomeView: View {
 
     private var listenAgainSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            ShelfHeader(title: "Listen again")
+            ShelfHeader(
+                title: "Listen again",
+                meta: min(model.recents.count, 10) == 1 ? "1 TRACK" : "\(min(model.recents.count, 10)) TRACKS"
+            )
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 12) {
                     ForEach(model.recents.prefix(10)) { track in
