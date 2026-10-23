@@ -28,11 +28,6 @@ struct SearchView: View {
             }
             .background(Color(white: 0.05).ignoresSafeArea())
             .overlay { stateOverlay }
-            .searchable(
-                text: $query,
-                placement: .navigationBarDrawer(displayMode: .always),
-                prompt: "Tracks, artists, albums"
-            )
             .task(id: query) { await runSearch() }
             .navigationTitle("Search")
             .sheet(item: $selectedRelease) { release in
@@ -42,6 +37,13 @@ struct SearchView: View {
                 ArtistDetailView(model: model, artist: artist)
             }
         }
+        // Owned by the navigation container so the drawer is visible on entry,
+        // rather than following the scroll view's content offset.
+        .searchable(
+            text: $query,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "Tracks, artists, albums"
+        )
     }
 
     private var trimmedQuery: String {
