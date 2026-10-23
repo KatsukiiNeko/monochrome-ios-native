@@ -37,24 +37,24 @@ The app includes Home, Search, and Library tabs; a persistent mini-player; a ful
 | Streaming | Resolve a playable track URL at playback time and retry resolution once after a playback failure. |
 | Playback | Play/pause, seeking, next/previous, queue management, and repeat modes. |
 | Library | Local library, favorites, and recently played history persisted on-device. |
-| Audio cache | On-disk cache with LRU eviction and a 500 MB cap; caching over cellular is opt-in. |
+| Audio cache | Temporary five-track on-disk LRU cache; caching over cellular is opt-in. Cache cleanup never touches imported files. |
 | Audio metadata | Displays the detected audio format and quality where available. |
-| iOS integration | Background audio, Now Playing metadata, Lock Screen controls, remote commands, interruption handling, and route-change handling. |
-| Preferences | Configure the streaming host or disable online streaming to use local audio only. |
+| iOS integration | Background audio, Now Playing metadata with album and artwork, Lock Screen controls, remote commands, interruption handling, and route-change handling. |
+| Preferences | System/Light/Dark appearance, streaming host, and temporary-cache controls. |
 | Privacy | No account system, analytics, or tracking SDK. No credentials are embedded in the source. |
 
-Lyrics, cloud playlists, account login, and cross-device synchronization are not implemented.
+Permanent catalog downloads are not offered. The catalog has no authorized download API, and the app does not treat temporary cache entries as downloads. YouTube Music is not integrated; the Monochrome catalog and user-imported files are the only playback sources. Lyrics, cloud playlists, account login, and cross-device synchronization are not implemented.
 
 ## Verification
 
-The maintainer has completed the physical-device test checklist and reports successful results. The app has also been compiled and its portable core test suite has been run on Linux.
+The maintainer completed the physical-device test checklist for the earlier UI pass and reports successful results. The current settings, five-track cache and Now Playing changes were compiled and host-tested, but not installed or run on a device.
 
 | Level | Meaning | Status |
 |---|---|---|
 | **L1 — Compile** | Swift sources compile for the target platform. | Passed |
-| **L2 — Unit tests** | Portable core behavior is tested on Linux. | Passed: 113 tests across 14 suites at the last recorded run. |
+| **L2 — Unit tests** | Portable core behavior is tested on Linux. | Passed: 152 tests across 21 suites at the last recorded run. |
 | **L3 — Live service** | Catalog search and stream resolution are checked against the live catalog. | Passed in the recorded live-service checks; the opt-in live test is not run by default. |
-| **L4 — Physical device** | Playback and iOS-specific behavior are checked on a real iPhone. | Passed according to the completed maintainer device checklist. |
+| **L4 — Physical device** | Playback and iOS-specific behavior are checked on a real iPhone. | Passed for the earlier UI pass; the current settings/cache/Now Playing changes are not device-validated. |
 
 CI runs the portable `swift test` suite. It does **not** run the live catalog test, build/sign an IPA, or install the app on a device. The iOS cross-compile check remains a separate local step because this workflow does not provision Apple's Darwin SDK.
 
@@ -71,6 +71,8 @@ The documented endpoint provides **FLAC, 16-bit / 44.1 kHz lossless audio**. It 
 The native client uses HTTPS and a truthful `User-Agent`; it does not spoof `Origin` or `Referer`, include credentials, or call the token-gated `/api/v2/track/` endpoint. The API client contains multi-host failover support and tests, but the current app wiring configures a single host; automatic user-host-to-default-host failover should not be considered an active app feature until that wiring is added.
 
 In Settings, you can configure a different HTTPS host (for example, your own instance or a supported paid endpoint) or clear the host to disable online streaming while retaining local playback.
+
+“Hi-Fi” in this app is a quality label, not a separate catalogue or provider: the catalog path exposes one lossless tier (FLAC 16-bit / 44.1 kHz). YouTube Music has no authorized integration here. Permanent downloads are also not implemented because the catalog provides no authorized download entitlement; the temporary cache is disposable and separate from imported files.
 
 ### Content and distribution notice
 

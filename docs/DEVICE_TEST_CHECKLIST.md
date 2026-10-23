@@ -22,7 +22,8 @@ unverified until someone looks at the screen.
 ## Appearance
 
 - [ ] Open Settings and switch Appearance between System, Light and Dark; the
-      choice survives relaunching the app.
+      open sheet changes immediately, without closing or reopening it.
+- [ ] The appearance choice survives relaunching the app.
 - [ ] System follows the device appearance after changing it in iOS Settings.
 - [ ] Light appearance keeps text, separators, chips, fields and the mini-player
       readable; dark appearance keeps the same hierarchy.
@@ -158,12 +159,15 @@ unverified until someone looks at the screen.
 - [ ] Play a catalog track once and wait for it to start; after a few seconds,
       Settings shows a non-zero cached size.
 - [ ] Keep Settings open while a track finishes downloading: the song count and
-      size update on the next open, not while the sheet stays open.
-- [ ] Open Settings with two cached songs: both are listed under Cached songs
+      size update while the sheet stays open.
+- [ ] Open Settings with two cached songs: both are listed under Cached now
       with title, artist and size.
 - [ ] Tap the trash button on one cached song: only that row disappears, the
       count drops by one, and the other cached song still starts instantly.
 - [ ] Play the deleted song again: it downloads again and returns to the list.
+- [ ] Play six distinct catalog tracks: the temporary cache never shows more
+      than five, and the least recently used track is the one removed.
+- [ ] Clear the temporary cache: imported files in Library still play offline.
 - [ ] Play the same track again: Now Playing shows `Cached` beside the badge.
 - [ ] Turn repeat-one on and let the track end: the next pass starts
       immediately and still shows `Cached`.
@@ -180,11 +184,15 @@ unverified until someone looks at the screen.
 
 ## System integration
 
-- [ ] Lock the screen: playback continues and the Lock Screen shows the track.
-- [ ] Lock Screen play/pause and next/previous work.
+- [ ] Lock the screen: playback continues and the Lock Screen shows the track,
+      album and artwork when the track has artwork.
+- [ ] Lock Screen play/pause, seek and next/previous work.
 - [ ] Switch to another app: playback continues (the audio session is
       `.playback`).
-- [ ] Pull down Control Center: the Now Playing tile shows the same track.
+- [ ] Pull down Control Center: the Now Playing tile shows the same track and
+      playback state.
+- [ ] An interruption (for example a call) resumes only if audio was playing
+      before it began.
 
 ## If something fails
 

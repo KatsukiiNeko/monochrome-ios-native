@@ -66,6 +66,9 @@ Facts that shape the client:
 - The repository carries **no terms of service, no content licence and no
   rights statement**. Its `license` file covers the source code (Apache-2.0)
   only, which says nothing about the audio.
+- No permanent-download endpoint or download entitlement is documented. A
+  progressive stream URL is not a download grant, so the app does not offer
+  permanent catalog downloads or treat temporary cache entries as downloads.
 - Keeping this as a personal build and distributing an app that streams the
   catalog are different acts. Do not publish it to TestFlight, the App Store or
   a public release without resolving that yourself.
