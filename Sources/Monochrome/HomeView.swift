@@ -77,8 +77,10 @@ struct HomeView: View {
     private var logo: some View {
         if let image = UIImage(named: "monochrome_logo") {
             Image(uiImage: image)
+                .renderingMode(.template)
                 .resizable()
                 .scaledToFit()
+                .foregroundStyle(Theme.primaryText)
                 .frame(height: 18)
                 .accessibilityLabel("Monochrome")
         }
