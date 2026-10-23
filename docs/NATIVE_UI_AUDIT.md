@@ -89,3 +89,38 @@ verified from a Linux build.
    Transparency enabled.
 9. System, Light and Dark appearances remain legible across sheets, alerts,
    navigation bars and the mini-player.
+
+## Implementation status
+
+The baseline table above records the state before this pass. The following
+changes are now on `development`:
+
+| area | change | verification |
+|---|---|---|
+| Theme | adaptive light/dark colors, red state accent, high-contrast transport tokens, tight radii, technical type and motion tokens | L1 |
+| Appearance | persisted System/Light/Dark preference in Settings, applied at the app boundary | L1 + host tests |
+| Shared components | rectangular chips, marked section headers, bordered artwork, red active-state rows, high-contrast play button, thin scrubber, technical badges | L1 |
+| Shell | one mini-player definition applied to each tab root so scroll content is inset on every tab | L1 |
+| Mini player | dark artwork-tinted surface with white text, 44 pt controls, red progress and favorite state | L1 |
+| Now Playing | artwork-derived background with an intentional light treatment, technical source caption, bordered artwork, accent repeat marker, queue, badge, cache and AirPlay | L1 |
+| Queue | medium/large sheet, marked section headers, real jump/reorder/remove | L1 |
+| Home | technical greeting, two-column quick access, marked shelves, active-track marker, separators | L1 |
+| Search | focused-field accent, marked top result, result-type chips, separated rows and recents | L1 |
+| Library | marked favorites row, accent heart, filter chips, sort and separators | L1 |
+
+Host tests: 148 tests in 21 suites passed. The iOS arm64 build-only check passed
+after every commit. No device is attached, so no screen reached L4 or Human
+verification.
+
+### What still needs a person
+
+1. The mini-player inset must be checked on each tab and on pushed detail
+   screens; SwiftUI safe-area behavior cannot be observed from the build host.
+2. The light appearance is new. Check every surface, sheet, toolbar, alert and
+   the artwork tint for contrast in both appearances.
+3. Check the red accent is limited to selection, progress and active state, and
+   that the primary play button still reads as the strongest control.
+4. Check large Dynamic Type and VoiceOver traversal on the shared rows, chips,
+   top result, transport controls and queue.
+5. Check the mini-player text against bright artwork; the tint is clamped but
+   only a device can confirm the final contrast.

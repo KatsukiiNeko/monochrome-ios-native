@@ -2,7 +2,34 @@
 
 Build under test: `development`, installed with `xtool dev` on the connected iPhone.
 Playback and the visual result can only be confirmed by a person, so tick each
-item by hand.
+item by hand. The build host cannot render SwiftUI; every visual item below is
+unverified until someone looks at the screen.
+
+## Nothing-inspired visual language
+
+- [ ] The chrome is monochrome; artwork is the only source of expressive colour.
+- [ ] The red accent appears only on selection, progress, favorites and active
+      playback state, not on every button or heading.
+- [ ] The primary play/pause control is the strongest control on Now Playing.
+- [ ] Section markers, hairline rules and monospaced time/metadata read as
+      structure, not decoration.
+- [ ] No fake signal meters, telemetry, recommendations, quality claims or
+      unimplemented controls are visible.
+- [ ] Tiles, rows and artwork use the tighter radii; no screen reads as a stack
+      of large rounded cards.
+- [ ] Long titles truncate cleanly and controls keep their alignment.
+
+## Appearance
+
+- [ ] Open Settings and switch Appearance between System, Light and Dark; the
+      choice survives relaunching the app.
+- [ ] System follows the device appearance after changing it in iOS Settings.
+- [ ] Light appearance keeps text, separators, chips, fields and the mini-player
+      readable; dark appearance keeps the same hierarchy.
+- [ ] The mini-player tint and Now Playing background remain legible in both
+      appearances.
+- [ ] Native tab bars, navigation bars, sheets, alerts and menus stay coherent
+      with the selected appearance.
 
 ## Layout and navigation
 
@@ -24,6 +51,20 @@ item by hand.
 - [ ] With Reduce Transparency on, the glass fallback stays solid and readable.
 - [ ] VoiceOver order matches the visual order on Home, Search, Library and Now
       Playing.
+
+## Now Playing and queue
+
+- [ ] The chevron and a downward swipe both dismiss Now Playing.
+- [ ] The source caption uses the real album when present and “Now playing”
+      otherwise.
+- [ ] Artwork fits without clipping on a 4.7-inch screen and at large text.
+- [ ] The idle scrubber is thin; dragging makes it easier to grab, and seeking
+      moves playback to the expected position.
+- [ ] Repeat shows a visible marker in addition to the accent colour; repeat-one
+      is unambiguous.
+- [ ] The queue sheet opens at medium and large detents; jump, reorder and
+      remove affect playback order as expected.
+- [ ] Format, Cached and AirPlay appear only when their real state exists.
 
 ## Playback
 
@@ -68,6 +109,40 @@ item by hand.
       it stays gone after relaunching.
 - [ ] Tap Clear all: the Recent searches section disappears, and it stays empty
       after relaunching.
+
+## Search results
+
+- [ ] Chips appear only for result types the service returned, and the selected
+      chip is visibly distinct without relying on colour alone.
+- [ ] Top result plays a song or opens the album/artist it names.
+- [ ] Song, album and artist sections use the shared rows and artwork, with no
+      invented metadata.
+- [ ] Rows with menus expose only actions the app implements.
+- [ ] The pinned field keeps focus styling and remains usable while results
+      load, fail or are empty.
+- [ ] At large text sizes the chips scroll horizontally and rows do not clip.
+
+## Library
+
+- [ ] All, Favorites and Local chips filter the real collection.
+- [ ] The sort menu changes the visible order and keeps the selection.
+- [ ] The pinned Favorites row shows the actual count and opens the filtered
+      list.
+- [ ] Import audio files opens the Files picker and imported tracks appear.
+- [ ] Local rows offer deletion; catalog rows do not.
+- [ ] Empty states are explicit for each filter.
+- [ ] The mini-player does not cover the last library row.
+
+## Accessibility
+
+- [ ] Largest Dynamic Type: Home, Search, Library, Now Playing, queue and
+      Settings remain usable without clipped controls.
+- [ ] VoiceOver traversal follows visual order; chips announce selected state;
+      active playback, favorite and repeat states are spoken.
+- [ ] Reduce Motion disables the artwork scale, tint and scrubber transitions.
+- [ ] Reduce Transparency keeps floating surfaces solid and readable.
+- [ ] Interactive targets are at least 44 pt where practical.
+- [ ] Controls are not obscured by the mini-player, tab bar or safe areas.
 
 ## Cache and loop
 
