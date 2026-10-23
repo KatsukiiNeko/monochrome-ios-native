@@ -75,7 +75,6 @@ struct LibraryView: View {
                 }
             }
             .background(Theme.background.ignoresSafeArea())
-            .tint(Theme.accent)
             .navigationTitle("Library")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -85,9 +84,11 @@ struct LibraryView: View {
                     Button("Import audio files", systemImage: "plus") {
                         isShowingImporter = true
                     }
+                    .foregroundStyle(Theme.primaryText)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Settings", systemImage: "gearshape") { onOpenSettings() }
+                        .foregroundStyle(Theme.primaryText)
                 }
             }
             .fileImporter(
@@ -184,6 +185,7 @@ struct LibraryView: View {
             }
         } label: {
             Image(systemName: "arrow.up.arrow.down")
+                .foregroundStyle(Theme.primaryText)
         }
         .accessibilityLabel("Sort library")
         .accessibilityValue(sort.title)

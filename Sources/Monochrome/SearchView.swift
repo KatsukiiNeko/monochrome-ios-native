@@ -42,7 +42,6 @@ struct SearchView: View {
                 .task(id: query) { await runSearch() }
             }
             .background(Theme.background.ignoresSafeArea())
-            .tint(Theme.accent)
             .navigationTitle("Search")
             .sheet(item: $selectedRelease) { release in
                 ReleaseDetailView(model: model, release: release)

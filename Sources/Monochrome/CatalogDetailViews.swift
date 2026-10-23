@@ -66,6 +66,7 @@ struct ReleaseDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
+                        .foregroundStyle(Theme.primaryText)
                 }
             }
             .task { await load() }
@@ -188,6 +189,7 @@ struct ArtistDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
+                        .foregroundStyle(Theme.primaryText)
                 }
             }
             .task { await load() }

@@ -58,7 +58,7 @@ struct PlayerView: View {
     private var background: some View {
         LinearGradient(
             colors: [
-                colorScheme == .light ? tint.opacity(0.28) : tint,
+                colorScheme == .light ? tint.opacity(0.18) : tint,
                 Theme.background
             ],
             startPoint: .top,

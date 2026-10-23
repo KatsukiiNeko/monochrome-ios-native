@@ -98,9 +98,11 @@ struct SettingsView: View {
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Close") { dismiss() }
+                    .foregroundStyle(Theme.primaryText)
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") { save() }
+                    .foregroundStyle(Theme.primaryText)
             }
         }
         .onAppear { host = model.streamingHost }

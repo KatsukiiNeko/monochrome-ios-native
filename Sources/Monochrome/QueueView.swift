@@ -103,6 +103,7 @@ struct QueueView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
+                        .foregroundStyle(Theme.primaryText)
                 }
             }
         }

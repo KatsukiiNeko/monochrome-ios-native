@@ -42,12 +42,12 @@ struct HomeView: View {
                 .padding(.bottom, 24)
             }
             .background(Theme.background.ignoresSafeArea())
-            .tint(Theme.accent)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { logo }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Settings", systemImage: "gearshape") { onOpenSettings() }
+                        .foregroundStyle(Theme.primaryText)
                 }
             }
         }
