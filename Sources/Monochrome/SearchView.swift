@@ -17,23 +17,29 @@ struct SearchView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 24) {
-                    if !tracks.isEmpty { tracksSection }
-                    if !releases.isEmpty { releasesSection }
-                    if !artists.isEmpty { artistsSection }
+            VStack(spacing: 0) {
+                searchField
+                    .padding(.horizontal, Theme.screenPadding)
+                    .padding(.vertical, 8)
+
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 24) {
+                        if trimmedQuery.isEmpty {
+                            if !model.searchRecents.isEmpty { recentSearchesSection }
+                        } else {
+                            if !tracks.isEmpty { tracksSection }
+                            if !releases.isEmpty { releasesSection }
+                            if !artists.isEmpty { artistsSection }
+                        }
+                    }
+                    .padding(.horizontal, Theme.screenPadding)
+                    .padding(.bottom, 24)
                 }
-                .padding(.horizontal, Theme.screenPadding)
-                .padding(.bottom, 24)
+                .background(Color(white: 0.05))
+                .overlay { stateOverlay }
+                .task(id: query) { await runSearch() }
             }
             .background(Color(white: 0.05).ignoresSafeArea())
-            .overlay { stateOverlay }
-            .searchable(
-                text: $query,
-                placement: .navigationBarDrawer(displayMode: .always),
-                prompt: "Tracks, artists, albums"
-            )
-            .task(id: query) { await runSearch() }
             .navigationTitle("Search")
             .sheet(item: $selectedRelease) { release in
                 ReleaseDetailView(model: model, release: release)
@@ -42,6 +48,33 @@ struct SearchView: View {
                 ArtistDetailView(model: model, artist: artist)
             }
         }
+    }
+
+    /// Pinned above the results instead of living in the navigation drawer, so
+    /// scrolling can never hide it.
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("Songs, artists, albums", text: $query)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .submitLabel(.search)
+                .accessibilityLabel("Search songs, artists and albums")
+            if !query.isEmpty {
+                Button {
+                    query = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.tertiary)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color(white: 0.12), in: RoundedRectangle(cornerRadius: 12))
     }
 
     private var trimmedQuery: String {
@@ -71,22 +104,70 @@ struct SearchView: View {
                 Button("Retry") { Task { await runSearch(force: true) } }
             }
         } else if trimmedQuery.isEmpty {
-            ContentUnavailableView {
-                Label("Search the catalog", systemImage: "magnifyingglass")
-            } description: {
-                Text("Find tracks, albums and artists by name.")
+            if model.searchRecents.isEmpty {
+                ContentUnavailableView {
+                    Label("Search the catalog", systemImage: "magnifyingglass")
+                } description: {
+                    Text("Find songs, albums and artists by name.")
+                }
             }
         } else if !hasResults {
             ContentUnavailableView.search(text: trimmedQuery)
         }
     }
 
+    private var recentSearchesSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                sectionHeader("Recent searches")
+                Spacer()
+                Button("Clear all") {
+                    model.clearSearchRecents()
+                }
+                .font(.caption)
+            }
+            ForEach(model.searchRecents) { track in
+                HStack(spacing: 8) {
+                    Button {
+                        Task {
+                            model.recordSearch(track)
+                            await model.play(track, in: model.searchRecents)
+                        }
+                    } label: {
+                        TrackRow(
+                            track: track,
+                            isCurrent: model.player.currentTrack?.id == track.id
+                        )
+                        .padding(.vertical, 2)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Button {
+                        model.removeSearchRecent(track)
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+                    .accessibilityLabel("Delete \(track.title) from recent searches")
+                }
+            }
+        }
+    }
+
     private var tracksSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader("Tracks")
+            sectionHeader("Songs")
             ForEach(tracks) { track in
                 Button {
-                    Task { await model.play(track, in: tracks) }
+                    Task {
+                        model.recordSearch(track)
+                        await model.play(track, in: tracks)
+                    }
                 } label: {
                     TrackRow(
                         track: track,

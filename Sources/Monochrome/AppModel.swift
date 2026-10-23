@@ -10,6 +10,7 @@ final class AppModel {
     private(set) var tracks: [Track] = []
     private(set) var favorites: [Track] = []
     private(set) var recents: [Track] = []
+    private(set) var searchRecents: [Track] = []
     private(set) var errorMessage: String?
     private(set) var isImporting = false
 
@@ -18,11 +19,14 @@ final class AppModel {
     private(set) var streamingHost: String
     private(set) var isStreamingConfigured: Bool
     private(set) var cacheSizeBytes = 0
+    private(set) var cacheEntryCount = 0
+    private(set) var cachedTracks: [CachedTrackSummary] = []
     var allowsCellularCaching: Bool { cacheSettings.allowsCellular }
 
     private let service: LocalFileService
     private let favoritesStore: FavoritesStore
     private let historyStore: HistoryStore
+    private let searchHistoryStore: HistoryStore
     private let resolver: DefaultTrackResolver
     private let streamingSettings: StreamingSettings
     private let cacheSettings: AudioCacheSettings
@@ -74,6 +78,10 @@ final class AppModel {
         self.mediaDirectory = media
         self.favoritesStore = FavoritesStore(fileURL: base.appendingPathComponent("favorites.json"))
         self.historyStore = HistoryStore(fileURL: base.appendingPathComponent("history.json"))
+        self.searchHistoryStore = HistoryStore(
+            fileURL: base.appendingPathComponent("search-history.json"),
+            limit: 20
+        )
         // System integration: audio session first, then Lock Screen metadata/commands.
         self.audioSession = AudioSessionController(player: player)
         self.nowPlaying = NowPlayingController(player: player)
@@ -131,6 +139,21 @@ final class AppModel {
         try await requireClient().artist(id: id)
     }
 
+    /// Keeps the Search tab's empty state useful without a separate history model.
+    func recordSearch(_ track: Track) {
+        searchRecents = (try? searchHistoryStore.record(track)) ?? searchRecents
+    }
+
+    func removeSearchRecent(_ track: Track) {
+        searchRecents.removeAll { $0.id == track.id }
+        try? searchHistoryStore.save(searchRecents)
+    }
+
+    func clearSearchRecents() {
+        searchRecents = []
+        try? searchHistoryStore.save([])
+    }
+
     private func requireClient() throws -> TracksAPIClient {
         guard let streamingClient else { throw TracksAPIError.notConfigured }
         return streamingClient
@@ -151,6 +174,7 @@ final class AppModel {
         }
         favorites = loadFavorites()
         recents = (try? historyStore.load()) ?? []
+        searchRecents = (try? searchHistoryStore.load()) ?? []
     }
 
     private func loadFavorites() -> [Track] {
@@ -219,7 +243,27 @@ final class AppModel {
     // MARK: - Cache
 
     func refreshCacheSize() async {
-        cacheSizeBytes = await cache.sizeBytes()
+        let tracks = await cache.cachedTracks()
+        // Old sidecars have no display metadata; fill it from anything already loaded.
+        var known: [String: Track] = [:]
+        for track in self.tracks + recents + searchRecents + favorites {
+            known[track.id] = track
+        }
+        cachedTracks = tracks.map { summary in
+            guard let track = known[summary.trackID] else { return summary }
+            var enriched = summary
+            if enriched.title == nil { enriched.title = track.title }
+            if enriched.artist == nil { enriched.artist = track.displayArtist }
+            if enriched.artworkURL == nil { enriched.artworkURL = track.artworkURL }
+            return enriched
+        }
+        cacheEntryCount = cachedTracks.count
+        cacheSizeBytes = cachedTracks.reduce(0) { $0 + $1.byteSize }
+    }
+
+    func removeCachedTrack(_ track: CachedTrackSummary) async {
+        await cache.remove(trackID: track.trackID, qualityName: track.quality)
+        await refreshCacheSize()
     }
 
     func clearCache() async {

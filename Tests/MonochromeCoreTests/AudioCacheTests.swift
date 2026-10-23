@@ -263,6 +263,37 @@ struct AudioCacheTests {
         try? FileManager.default.removeItem(at: directory)
     }
 
+    @Test func cachedTracksCarryMetadataAndCanBeRemovedIndividually() async throws {
+        let directory = temporaryDirectory()
+        let cache = makeCache(directory: directory, downloader: FakeDownloader())
+        let first = streamTrack("1")
+        let second = streamTrack("2")
+        await store(cache, first)
+        await store(cache, second)
+
+        let summaries = await cache.cachedTracks()
+        #expect(summaries.count == 2)
+        #expect(Set(summaries.compactMap(\.title)) == ["Stream 1", "Stream 2"])
+        let summary = try #require(summaries.first { $0.trackID == first.id })
+        #expect(summary.artist == "Unknown artist")
+
+        await cache.remove(trackID: summary.trackID, qualityName: summary.quality)
+
+        #expect(await cache.cachedAudio(for: first, quality: .lossless) == nil)
+        #expect(await cache.cachedAudio(for: second, quality: .lossless) != nil)
+        #expect(await cache.cachedTracks().count == 1)
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    @Test func legacySidecarWithoutDisplayMetadataDecodes() throws {
+        let json = #"{"trackID":"stream:1","quality":"lossless","fileName":"x.flac","byteSize":10,"lastUsedAt":0}"#
+        let entry = try JSONDecoder().decode(AudioCacheEntry.self, from: Data(json.utf8))
+
+        #expect(entry.title == nil)
+        #expect(entry.artist == nil)
+        #expect(entry.artworkURL == nil)
+    }
+
     @Test func downloaderFailureLeavesNothingBehind() async throws {
         let directory = temporaryDirectory()
         let downloader = FakeDownloader()

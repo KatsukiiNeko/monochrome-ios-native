@@ -45,14 +45,14 @@ struct SettingsView: View {
             }
 
             Section {
-                LabeledContent("Cached audio", value: ByteCountFormatter.string(
+                LabeledContent("Cached audio", value: "\(model.cacheEntryCount) songs, " + ByteCountFormatter.string(
                     fromByteCount: Int64(model.cacheSizeBytes),
                     countStyle: .file
                 ))
                 Button("Clear cache", role: .destructive) {
                     Task { await model.clearCache() }
                 }
-                .disabled(model.cacheSizeBytes == 0)
+                .disabled(model.cacheEntryCount == 0)
                 Toggle("Cache over cellular", isOn: Binding(
                     get: { model.allowsCellularCaching },
                     set: { model.setAllowsCellularCaching($0) }
@@ -61,6 +61,19 @@ struct SettingsView: View {
                 Text("Audio cache")
             } footer: {
                 Text("Streams are kept on this device so replaying a track does not download it again. Up to 500 MB; the system may clear the cache at any time.")
+            }
+
+            Section {
+                if model.cachedTracks.isEmpty {
+                    Text("No cached songs")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(model.cachedTracks) { cached in
+                        cachedRow(cached)
+                    }
+                }
+            } header: {
+                Text("Cached songs")
             }
         }
         .navigationTitle("Settings")
@@ -75,6 +88,49 @@ struct SettingsView: View {
         }
         .onAppear { host = model.streamingHost }
         .task { await model.refreshCacheSize() }
+    }
+
+    private func cachedRow(_ cached: CachedTrackSummary) -> some View {
+        HStack(spacing: 12) {
+            TrackArtwork(
+                track: Track(
+                    id: cached.trackID,
+                    title: cached.title ?? "Cached song",
+                    artist: cached.artist ?? "",
+                    artworkURL: cached.artworkURL
+                ),
+                cornerRadius: 6
+            )
+            .frame(width: 40, height: 40)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(cached.title ?? "Cached song")
+                    .font(.subheadline)
+                    .lineLimit(1)
+                if let artist = cached.artist, !artist.isEmpty {
+                    Text(artist)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            Text(ByteCountFormatter.string(fromByteCount: Int64(cached.byteSize), countStyle: .file))
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+
+            Button(role: .destructive) {
+                Task { await model.removeCachedTrack(cached) }
+            } label: {
+                Image(systemName: "trash")
+            }
+            .buttonStyle(.borderless)
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+            .accessibilityLabel("Delete \(cached.title ?? "cached song") from cache")
+        }
     }
 
     private func save() {
