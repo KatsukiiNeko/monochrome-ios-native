@@ -117,6 +117,7 @@ public enum DownloadError: LocalizedError, Equatable {
     case sizeMismatch(expected: Int, actual: Int)
     case recordWriteFailed
     case missingRecord
+    case recordsUnavailable
 
     public var errorDescription: String? {
         switch self {
@@ -131,6 +132,7 @@ public enum DownloadError: LocalizedError, Equatable {
             "The downloaded file had \(actual) bytes instead of \(expected)."
         case .recordWriteFailed: "The download could not be saved."
         case .missingRecord: "The download record is missing."
+        case .recordsUnavailable: "Download records could not be read. Existing files were left in place."
         }
     }
 }
@@ -153,6 +155,9 @@ public actor DownloadStore: DownloadedAudioProviding {
     private let maxConcurrentDownloads: Int
     private let log: @Sendable (String) -> Void
     private var records: [String: DownloadRecord]
+    /// Set when a records file exists but cannot be decoded. Reconciliation then
+    /// leaves the audio files alone instead of treating them as orphans.
+    private(set) var recordsLoadError: String?
     private var active: [String: Active] = [:]
     private var tasks: [String: Task<Void, Never>] = [:]
     private var activeSlots = 0
@@ -170,7 +175,9 @@ public actor DownloadStore: DownloadedAudioProviding {
         self.minimumFreeSpaceBytes = minimumFreeSpaceBytes
         self.maxConcurrentDownloads = max(1, maxConcurrentDownloads)
         self.log = log
-        self.records = Self.loadRecords(in: directory)
+        let loaded = Self.loadRecords(in: directory)
+        self.records = loaded.records
+        self.recordsLoadError = loaded.error
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 
@@ -201,6 +208,10 @@ public actor DownloadStore: DownloadedAudioProviding {
 
     public func totalBytes() -> Int {
         records.values.reduce(0) { $0 + $1.byteSize }
+    }
+
+    public func metadataError() -> String? {
+        recordsLoadError
     }
 
     public func isDownloaded(_ track: Track) -> Bool {
@@ -234,6 +245,7 @@ public actor DownloadStore: DownloadedAudioProviding {
         format: AudioFormat?,
         duration: Double?
     ) async throws {
+        guard recordsLoadError == nil else { throw DownloadError.recordsUnavailable }
         guard track.isStreaming else { throw DownloadError.notStreaming }
         guard track.source.supportsDownloads else {
             throw DownloadError.sourceNotEligible(track.source.displayName)
@@ -298,6 +310,11 @@ public actor DownloadStore: DownloadedAudioProviding {
     /// Never touches the temporary cache.
     public func reconcile() {
         Self.removePartials(in: directory)
+        guard recordsLoadError == nil else {
+            log("download reconcile skipped reason=records-unreadable")
+            markActiveInterrupted()
+            return
+        }
         var repaired = records
         for (id, record) in records {
             let url = directory.appendingPathComponent(record.fileName)
@@ -322,6 +339,10 @@ public actor DownloadStore: DownloadedAudioProviding {
         }
         records = repaired
         writeRecords()
+        markActiveInterrupted()
+    }
+
+    private func markActiveInterrupted() {
         for (id, entry) in active {
             if case .queued = entry.state {
                 active[id] = Active(track: entry.track, state: .failed("Interrupted"))
@@ -472,13 +493,18 @@ public actor DownloadStore: DownloadedAudioProviding {
         }
     }
 
-    private static func loadRecords(in directory: URL) -> [String: DownloadRecord] {
+    private static func loadRecords(in directory: URL) -> (records: [String: DownloadRecord], error: String?) {
         let url = directory.appendingPathComponent(recordFileName)
+        guard FileManager.default.fileExists(atPath: url.path) else { return ([:], nil) }
         guard let data = try? Data(contentsOf: url),
               let list = try? JSONDecoder().decode([DownloadRecord].self, from: data) else {
-            return [:]
+            return ([:], "Download records could not be read.")
         }
-        return Dictionary(uniqueKeysWithValues: list.map { ($0.id, $0) })
+        var records: [String: DownloadRecord] = [:]
+        for record in list {
+            records[record.id] = record
+        }
+        return (records, nil)
     }
 
     // MARK: - Identity

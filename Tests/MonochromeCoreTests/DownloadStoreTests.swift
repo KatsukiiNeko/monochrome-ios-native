@@ -226,6 +226,69 @@ struct DownloadStoreTests {
         try? FileManager.default.removeItem(at: directory)
     }
 
+    @Test func removingOneDownloadKeepsTheOtherFile() async throws {
+        let directory = temporaryDirectory()
+        let store = makeStore(directory: directory, downloader: DownloadFake())
+        let first = downloadTrack("1")
+        let second = downloadTrack("2")
+        try await download(store, first)
+        try await download(store, second)
+
+        let items = await store.items()
+        let firstItem = try #require(items.first { $0.track.id == first.id })
+        let firstAudio = try #require(await store.downloadedFile(for: first))
+        let secondAudio = try #require(await store.downloadedFile(for: second))
+
+        try await store.remove(id: firstItem.id)
+
+        #expect(!FileManager.default.fileExists(atPath: firstAudio.url.path))
+        #expect(FileManager.default.fileExists(atPath: secondAudio.url.path))
+        #expect(await store.isDownloaded(second))
+        #expect(await store.items().count == 1)
+        #expect(await store.totalBytes() == 256)
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    @Test func failedDownloadIsNotReportedAsCompletedAndCanBeRetried() async throws {
+        let directory = temporaryDirectory()
+        let downloader = DownloadFake()
+        await downloader.setFailure(URLError(.timedOut))
+        let store = makeStore(directory: directory, downloader: downloader)
+        let track = downloadTrack()
+
+        try? await download(store, track)
+        #expect(!(await store.isDownloaded(track)))
+        #expect(await store.totalBytes() == 0)
+
+        let retryDownloader = DownloadFake()
+        let retryStore = makeStore(directory: directory, downloader: retryDownloader)
+        try await download(retryStore, track)
+
+        #expect(await retryStore.isDownloaded(track))
+        #expect(await retryStore.items().count == 1)
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    @Test func unreadableRecordsProtectExistingAudio() async throws {
+        let directory = temporaryDirectory()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data("not json".utf8).write(to: directory.appendingPathComponent(DownloadStore.recordFileName))
+        let existing = directory.appendingPathComponent("existing.flac")
+        try Data(repeating: 1, count: 64).write(to: existing)
+        let store = makeStore(directory: directory, downloader: DownloadFake())
+
+        #expect(await store.metadataError() != nil)
+        #expect(await store.items().isEmpty)
+
+        await store.reconcile()
+
+        #expect(FileManager.default.fileExists(atPath: existing.path))
+        await #expect(throws: DownloadError.recordsUnavailable) {
+            try await download(store, downloadTrack())
+        }
+        try? FileManager.default.removeItem(at: directory)
+    }
+
     @Test func twoDownloadsRunAtOnceAndAThirdWaits() async throws {
         let directory = temporaryDirectory()
         let downloader = DownloadFake()
