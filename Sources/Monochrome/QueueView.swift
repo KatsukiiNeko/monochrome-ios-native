@@ -41,16 +41,18 @@ struct QueueView: View {
                 } else {
                     List {
                         if let current = player.queue.current {
-                            Section("Now playing") {
+                            Section {
                                 TrackRow(
                                     track: current,
                                     localArtworkURL: model.artworkURL(for: current),
                                     isCurrent: true
                                 )
+                            } header: {
+                                sectionHeader("Now playing")
                             }
                         }
 
-                        Section("Next in queue") {
+                        Section {
                             if upcoming.isEmpty {
                                 Text("Nothing else is queued.")
                                     .font(Theme.rowSubtitle)
@@ -80,10 +82,14 @@ struct QueueView: View {
                                     )
                                 }
                             }
+                        } header: {
+                            sectionHeader("Next in queue")
                         }
                     }
                     .listStyle(.plain)
+                    .listRowSeparatorTint(Theme.separator)
                     .scrollContentBackground(.hidden)
+                    .tint(Theme.accent)
                 }
             }
             .background(Theme.background.ignoresSafeArea())
@@ -99,6 +105,16 @@ struct QueueView: View {
                     Button("Done") { dismiss() }
                 }
             }
+        }
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        HStack(spacing: 6) {
+            Rectangle()
+                .fill(Theme.accent)
+                .frame(width: 4, height: 10)
+                .accessibilityHidden(true)
+            TechnicalLabel(text: title)
         }
     }
 }
