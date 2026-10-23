@@ -30,6 +30,8 @@ unverified until someone looks at the screen.
       appearances.
 - [ ] Native tab bars, navigation bars, sheets, alerts and menus stay coherent
       with the selected appearance.
+- [ ] The toolbar logo remains visible in light and dark appearance; it is
+      rendered as a template from the existing asset.
 
 ## Layout and navigation
 
