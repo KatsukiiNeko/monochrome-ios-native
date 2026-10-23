@@ -1,122 +1,84 @@
-# Native UI audit and plan
+# Native UI audit and redesign plan
 
-Date: 2026-10-22. Audit of the SwiftUI layer as imported, plus what the installed
-SDK actually offers. Nothing here was rendered; visual results are L1 at most.
+Date: 2026-10-23. Audit of the SwiftUI layer before the redesign. Nothing here was
+rendered; visual results are L1 at most.
 
-## What exists today
+## Current inventory
 
-| screen | file | state |
+| screen / component | file | state |
 |---|---|---|
-| Library | `Sources/Monochrome/ContentView.swift` | one flat `List` of imported files, favorites-only toggle, import/delete, queue button |
-| Mini player | `MiniPlayerView.swift` | title + play/pause + next above the list, no artwork, no progress |
-| Now Playing | `PlayerView.swift` | sheet with a fixed 280-pt artwork block, transport and seek |
-| Queue | `QueueView.swift` | sheet listing the queue with reorder/jump/remove |
-| Artwork | `ArtworkView.swift` | embedded-artwork reader for local files |
+| App entry | `Sources/Monochrome/App.swift` | `@main`; forces dark appearance |
+| Shell | `Sources/Monochrome/ContentView.swift` | three classic tabs; player in a full-screen cover; mini player inset applied to each tab |
+| Mini player | `Sources/Monochrome/MiniPlayerView.swift` | flat bar; artwork, title, badge, play/pause, next, progress |
+| Now Playing | `Sources/Monochrome/PlayerView.swift` | artwork, title, favorite, seek, previous/play/next, repeat, queue |
+| Queue | `Sources/Monochrome/QueueView.swift` | list with jump, reorder and remove |
+| Home | `Sources/Monochrome/HomeView.swift` | greeting, recents shelf, favorites list, empty state |
+| Search | `Sources/Monochrome/SearchView.swift` | pinned field, persisted recents, songs/albums/artists sections, debounced search |
+| Library | `Sources/Monochrome/LibraryView.swift` | imported/favorites segments, import, swipe favorite/delete |
+| Album and artist | `Sources/Monochrome/CatalogDetailViews.swift` | detail sheets with real catalog data |
+| Settings | `Sources/Monochrome/SettingsView.swift` | host, cache summary, cached-song list |
+| Shared row | `Sources/Monochrome/TrackRow.swift` | artwork, title, artist, badge, favorite marker, duration |
+| Shared artwork | `Sources/Monochrome/TrackArtwork.swift` | remote image, local embedded image, placeholder |
+| Tokens | `Sources/Monochrome/Theme.swift` | spacing, corner radius, screen padding, glass helpers |
+| Bar model | `Sources/MonochromeCore/NowPlayingBar.swift` | derived title, subtitle, badge, progress, loading/failure |
 
-Gaps against the brief:
+## Findings to address
 
-- No tab shell, no Home, no Search. Everything is one library list.
-- No online content anywhere: rows show file-imported tracks only.
-- Mini player has no artwork, no progress, no glass, and lives in a
-  `safeAreaInset` on the single screen — it disappears with navigation changes.
-- Now Playing uses a fixed 280-pt frame instead of `containerRelativeFrame` and
-  breaks on small phones and with large Dynamic Type.
-- No design tokens: paddings, radii and type are inline and inconsistent.
-- No app icon (the xtool manifest has no `iconPath`, no asset catalog), no logo
-  anywhere in the UI.
-- No empty/error state for anything online, because nothing online exists.
+1. `ContentView` declares a private `enum Tab` that shadows `SwiftUI.Tab`. It is
+   renamed before any typed-tab API is considered.
+2. The player uses `.fullScreenCover`, so a downward swipe cannot dismiss it. It
+   becomes a large sheet with interactive dismissal and keeps the chevron.
+3. `.nowPlayingBarInset` is attached to each tab, so three `MiniPlayerView`
+   instances exist and each supplies its own `.bar` background. The shell owns
+   one inset above the tab bar instead.
+4. `MiniPlayerView` is a flat bar with no card, tint, favorite control or
+   artwork-derived color. The core `NowPlayingBar` model is kept and extended
+   only with presentation values.
+5. `HomeView` hardcodes `Color(white: 0.05)` and accepts an unused
+   `onOpenPlayer` closure. Both are removed.
+6. Colors, radii and spacing are inline in several views. `Theme` becomes the
+   single source of tokens.
+7. There is no artwork tint and no quick-access merge, search partitioning,
+   library sort/filter or shared chip/scrubber logic. Each lands in
+   `MonochromeCore` with host tests.
 
-## What the installed SDK actually provides
+## Target per screen
 
-Checked in
-`…/iPhoneOS27.1.sdk/System/Library/Frameworks/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface`.
+| screen | target |
+|---|---|
+| Shell | Home/Search/Library tabs; one mini-player inset; player opens as a large sheet |
+| Mini player | floating tinted card, 40–44 pt artwork, title/artist, badge, favorite, play/pause, next, 2 pt progress, loading and retry states |
+| Now Playing | tint fading into near-black, chevron and source caption, large artwork, favorite, scrubber with elapsed/remaining, previous/play/next/repeat, queue sheet, cached badge, AirPlay route picker |
+| Queue | medium/large sheet; current track then upcoming tracks; jump, reorder and remove only |
+| Home | greeting and logo; two-column quick-access grid; “Listen again”; “Your favorites” with See all; empty state |
+| Search | pinned field; recent searches; chips only for returned types; top result; shared rows with supported actions |
+| Library | title and sort menu; All/Favorites/Local files chips; pinned Favorites row; import action; shared rows |
+| Shared | `Chip`, `ShelfHeader`, `ArtworkTile`, upgraded `TrackRow`, `RoundPlayButton`, `Scrubber` |
 
-| API | found | availability |
-|---|---|---|
-| `glassEffect` | **no** | not in this SDK |
-| `GlassEffectContainer` | **no** | not in this SDK |
-| `glassEffectID` | **no** | not in this SDK |
-| `.buttonStyle(.glass)` / `GlassButtonStyle` | yes | iOS 26.0 |
-| `tabViewBottomAccessory` | yes | iOS 26.0 (the `isEnabled:` overload is **26.1**) |
-| `tabViewBottomAccessoryPlacement` | yes | iOS 26.0 |
-| `tabBarMinimizeBehavior` | yes | iOS 26.0 |
-| `Tab(_:image:value:)` typed tabs | yes | **iOS 18.0** |
-| `TabRole.search` | yes | iOS 18.0 |
-| `matchedTransitionSource` | yes | iOS 18.0 |
-| `navigationTransition` | yes | iOS 18.0 |
+## Constraints confirmed in the SDK
 
-Package deployment target is **iOS 17.0** and stays there. Consequences:
+The installed SDK is newer than the deployment target. The package stays on iOS
+17. APIs used by the redesign are checked in the installed SwiftUI interfaces;
+newer conveniences are used only behind availability checks. System tab bars,
+navigation bars and sheets keep their own material instead of being painted
+over.
 
-1. `glassEffect`, `GlassEffectContainer` and `glassEffectID` cannot be used at
-   all — they do not exist in this SDK. No guessing, no shim under those names.
-2. Typed `Tab` and `TabRole.search` need iOS 18, so the tab shell uses the
-   classic `TabView` + `.tabItem`, which works on 17 and renders with Liquid
-   Glass on 26 (system components adopt the new design when built with this
-   SDK).
-3. `tabViewBottomAccessory` is iOS 26-only, and its `isEnabled:` overload is
-   26.1. The mini player uses that overload behind `#available(iOS 26.1, *)`,
-   and a `safeAreaInset` bar on everything older.
-4. `.buttonStyle(.glass)` is iOS 26-only. It is applied through **one**
-   `glassControlStyle()` helper with a `.bordered` fallback, honoring
-   `accessibilityReduceTransparency`.
+## Needs eyes on a device
 
-So the honest Liquid Glass story for this repo: glass arrives through the
-system tab bar, navigation bars, toolbars and sheets on iOS 26, plus one
-`.glass` button style on the Now Playing transport. Everything else uses
-system materials. We never paint opaque backgrounds over system chrome.
+Every screen below is L1 until a person looks at it.
 
-## Design decisions
-
-- **Palette:** near-black background (`Color(white: 0.05)`), primary text white,
-  secondary `white.opacity(0.6)`, one accent derived from the artwork. No
-  gradients, no neon, no Spotify green.
-- **Type:** SF Pro via semantic styles only (`.largeTitle`, `.headline`,
-  `.subheadline`, `.caption`), so Dynamic Type works. Durations use
-  `.monospacedDigit()`.
-- **Spacing scale:** 4 / 8 / 12 / 16 / 24 / 32 as `CGFloat` constants in one
-  `Theme` enum.
-- **Artwork:** `AsyncImage` for remote URLs, existing `ArtworkView` for local
-  files, and a single missing-artwork placeholder (SF Symbol on a neutral
-  fill). Artwork never gets a glass overlay.
-- **Navigation:** `TabView` with Home, Search, Library. Each tab owns a
-  `NavigationStack`. Navigating never touches `PlayerController`, which stays
-  the single source of truth.
-- **Now Playing:** full-screen cover (not a sheet) from the mini player.
-  Artwork sized with `containerRelativeFrame`, controls in one glass cluster on
-  iOS 26, materials below.
-- **Queue:** sheet from Now Playing; reorder/remove only where the player
-  supports it (it does: `Queue` has move/remove).
-- **Logo:** the web app's own icon/logo, unchanged, in the Home header.
-
-## Needs eyes on a device (cannot be verified here)
-
-1. Does `AVPlayer` accept `application/octet-stream` FLAC from the tracks host?
-   This is the single biggest unknown; if it refuses, playback needs a
-   different tier or a server that sets `audio/flac`.
-2. Mini player placement on iOS 26 devices with `tabViewBottomAccessory`, and
-   that it does not cover list content on iOS 17 (fallback path).
-3. Glass legibility over bright artwork, and with Reduce Transparency enabled.
-4. Artwork layout at the largest accessibility text sizes and on a 4.7" screen.
-5. Safe areas during scrolling, especially the mini player over a tab bar that
-   minimizes on scroll.
-6. Remote artwork loading over a slow connection (placeholder then fade).
-7. Haptics/animations timing — none were added beyond system defaults.
-8. Background audio + lock-screen controls after the navigation rewrite.
-
-## What shipped (R5–R7)
-
-| screen | file | data source |
-|---|---|---|
-| Shell: Home / Search / Library tabs + mini player | `ContentView.swift`, `Theme.swift` | player + model only |
-| Home: greeting, recently played, favorites | `HomeView.swift` | `HistoryStore`, favorites |
-| Search: tracks, albums, artists (debounced, cancellable) | `SearchView.swift` | catalog API |
-| Album detail | `CatalogDetailViews.swift` | `/releases/{id}` |
-| Artist detail: top tracks + albums | `CatalogDetailViews.swift` | `/artists/{id}` |
-| Library: imported files and favorites, import/delete | `LibraryView.swift` | local files + favorites |
-| Now Playing: artwork, seek, transport, favorite, retry | `PlayerView.swift` | `PlayerController` |
-| Queue: jump, reorder, remove | `QueueView.swift` | `PlayerController` |
-| Shared row / artwork | `TrackRow.swift`, `TrackArtwork.swift` | local or remote |
-
-Deliberately absent: shuffle, repeat, lyrics, playlists, accounts, downloads and
-offline caching — the player does not implement them, and fake controls were
-ruled out. `ArtworkView.swift` was removed; `TrackArtwork.swift` replaces it.
+1. Shell: mini player sits above the tab bar on every tab and pushed screen, and
+   does not cover the last row.
+2. Mini player: tint changes with artwork, stays readable over bright artwork,
+   and its controls remain 44 pt.
+3. Now Playing: sheet swipes down, artwork fits a 4.7-inch screen, scrubber
+   seeks, tint fades cleanly.
+4. Queue: medium detent is usable, reorder handles work.
+5. Home: grid tiles and shelves align; long titles truncate without pushing
+   controls.
+6. Search: chips fit on one line, top result and rows share spacing, keyboard
+   does not cover results.
+7. Library: chips and sort menu fit, pinned Favorites row does not duplicate
+   rows below.
+8. All screens at the largest Dynamic Type size, with Reduce Motion and Reduce
+   Transparency enabled.
