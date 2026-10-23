@@ -40,6 +40,7 @@ struct ContentView: View {
             .tabItem { Label("Library", systemImage: "music.note.list") }
             .tag(AppTab.library)
         }
+        .tint(Theme.accent)
         .sheet(isPresented: $isShowingPlayer) {
             PlayerView(model: model)
                 .presentationDetents([.large])

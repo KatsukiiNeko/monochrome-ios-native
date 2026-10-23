@@ -242,6 +242,15 @@ struct PlayerView: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(player.repeatMode == .off ? Theme.secondaryText : Theme.accent)
                 .frame(width: Theme.controlSize, height: Theme.controlSize)
+                .overlay(alignment: .bottom) {
+                    if player.repeatMode != .off {
+                        Rectangle()
+                            .fill(Theme.accent)
+                            .frame(width: 5, height: 2)
+                            .offset(y: -6)
+                            .accessibilityHidden(true)
+                    }
+                }
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

@@ -38,7 +38,7 @@ struct SettingsView: View {
                 if let errorMessage {
                     Text(errorMessage)
                         .font(.footnote)
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Theme.destructive)
                 }
             } header: {
                 Text("Streaming host")
@@ -105,6 +105,7 @@ struct SettingsView: View {
         }
         .onAppear { host = model.streamingHost }
         .task { await model.refreshCacheSize() }
+        .tint(Theme.accent)
     }
 
     private func cachedRow(_ cached: CachedTrackSummary) -> some View {
