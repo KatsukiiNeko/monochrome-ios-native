@@ -73,8 +73,8 @@ screen was rendered; visual results remain L1 unless a person inspects them.
 Every screen below is L1 until a person looks at it. The visual result cannot be
 verified from a Linux build.
 
-1. Shell: the mini-player stays above the tab bar on every tab and pushed screen,
-   and the last scroll row clears it.
+1. Shell: the mini-player stays above the tab bar on every tab and after
+   dismissing a modal detail sheet, and the last scroll row clears it.
 2. Mini player: tint changes with artwork, text stays readable over bright
    artwork, and controls remain 44 pt.
 3. Now Playing: sheet swipes down, artwork fits a 4.7-inch screen, scrubber seeks,

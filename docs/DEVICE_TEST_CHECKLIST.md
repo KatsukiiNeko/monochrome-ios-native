@@ -36,7 +36,9 @@ unverified until someone looks at the screen.
 ## Layout and navigation
 
 - [ ] The mini-player is a floating card above the tab bar on Home, Search and
-      Library, including pushed album/artist screens.
+      Library, including after scrolling to the end of each list.
+- [ ] Opening an album or artist detail sheet covers the bar; dismiss the sheet
+      and confirm the bar is still in place.
 - [ ] The card tint follows the current artwork and remains readable; the
       favorite, play/pause and next controls work.
 - [ ] Tapping the card opens Now Playing; swiping down or tapping the chevron
@@ -90,7 +92,8 @@ unverified until someone looks at the screen.
 
 - [ ] With a track loaded, the bar is visible on Home, Search and Library,
       above the tab bar.
-- [ ] Open an album or artist detail screen: the bar stays visible.
+- [ ] Open an album or artist detail sheet: it covers the bar; dismiss it and
+      confirm the bar returns.
 - [ ] The bar shows artwork, title, artist, the format badge, play/pause and a
       thin progress line.
 - [ ] Tapping the bar opens Now Playing.
