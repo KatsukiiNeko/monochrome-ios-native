@@ -7,6 +7,8 @@ struct MiniPlayerView: View {
     let model: AppModel
     var onOpen: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var tint = Color(ArtworkTintColor.neutral)
 
     private var player: PlayerController { model.player }
@@ -43,7 +45,7 @@ struct MiniPlayerView: View {
             .shadow(color: .black.opacity(0.35), radius: 12, y: 4)
             .padding(.horizontal, 12)
             .padding(.bottom, 6)
-            .animation(.easeInOut(duration: 0.35), value: tint)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: tint)
             .task(id: track.id) {
                 tint = Color(await model.artworkTint(for: track))
             }
@@ -66,7 +68,7 @@ struct MiniPlayerView: View {
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(Theme.primaryText)
                             .lineLimit(1)
-                        if let badge = bar.badgeText {
+                        if let badge = bar.badgeText, !dynamicTypeSize.isAccessibilitySize {
                             QualityBadgeLabel(text: badge, spokenText: bar.badgeSpokenText)
                         }
                     }

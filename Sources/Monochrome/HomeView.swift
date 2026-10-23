@@ -9,6 +9,8 @@ struct HomeView: View {
     var onOpenLibrary: () -> Void
     var onOpenSettings: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     private var quickAccess: [Track] {
         QuickAccess.merge(recents: model.recents, favorites: model.favorites)
     }
@@ -75,13 +77,7 @@ struct HomeView: View {
     }
 
     private var quickAccessGrid: some View {
-        LazyVGrid(
-            columns: [
-                GridItem(.flexible(), spacing: 8),
-                GridItem(.flexible(), spacing: 8),
-            ],
-            spacing: 8
-        ) {
+        LazyVGrid(columns: gridColumns, spacing: 8) {
             ForEach(quickAccess) { track in
                 Button {
                     Task { await model.play(track, in: quickAccess) }
@@ -112,6 +108,16 @@ struct HomeView: View {
                 .accessibilityHint("Plays this track")
             }
         }
+    }
+
+    private var gridColumns: [GridItem] {
+        if dynamicTypeSize.isAccessibilitySize {
+            return [GridItem(.flexible())]
+        }
+        return [
+            GridItem(.flexible(), spacing: 8),
+            GridItem(.flexible(), spacing: 8),
+        ]
     }
 
     private var listenAgainSection: some View {

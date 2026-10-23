@@ -4,6 +4,27 @@ Build under test: `development`, installed with `xtool dev` on the connected iPh
 Playback and the visual result can only be confirmed by a person, so tick each
 item by hand.
 
+## Layout and navigation
+
+- [ ] The mini-player is a floating card above the tab bar on Home, Search and
+      Library, including pushed album/artist screens.
+- [ ] The card tint follows the current artwork and remains readable; the
+      favorite, play/pause and next controls work.
+- [ ] Tapping the card opens Now Playing; swiping down or tapping the chevron
+      closes it.
+- [ ] Home shows a two-column quick-access grid, Listen again and Your
+      favorites; the last row scrolls clear of the mini-player.
+- [ ] Search chips appear only for returned types; Top result, songs, albums and
+      artists sections open or play the right item.
+- [ ] Library chips and sort menu work; the pinned Favorites row and local-file
+      rows do not duplicate each other.
+- [ ] At the largest Dynamic Type size the quick-access grid becomes one column
+      and no control is clipped.
+- [ ] With Reduce Motion on, the artwork scale and tint changes do not animate.
+- [ ] With Reduce Transparency on, the glass fallback stays solid and readable.
+- [ ] VoiceOver order matches the visual order on Home, Search, Library and Now
+      Playing.
+
 ## Playback
 
 - [ ] Search for a track and open the results list.

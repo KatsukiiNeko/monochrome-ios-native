@@ -8,6 +8,7 @@ struct PlayerView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var isShowingQueue = false
     @State private var tint = Color(ArtworkTintColor.neutral)
 
@@ -43,6 +44,7 @@ struct PlayerView: View {
         .task(id: player.currentTrack?.id) {
             tint = Color(await model.artworkTint(for: player.currentTrack))
         }
+        .sensoryFeedback(.selection, trigger: player.isPlaying)
         .sheet(isPresented: $isShowingQueue) {
             QueueView(model: model)
                 .presentationDetents([.medium, .large])
@@ -230,9 +232,16 @@ struct PlayerView: View {
                 Button {
                     isShowingQueue = true
                 } label: {
-                    Label("Queue", systemImage: "list.bullet")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(Theme.secondaryText)
+                    if dynamicTypeSize.isAccessibilitySize {
+                        Image(systemName: "list.bullet")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Theme.secondaryText)
+                            .frame(width: 44, height: 44)
+                    } else {
+                        Label("Queue", systemImage: "list.bullet")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Theme.secondaryText)
+                    }
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Open queue")

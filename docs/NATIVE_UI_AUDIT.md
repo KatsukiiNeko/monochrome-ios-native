@@ -55,6 +55,22 @@ rendered; visual results are L1 at most.
 | Library | title and sort menu; All/Favorites/Local files chips; pinned Favorites row; import action; shared rows |
 | Shared | `Chip`, `ShelfHeader`, `ArtworkTile`, upgraded `TrackRow`, `RoundPlayButton`, `Scrubber` |
 
+## What shipped (L1, not rendered)
+
+| area | file | state |
+|---|---|---|
+| Tokens | `Theme.swift` | colors, spacing, radii, sizes and type; glass fallback |
+| Artwork tint | `ArtworkTint.swift`, `ArtworkTintStore.swift` | average color sampled once per track, cached, darkened by tested core math |
+| Shared UI | `Chip`, `ShelfHeader`, `ArtworkTile`, `RoundPlayButton`, `Scrubber`, `TrackRow` | one responsibility each |
+| Shell | `ContentView.swift` | `AppTab`, one mini-player inset, large player sheet |
+| Mini player | `MiniPlayerView.swift` | floating tinted card, favorite, play/pause, next, progress, retry |
+| Now Playing | `PlayerView.swift`, `AirPlayRoutePicker.swift` | tinted background, top bar, large artwork, scrubber, transport, queue, badge, AirPlay |
+| Queue | `QueueView.swift` | current track and upcoming section; jump, reorder, remove |
+| Home | `HomeView.swift`, `QuickAccess.swift` | quick-access grid, Listen again, Your favorites, empty state |
+| Search | `SearchView.swift`, `SearchResults.swift` | pinned field, recents, result-type chips, top result, row actions |
+| Library | `LibraryView.swift`, `LibraryQuery.swift` | filter chips, sort, pinned Favorites, import, local delete |
+| Tests | `Tests/MonochromeCoreTests` | tint, quick-access merge, search partitioning, library query |
+
 ## Constraints confirmed in the SDK
 
 The installed SDK is newer than the deployment target. The package stays on iOS
@@ -65,7 +81,9 @@ over.
 
 ## Needs eyes on a device
 
-Every screen below is L1 until a person looks at it.
+Every screen below is L1 until a person looks at it. No device was attached during
+this work (`idevice_id -l` returned `ERROR: Unable to retrieve device list!`), so no
+deploy or device log was produced.
 
 1. Shell: mini player sits above the tab bar on every tab and pushed screen, and
    does not cover the last row.
