@@ -94,7 +94,12 @@ final class AppModel {
         )
         // System integration: audio session first, then Lock Screen metadata/commands.
         self.audioSession = AudioSessionController(player: player)
-        self.nowPlaying = NowPlayingController(player: player)
+        self.nowPlaying = NowPlayingController(player: player) { track in
+            if let name = track.artworkFileName, !name.isEmpty {
+                return media.appendingPathComponent(name)
+            }
+            return track.artworkURL
+        }
         applyStreamingSettings()
         // One source of truth: every track the player actually starts lands in history.
         player.onTrackStarted = { [weak self] track in self?.record(track) }

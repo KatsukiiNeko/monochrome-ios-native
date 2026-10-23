@@ -12,6 +12,8 @@ final class AudioSessionController {
     private let interruptionRelay = CallbackRelay<AudioInterruption>()
     private let routeRelay = CallbackRelay<RouteChange>()
     private var observers: [NSObjectProtocol] = []
+    /// An interruption must only resume audio it paused, not a user's pause.
+    private var wasPlayingBeforeInterruption = false
 
     init(player: PlayerController) {
         self.player = player
@@ -65,10 +67,13 @@ final class AudioSessionController {
         switch event {
         case .began:
             sessionLog.notice("interruption began")
+            wasPlayingBeforeInterruption = player.isPlaying
             if player.isPlaying { Task { await player.togglePlayPause() } }
         case .ended(let shouldResume):
             sessionLog.notice("interruption ended shouldResume=\(shouldResume, privacy: .public)")
-            if shouldResume, player.state == .paused { Task { await player.togglePlayPause() } }
+            let resume = shouldResume && wasPlayingBeforeInterruption
+            wasPlayingBeforeInterruption = false
+            if resume, player.state == .paused { Task { await player.togglePlayPause() } }
         }
     }
 
