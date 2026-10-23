@@ -79,6 +79,13 @@ public protocol AudioCaching: Sendable {
         format: AudioFormat?,
         duration: Double?
     ) async
+    /// Cancels a background download that belongs to a track the user left.
+    func cancelDownload(for track: Track, quality: AudioQuality?, reason: String) async
+}
+
+public extension AudioCaching {
+    /// A cache that does not download in the background has nothing to cancel.
+    func cancelDownload(for track: Track, quality: AudioQuality?, reason: String) async {}
 }
 
 public enum AudioFileType {
@@ -129,7 +136,21 @@ public actor AudioCache: AudioCaching {
     private let downloader: any FileDownloader
     private let allowsExpensiveNetwork: @Sendable () -> Bool
     private let log: @Sendable (String) -> Void
-    private var inFlight: [String: Task<Void, Never>] = [:]
+    private struct InFlight {
+        let id: UUID
+        let task: Task<Void, Never>
+    }
+    private struct Waiter {
+        let id: UUID
+        let name: String
+        let continuation: CheckedContinuation<Bool, Never>
+    }
+    private var inFlight: [String: InFlight] = [:]
+    /// One download at a time; a single waiter may queue behind it.
+    private var activeToken: UUID?
+    private var waiter: Waiter?
+    private var cancelReasons: [String: String] = [:]
+    private static let maxWaitingDownloads = 1
 
     public init(
         directory: URL,
@@ -181,16 +202,21 @@ public actor AudioCache: AudioCaching {
         duration: Double?
     ) async {
         guard track.isStreaming else { return }
+        let name = Self.storageBaseName(track: track, quality: quality)
         guard CacheEligibility.isCacheable(url: url, contentType: contentType) else {
-            log("cache skip track=\(track.id) reason=unsupported-source")
+            log("cache skip key=\(name) reason=uncacheable format=\(contentType ?? "unknown")")
             return
         }
-        let name = Self.storageBaseName(track: track, quality: quality)
         if let existing = inFlight[name] {
             // Two requests for the same key share one download.
-            await existing.value
+            await existing.task.value
             return
         }
+        if Self.hasCompleteEntry(named: name, in: directory) {
+            log("cache skip key=\(name) reason=already-cached")
+            return
+        }
+        let id = UUID()
         let task = Task { [weak self] in
             guard let self else { return }
             await self.performStore(
@@ -200,12 +226,15 @@ public actor AudioCache: AudioCaching {
                 contentType: contentType,
                 format: format,
                 duration: duration,
-                name: name
+                name: name,
+                id: id
             )
         }
-        inFlight[name] = task
+        inFlight[name] = InFlight(id: id, task: task)
         await task.value
-        inFlight[name] = nil
+        if inFlight[name]?.id == id {
+            inFlight[name] = nil
+        }
     }
 
     private func performStore(
@@ -215,28 +244,40 @@ public actor AudioCache: AudioCaching {
         contentType: String?,
         format: AudioFormat?,
         duration: Double?,
-        name: String
+        name: String,
+        id: UUID
     ) async {
+        guard let token = await acquireSlot(id: id, name: name) else { return }
+        defer { releaseSlot(token: token) }
+        guard !Task.isCancelled else {
+            log("cache cancel key=\(name) reason=\(cancelReason(for: name))")
+            return
+        }
+        ensureDirectory()
         guard hasFreeSpace() else {
-            log("cache skip track=\(track.id) reason=low-disk")
+            log("cache skip key=\(name) reason=low-space")
             return
         }
         let ext = AudioFileType.fileExtension(forContentType: contentType)
         let fileName = "\(name).\(ext)"
-        let partial = directory.appendingPathComponent("\(fileName).partial")
+        // Unique per attempt: a cancelled download must never delete a newer partial.
+        let partial = directory.appendingPathComponent("\(fileName).\(id.uuidString).partial")
         try? FileManager.default.removeItem(at: partial)
+        log("cache download start key=\(name)")
         do {
             let result = try await downloader.download(
                 from: url,
                 to: partial,
                 allowsExpensiveNetwork: allowsExpensiveNetwork()
             )
+            try Task.checkCancellation()
             guard result.bytesWritten > 0 else {
                 throw CacheError.emptyDownload
             }
             if let expected = result.expectedBytes, expected > 0, expected != result.bytesWritten {
                 throw CacheError.sizeMismatch(expected: expected, actual: result.bytesWritten)
             }
+            ensureDirectory()
             let finalURL = directory.appendingPathComponent(fileName)
             try? FileManager.default.removeItem(at: finalURL)
             try FileManager.default.moveItem(at: partial, to: finalURL)
@@ -248,13 +289,19 @@ public actor AudioCache: AudioCaching {
                 duration: duration,
                 byteSize: result.bytesWritten
             )
+            ensureDirectory()
             Self.write(entry: entry, named: name, in: directory)
-            log("cache store track=\(track.id) quality=\(Self.qualityName(quality)) bytes=\(result.bytesWritten)")
+            log("cache download finish key=\(name) bytes=\(result.bytesWritten)")
             evictIfNeeded()
         } catch {
             try? FileManager.default.removeItem(at: partial)
-            log("cache store failed track=\(track.id) reason=\(error.localizedDescription)")
+            if Task.isCancelled {
+                log("cache cancel key=\(name) reason=\(cancelReason(for: name))")
+            } else {
+                log("cache download failed key=\(name) reason=\(error.localizedDescription)")
+            }
         }
+        cancelReasons[name] = nil
     }
 
     // MARK: - Maintenance
@@ -263,14 +310,97 @@ public actor AudioCache: AudioCaching {
         Self.entries(in: directory).reduce(0) { $0 + $1.byteSize }
     }
 
+    /// Count and bytes in one directory scan for the Settings row.
+    public func stats() -> (count: Int, bytes: Int) {
+        let entries = Self.entries(in: directory)
+        return (entries.count, entries.reduce(0) { $0 + $1.byteSize })
+    }
+
+    public func entryCount() -> Int {
+        Self.entries(in: directory).count
+    }
+
+    public func cancelDownload(for track: Track, quality: AudioQuality?, reason: String) async {
+        let name = Self.storageBaseName(track: track, quality: quality)
+        cancelReasons[name] = reason
+        if let entry = inFlight.removeValue(forKey: name) {
+            entry.task.cancel()
+            log("cache cancel key=\(name) reason=\(reason)")
+        }
+        if let queued = waiter, queued.name == name {
+            waiter = nil
+            queued.continuation.resume(returning: false)
+            log("cache cancel key=\(name) reason=\(reason)")
+        }
+    }
+
     public func clear() {
+        let entries = Self.entries(in: directory)
+        let bytes = entries.reduce(0) { $0 + $1.byteSize }
+        let running = inFlight
+        inFlight.removeAll()
+        for (name, entry) in running {
+            cancelReasons[name] = "clear"
+            entry.task.cancel()
+        }
+        if let queued = waiter {
+            waiter = nil
+            queued.continuation.resume(returning: false)
+        }
+        activeToken = nil
         try? FileManager.default.removeItem(at: directory)
-        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        log("cache clear")
+        ensureDirectory()
+        log("cache clear removed=\(entries.count) bytes=\(bytes)")
+        if !running.isEmpty {
+            log("cache slot released")
+        }
     }
 
     public func purgePartials() {
         Self.removePartials(in: directory)
+    }
+
+    // MARK: - Download slot
+
+    private func acquireSlot(id: UUID, name: String) async -> UUID? {
+        if activeToken == nil {
+            activeToken = id
+            return id
+        }
+        guard waiter == nil, Self.maxWaitingDownloads > 0 else {
+            log("cache skip key=\(name) reason=queue-full")
+            return nil
+        }
+        let admitted = await withCheckedContinuation { continuation in
+            waiter = Waiter(id: id, name: name, continuation: continuation)
+        }
+        guard admitted else { return nil }
+        guard !Task.isCancelled else {
+            // The slot was handed over while this request was being cancelled.
+            releaseSlot(token: id)
+            return nil
+        }
+        return id
+    }
+
+    private func releaseSlot(token: UUID) {
+        guard activeToken == token else { return }
+        if let queued = waiter {
+            waiter = nil
+            activeToken = queued.id
+            queued.continuation.resume(returning: true)
+        } else {
+            activeToken = nil
+            log("cache slot released")
+        }
+    }
+
+    private func cancelReason(for name: String) -> String {
+        cancelReasons[name] ?? "cancelled"
+    }
+
+    private func ensureDirectory() {
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 
     private func evictIfNeeded() {
@@ -312,6 +442,14 @@ public actor AudioCache: AudioCaching {
             character.isLetter || character.isNumber ? character : "_"
         }
         return "\(String(safe).prefix(80))-\(qualityName)"
+    }
+
+    private static func hasCompleteEntry(named name: String, in directory: URL) -> Bool {
+        guard let entry = readEntry(named: name, in: directory),
+              let size = fileSize(directory.appendingPathComponent(entry.fileName)),
+              size == entry.byteSize,
+              size > 0 else { return false }
+        return true
     }
 
     private static func readEntry(named name: String, in directory: URL) -> AudioCacheEntry? {
