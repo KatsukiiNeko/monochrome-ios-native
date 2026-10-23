@@ -45,14 +45,14 @@ struct SettingsView: View {
             }
 
             Section {
-                LabeledContent("Cached audio", value: ByteCountFormatter.string(
+                LabeledContent("Cached audio", value: "\(model.cacheEntryCount) songs, " + ByteCountFormatter.string(
                     fromByteCount: Int64(model.cacheSizeBytes),
                     countStyle: .file
                 ))
                 Button("Clear cache", role: .destructive) {
                     Task { await model.clearCache() }
                 }
-                .disabled(model.cacheSizeBytes == 0)
+                .disabled(model.cacheEntryCount == 0)
                 Toggle("Cache over cellular", isOn: Binding(
                     get: { model.allowsCellularCaching },
                     set: { model.setAllowsCellularCaching($0) }

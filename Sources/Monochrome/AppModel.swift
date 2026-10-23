@@ -18,6 +18,7 @@ final class AppModel {
     private(set) var streamingHost: String
     private(set) var isStreamingConfigured: Bool
     private(set) var cacheSizeBytes = 0
+    private(set) var cacheEntryCount = 0
     var allowsCellularCaching: Bool { cacheSettings.allowsCellular }
 
     private let service: LocalFileService
@@ -219,7 +220,9 @@ final class AppModel {
     // MARK: - Cache
 
     func refreshCacheSize() async {
-        cacheSizeBytes = await cache.sizeBytes()
+        let stats = await cache.stats()
+        cacheEntryCount = stats.count
+        cacheSizeBytes = stats.bytes
     }
 
     func clearCache() async {
