@@ -42,6 +42,7 @@ struct HomeView: View {
                 .padding(.bottom, 24)
             }
             .background(Theme.background.ignoresSafeArea())
+            .tint(Theme.accent)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { logo }
@@ -54,6 +55,13 @@ struct HomeView: View {
 
     private var greeting: some View {
         VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Rectangle()
+                    .fill(Theme.accent)
+                    .frame(width: 5, height: 5)
+                    .accessibilityHidden(true)
+                TechnicalLabel(text: "Monochrome")
+            }
             Text(Self.greeting(for: .now))
                 .font(Theme.screenTitle)
                 .foregroundStyle(Theme.primaryText)
@@ -77,35 +85,54 @@ struct HomeView: View {
     }
 
     private var quickAccessGrid: some View {
-        LazyVGrid(columns: gridColumns, spacing: 8) {
-            ForEach(quickAccess) { track in
-                Button {
-                    Task { await model.play(track, in: quickAccess) }
-                } label: {
-                    HStack(spacing: 8) {
-                        TrackArtwork(
-                            track: track,
-                            localURL: model.artworkURL(for: track),
-                            cornerRadius: Theme.tileRadius
-                        )
-                        .frame(width: 48, height: 48)
+        VStack(alignment: .leading, spacing: 12) {
+            ShelfHeader(title: "Quick access")
 
-                        Text(track.title)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Theme.primaryText)
-                            .lineLimit(2)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+            LazyVGrid(columns: gridColumns, spacing: 8) {
+                ForEach(quickAccess) { track in
+                    Button {
+                        Task { await model.play(track, in: quickAccess) }
+                    } label: {
+                        HStack(spacing: 8) {
+                            TrackArtwork(
+                                track: track,
+                                localURL: model.artworkURL(for: track),
+                                cornerRadius: Theme.tileRadius
+                            )
+                            .frame(width: 48, height: 48)
+
+                            Text(track.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Theme.primaryText)
+                                .lineLimit(2)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+
+                            if model.player.currentTrack?.id == track.id {
+                                Rectangle()
+                                    .fill(Theme.accent)
+                                    .frame(width: 5, height: 5)
+                                    .accessibilityHidden(true)
+                            }
+                        }
+                        .padding(6)
+                        .background(
+                            Theme.surface,
+                            in: RoundedRectangle(cornerRadius: Theme.tileRadius, style: .continuous)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: Theme.tileRadius, style: .continuous)
+                                .stroke(Theme.border, lineWidth: Theme.hairline)
+                        }
+                        .contentShape(Rectangle())
                     }
-                    .padding(6)
-                    .background(
-                        Theme.surface,
-                        in: RoundedRectangle(cornerRadius: Theme.tileRadius, style: .continuous)
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        model.player.currentTrack?.id == track.id
+                            ? "\(track.title) by \(track.displayArtist), now playing"
+                            : "\(track.title) by \(track.displayArtist)"
                     )
-                    .contentShape(Rectangle())
+                    .accessibilityHint("Plays this track")
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("\(track.title) by \(track.displayArtist)")
-                .accessibilityHint("Plays this track")
             }
         }
     }
@@ -146,7 +173,14 @@ struct HomeView: View {
                 onOpenLibrary()
             }
             VStack(spacing: 0) {
-                ForEach(model.favorites.prefix(5)) { track in
+                ForEach(Array(model.favorites.prefix(5).enumerated()), id: \.element.id) { index, track in
+                    if index > 0 {
+                        Rectangle()
+                            .fill(Theme.separator)
+                            .frame(height: Theme.hairline)
+                            .padding(.leading, 64)
+                            .accessibilityHidden(true)
+                    }
                     Button {
                         Task { await model.play(track, in: model.favorites) }
                     } label: {
@@ -173,6 +207,7 @@ struct HomeView: View {
         } actions: {
             Button("Search the catalog") { onOpenSearch() }
                 .buttonStyle(.borderedProminent)
+                .tint(Theme.primaryAction)
         }
         .padding(.top, 40)
     }
