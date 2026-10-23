@@ -1,15 +1,15 @@
-// ContentView.swift: the app shell — three tabs, one mini player, one full-screen player.
+// ContentView.swift: the app shell — three tabs, one mini player, one player sheet.
 #if canImport(SwiftUI)
 import MonochromeCore
 import SwiftUI
 
 struct ContentView: View {
     @State private var model = AppModel()
-    @State private var tab: Tab = .home
+    @State private var tab: AppTab = .home
     @State private var isShowingPlayer = false
     @State private var isShowingSettings = false
 
-    private enum Tab: Hashable {
+    private enum AppTab: Hashable {
         case home
         case search
         case library
@@ -24,26 +24,27 @@ struct ContentView: View {
                 onOpenLibrary: { tab = .library },
                 onOpenSettings: { isShowingSettings = true }
             )
-            .nowPlayingBarInset(isPresented: isPlayingBarVisible) { miniPlayer }
             .tabItem { Label("Home", systemImage: "house") }
-            .tag(Tab.home)
+            .tag(AppTab.home)
 
             SearchView(model: model)
-                .nowPlayingBarInset(isPresented: isPlayingBarVisible) { miniPlayer }
                 .tabItem { Label("Search", systemImage: "magnifyingglass") }
-                .tag(Tab.search)
+                .tag(AppTab.search)
 
             LibraryView(
                 model: model,
                 onOpenPlayer: { isShowingPlayer = true },
                 onOpenSettings: { isShowingSettings = true }
             )
-            .nowPlayingBarInset(isPresented: isPlayingBarVisible) { miniPlayer }
             .tabItem { Label("Library", systemImage: "music.note.list") }
-            .tag(Tab.library)
+            .tag(AppTab.library)
         }
-        .fullScreenCover(isPresented: $isShowingPlayer) {
+        .nowPlayingBarInset(isPresented: isPlayingBarVisible) { miniPlayer }
+        .sheet(isPresented: $isShowingPlayer) {
             PlayerView(model: model)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.hidden)
+                .presentationBackground(Theme.background)
         }
         .sheet(isPresented: $isShowingSettings) {
             NavigationStack {
