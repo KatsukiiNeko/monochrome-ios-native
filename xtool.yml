@@ -1,0 +1,9 @@
+version: 1
+# Bundle identifier for device runs and release builds.
+bundleID: com.katsukiineko.monochrome
+infoPath: Resources/Info.plist
+# The web app's own icon, unchanged; see Branding/SOURCE.md.
+iconPath: Branding/appicon.png
+# The web logo, unchanged, bundled for the Home header.
+resources:
+  - Branding/monochrome_logo.png

@@ -114,7 +114,7 @@ Run it only when you intend to contact the live service. It searches the catalog
 
 ### Device build and installation
 
-Device installation is a deliberate, manual operation and is not part of CI. It requires a locally configured, untracked `xtool.yml` with your bundle identifier and resource settings. `xtool dev` installs the app on a connected device; **do not run it when you only want a non-deploying build check**. The repository's CI does not access Apple credentials, provisioning profiles, or physical devices.
+Device installation is a deliberate, manual operation and is not part of CI. The tracked `xtool.yml` holds the bundle identifier and resource settings. `xtool dev build` produces a build without deploying; `xtool dev` installs it on a connected device. The repository's CI does not access Apple credentials, provisioning profiles, or physical devices.
 
 ## CI
 
