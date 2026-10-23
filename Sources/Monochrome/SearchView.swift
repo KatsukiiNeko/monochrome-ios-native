@@ -1,4 +1,4 @@
-// SearchView.swift: debounced catalog search for tracks, albums and artists.
+// SearchView.swift: pinned catalog search with recent searches, chips and a top result.
 #if canImport(SwiftUI)
 import MonochromeCore
 import SwiftUI
@@ -12,6 +12,7 @@ struct SearchView: View {
     @State private var artists: [RemoteArtist] = []
     @State private var isSearching = false
     @State private var errorMessage: String?
+    @State private var filter: SearchResultKind = .all
     @State private var selectedRelease: RemoteRelease?
     @State private var selectedArtist: RemoteArtist?
 
@@ -23,13 +24,13 @@ struct SearchView: View {
                     .padding(.vertical, 8)
 
                 ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 24) {
+                    LazyVStack(alignment: .leading, spacing: Theme.sectionSpacing) {
                         if trimmedQuery.isEmpty {
                             if !model.searchRecents.isEmpty { recentSearchesSection }
+                        } else if isSearching && !hasResults {
+                            loadingPlaceholder
                         } else {
-                            if !tracks.isEmpty { tracksSection }
-                            if !releases.isEmpty { releasesSection }
-                            if !artists.isEmpty { artistsSection }
+                            resultsContent
                         }
                     }
                     .padding(.horizontal, Theme.screenPadding)
@@ -55,7 +56,7 @@ struct SearchView: View {
     private var searchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.secondaryText)
             TextField("Songs, artists, albums", text: $query)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -68,7 +69,7 @@ struct SearchView: View {
                     Image(systemName: "xmark.circle.fill")
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Theme.tertiaryText)
                 .accessibilityLabel("Clear search")
             }
         }
@@ -85,6 +86,56 @@ struct SearchView: View {
         !tracks.isEmpty || !releases.isEmpty || !artists.isEmpty
     }
 
+    private var availableKinds: [SearchResultKind] {
+        SearchResults.availableKinds(
+            hasTracks: !tracks.isEmpty,
+            hasReleases: !releases.isEmpty,
+            hasArtists: !artists.isEmpty
+        )
+    }
+
+    private var activeFilter: SearchResultKind {
+        availableKinds.contains(filter) ? filter : .all
+    }
+
+    private var sections: SearchResultSections {
+        SearchResults.apply(
+            activeFilter,
+            tracks: tracks,
+            releases: releases,
+            artists: artists
+        )
+    }
+
+    @ViewBuilder
+    private var resultsContent: some View {
+        if !availableKinds.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(availableKinds) { kind in
+                        Chip(title: kind.title, isSelected: activeFilter == kind) {
+                            filter = kind
+                        }
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        }
+
+        if activeFilter == .all, let top = sections.tracks.first {
+            topResult(top)
+        }
+        if !sections.tracks.isEmpty {
+            tracksSection
+        }
+        if !sections.releases.isEmpty {
+            releasesSection
+        }
+        if !sections.artists.isEmpty {
+            artistsSection
+        }
+    }
+
     @ViewBuilder
     private var stateOverlay: some View {
         if !model.isStreamingConfigured {
@@ -93,8 +144,6 @@ struct SearchView: View {
             } description: {
                 Text("Choose a streaming host in Settings to search the catalog.")
             }
-        } else if isSearching {
-            ProgressView("Searching…")
         } else if let errorMessage {
             ContentUnavailableView {
                 Label("Search failed", systemImage: "exclamationmark.triangle")
@@ -103,36 +152,50 @@ struct SearchView: View {
             } actions: {
                 Button("Retry") { Task { await runSearch(force: true) } }
             }
-        } else if trimmedQuery.isEmpty {
-            if model.searchRecents.isEmpty {
-                ContentUnavailableView {
-                    Label("Search the catalog", systemImage: "magnifyingglass")
-                } description: {
-                    Text("Find songs, albums and artists by name.")
-                }
+        } else if !isSearching, trimmedQuery.isEmpty, model.searchRecents.isEmpty {
+            ContentUnavailableView {
+                Label("Search the catalog", systemImage: "magnifyingglass")
+            } description: {
+                Text("Find songs, albums and artists by name.")
             }
-        } else if !hasResults {
+        } else if !isSearching, !trimmedQuery.isEmpty, !hasResults {
             ContentUnavailableView.search(text: trimmedQuery)
         }
     }
 
+    private var loadingPlaceholder: some View {
+        VStack(spacing: 12) {
+            ForEach(0..<6, id: \.self) { _ in
+                HStack(spacing: Theme.rowSpacing) {
+                    RoundedRectangle(cornerRadius: Theme.artworkRadius)
+                        .fill(Theme.elevated)
+                        .frame(width: 52, height: 52)
+                    VStack(alignment: .leading, spacing: 6) {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Theme.elevated)
+                            .frame(width: 180, height: 12)
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(Theme.elevated)
+                            .frame(width: 120, height: 10)
+                    }
+                    Spacer()
+                }
+            }
+        }
+        .redacted(reason: .placeholder)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Searching")
+    }
+
     private var recentSearchesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                sectionHeader("Recent searches")
-                Spacer()
-                Button("Clear all") {
-                    model.clearSearchRecents()
-                }
-                .font(.caption)
+            ShelfHeader(title: "Recent searches", actionTitle: "Clear all") {
+                model.clearSearchRecents()
             }
             ForEach(model.searchRecents) { track in
                 HStack(spacing: 8) {
                     Button {
-                        Task {
-                            model.recordSearch(track)
-                            await model.play(track, in: model.searchRecents)
-                        }
+                        play(track, in: model.searchRecents)
                     } label: {
                         TrackRow(
                             track: track,
@@ -148,7 +211,7 @@ struct SearchView: View {
                     } label: {
                         Image(systemName: "trash")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.secondaryText)
                     }
                     .buttonStyle(.plain)
                     .frame(width: 44, height: 44)
@@ -159,58 +222,115 @@ struct SearchView: View {
         }
     }
 
+    private func topResult(_ track: Track) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Top result")
+                .font(Theme.sectionTitle)
+                .foregroundStyle(Theme.primaryText)
+            Button {
+                play(track, in: sections.tracks)
+            } label: {
+                HStack(spacing: 12) {
+                    TrackArtwork(
+                        track: track,
+                        localURL: model.artworkURL(for: track),
+                        cornerRadius: Theme.albumRadius
+                    )
+                    .frame(width: 76, height: 76)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(track.title)
+                            .font(.headline)
+                            .foregroundStyle(Theme.primaryText)
+                            .lineLimit(2)
+                        Text(track.displayArtist)
+                            .font(.subheadline)
+                            .foregroundStyle(Theme.secondaryText)
+                            .lineLimit(1)
+                    }
+
+                    Spacer(minLength: 8)
+
+                    Image(systemName: "play.circle.fill")
+                        .font(.system(size: 34))
+                        .foregroundStyle(Theme.primaryText)
+                        .accessibilityHidden(true)
+                }
+                .padding(10)
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Top result: \(track.title) by \(track.displayArtist)")
+            .accessibilityHint("Plays this track")
+        }
+    }
+
     private var tracksSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader("Songs")
-            ForEach(tracks) { track in
-                Button {
-                    Task {
-                        model.recordSearch(track)
-                        await model.play(track, in: tracks)
+            ShelfHeader(title: "Songs")
+            ForEach(sections.tracks) { track in
+                HStack(spacing: 0) {
+                    Button {
+                        play(track, in: sections.tracks)
+                    } label: {
+                        TrackRow(
+                            track: track,
+                            isCurrent: model.player.currentTrack?.id == track.id,
+                            showsKind: true
+                        )
+                        .padding(.vertical, 2)
                     }
-                } label: {
-                    TrackRow(
-                        track: track,
-                        isCurrent: model.player.currentTrack?.id == track.id
-                    )
-                    .padding(.vertical, 2)
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    trackMenu(track)
                 }
-                .buttonStyle(.plain)
             }
         }
     }
 
+    private func trackMenu(_ track: Track) -> some View {
+        Menu {
+            if model.player.currentTrack != nil {
+                Button("Add to queue", systemImage: "text.badge.plus") {
+                    model.player.append([track])
+                }
+            }
+            Button(
+                model.isFavorite(track) ? "Remove from favorites" : "Add to favorites",
+                systemImage: model.isFavorite(track) ? "heart.slash" : "heart"
+            ) {
+                model.toggleFavorite(track)
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.body)
+                .foregroundStyle(Theme.secondaryText)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel("More actions for \(track.title)")
+    }
+
     private var releasesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Albums")
+            ShelfHeader(title: "Albums")
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 12) {
-                    ForEach(releases) { release in
-                        Button {
+                    ForEach(sections.releases) { release in
+                        ArtworkTile(
+                            track: Track(
+                                title: release.title,
+                                artist: release.artist,
+                                artworkURL: release.artworkURL
+                            ),
+                            width: 140,
+                            accessibilityLabel: "Album \(release.title) by \(release.artist)",
+                            accessibilityHint: "Opens album"
+                        ) {
                             selectedRelease = release
-                        } label: {
-                            VStack(alignment: .leading, spacing: 6) {
-                                TrackArtwork(
-                                    track: Track(
-                                        title: release.title,
-                                        artist: release.artist,
-                                        artworkURL: release.artworkURL
-                                    ),
-                                    cornerRadius: 10
-                                )
-                                .frame(width: 140, height: 140)
-                                Text(release.title)
-                                    .font(.caption.weight(.medium))
-                                    .lineLimit(1)
-                                Text(release.artist)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                            .frame(width: 140, alignment: .leading)
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Album \(release.title) by \(release.artist)")
                     }
                 }
                 .padding(.vertical, 2)
@@ -220,8 +340,8 @@ struct SearchView: View {
 
     private var artistsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader("Artists")
-            ForEach(artists) { artist in
+            ShelfHeader(title: "Artists")
+            ForEach(sections.artists) { artist in
                 Button {
                     selectedArtist = artist
                 } label: {
@@ -238,11 +358,12 @@ struct SearchView: View {
                         .accessibilityHidden(true)
 
                         Text(artist.name)
-                            .font(.subheadline)
+                            .font(Theme.rowTitle)
+                            .foregroundStyle(Theme.primaryText)
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.caption)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Theme.tertiaryText)
                     }
                     .contentShape(Rectangle())
                 }
@@ -252,12 +373,15 @@ struct SearchView: View {
         }
     }
 
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.title3.weight(.semibold))
+    private func play(_ track: Track, in results: [Track]) {
+        Task {
+            model.recordSearch(track)
+            await model.play(track, in: results)
+        }
     }
 
     private func runSearch(force: Bool = false) async {
+        filter = .all
         let text = trimmedQuery
         guard text.count >= 2 else {
             tracks = []

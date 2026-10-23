@@ -81,7 +81,7 @@ final class AppModel {
         self.historyStore = HistoryStore(fileURL: base.appendingPathComponent("history.json"))
         self.searchHistoryStore = HistoryStore(
             fileURL: base.appendingPathComponent("search-history.json"),
-            limit: 20
+            limit: 10
         )
         // System integration: audio session first, then Lock Screen metadata/commands.
         self.audioSession = AudioSessionController(player: player)

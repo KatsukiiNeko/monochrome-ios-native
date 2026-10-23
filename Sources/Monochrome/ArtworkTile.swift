@@ -7,6 +7,8 @@ struct ArtworkTile: View {
     let track: Track
     var localArtworkURL: URL?
     var width: CGFloat = 132
+    var accessibilityLabel: String?
+    var accessibilityHint = "Plays this track"
     var action: () -> Void
 
     var body: some View {
@@ -32,8 +34,8 @@ struct ArtworkTile: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(track.title) by \(track.displayArtist)")
-        .accessibilityHint("Plays this track")
+        .accessibilityLabel(accessibilityLabel ?? "\(track.title) by \(track.displayArtist)")
+        .accessibilityHint(accessibilityHint)
     }
 }
 #endif
