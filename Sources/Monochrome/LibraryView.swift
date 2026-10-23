@@ -62,6 +62,7 @@ struct LibraryView: View {
                     }
                 }
                 .listStyle(.plain)
+                .listRowSeparatorTint(Theme.separator)
                 .scrollContentBackground(.hidden)
                 .overlay {
                     if model.isImporting {
@@ -74,6 +75,7 @@ struct LibraryView: View {
                 }
             }
             .background(Theme.background.ignoresSafeArea())
+            .tint(Theme.accent)
             .navigationTitle("Library")
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -141,7 +143,7 @@ struct LibraryView: View {
             HStack(spacing: 12) {
                 Image(systemName: "heart.fill")
                     .font(.headline)
-                    .foregroundStyle(Theme.primaryText)
+                    .foregroundStyle(Theme.accent)
                     .frame(width: 48, height: 48)
                     .background(Theme.elevated, in: RoundedRectangle(cornerRadius: Theme.tileRadius))
 
@@ -149,9 +151,9 @@ struct LibraryView: View {
                     Text("Favorites")
                         .font(Theme.rowTitle)
                         .foregroundStyle(Theme.primaryText)
-                    Text(model.favorites.count == 1 ? "1 song" : "\(model.favorites.count) songs")
-                        .font(Theme.rowSubtitle)
-                        .foregroundStyle(Theme.secondaryText)
+                    TechnicalLabel(
+                        text: model.favorites.count == 1 ? "1 song" : "\(model.favorites.count) songs"
+                    )
                 }
 
                 Spacer(minLength: 8)
@@ -161,7 +163,11 @@ struct LibraryView: View {
                     .foregroundStyle(Theme.tertiaryText)
             }
             .padding(8)
-            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius))
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                    .stroke(Theme.border, lineWidth: Theme.hairline)
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -194,6 +200,7 @@ struct LibraryView: View {
             } actions: {
                 Button("Import audio files") { isShowingImporter = true }
                     .buttonStyle(.borderedProminent)
+                    .tint(Theme.primaryAction)
             }
         case .favorites:
             ContentUnavailableView {
@@ -209,6 +216,7 @@ struct LibraryView: View {
             } actions: {
                 Button("Import audio files") { isShowingImporter = true }
                     .buttonStyle(.borderedProminent)
+                    .tint(Theme.primaryAction)
             }
         }
     }
