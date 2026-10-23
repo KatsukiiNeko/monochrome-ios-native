@@ -43,6 +43,7 @@ public struct Palette: Equatable, Sendable {
     public var secondaryText: PaletteColor
     public var tertiaryText: PaletteColor
     public var accent: PaletteColor
+    public var destructive: PaletteColor
 }
 
 public enum ThemePalette {
@@ -57,7 +58,8 @@ public enum ThemePalette {
         primaryText: .gray(0.05),
         secondaryText: .gray(0.40),
         tertiaryText: .gray(0.55),
-        accent: PaletteColor(red: 0.69, green: 0, blue: 0.06)
+        accent: PaletteColor(red: 0.69, green: 0, blue: 0.06),
+        destructive: PaletteColor(red: 0.69, green: 0, blue: 0.06)
     )
 
     public static let dark = Palette(
@@ -71,7 +73,9 @@ public enum ThemePalette {
         primaryText: .gray(0.98),
         secondaryText: .gray(0.72),
         tertiaryText: .gray(0.55),
-        accent: PaletteColor(red: 0.88, green: 0.10, blue: 0.14)
+        accent: PaletteColor(red: 0.88, green: 0.10, blue: 0.14),
+        // Text-safe red for destructive labels on the dark surface.
+        destructive: PaletteColor(red: 0.96, green: 0.30, blue: 0.32)
     )
 
     /// WCAG contrast ratio. A translucent foreground is composited over the

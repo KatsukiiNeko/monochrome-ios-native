@@ -19,6 +19,13 @@ struct ThemePaletteTests {
         }
     }
 
+    @Test func destructiveTextMeetsBodyContrast() {
+        for palette in [ThemePalette.light, ThemePalette.dark] {
+            #expect(ThemePalette.contrastRatio(palette.destructive, palette.background) >= 4.5)
+            #expect(ThemePalette.contrastRatio(palette.destructive, palette.surface) >= 4.5)
+        }
+    }
+
     @Test func lightAndDarkDiffer() {
         #expect(ThemePalette.light != ThemePalette.dark)
         #expect(ThemePalette.light.background != ThemePalette.dark.background)

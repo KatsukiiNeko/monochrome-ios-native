@@ -62,7 +62,10 @@ enum Theme {
         dark: ThemePalette.dark.accent
     )
     static let onAccent = Color.white
-    static let destructive = accent
+    static let destructive = adaptive(
+        light: ThemePalette.light.destructive,
+        dark: ThemePalette.dark.destructive
+    )
 
     /// High-contrast transport surface, independent of the red state accent.
     static let primaryAction = adaptive(light: .black, dark: .white)
@@ -76,18 +79,18 @@ enum Theme {
 
     // MARK: Spacing
 
-    static let sectionSpacing: CGFloat = 24
-    static let screenPadding: CGFloat = 16
+    static let sectionSpacing: CGFloat = 28
+    static let screenPadding: CGFloat = 20
     static let rowSpacing: CGFloat = 12
     static let hairline: CGFloat = 1
     static let cardPadding: CGFloat = 14
-    static let rowMinHeight: CGFloat = 56
-    static let iconSize: CGFloat = 32
+    static let rowMinHeight: CGFloat = 52
+    static let iconSize: CGFloat = 28
 
     // MARK: Radii
 
     static let corner: CGFloat = 12
-    static let cardRadius: CGFloat = 20
+    static let cardRadius: CGFloat = 10
     static let artworkRadius: CGFloat = 2
     static let albumRadius: CGFloat = 4
     static let tileRadius: CGFloat = 6
@@ -98,23 +101,28 @@ enum Theme {
     static let controlSize: CGFloat = 44
     static let miniArtworkSize: CGFloat = 42
     static let sectionMarker: CGFloat = 5
+    static let markerHeight: CGFloat = 13
 
     // MARK: Type
 
     static let screenTitle = Font.system(.largeTitle, design: .default, weight: .bold)
     static let heroTitle = Font.system(.title, design: .default, weight: .bold)
     static let sectionTitle = Font.system(.title3, design: .default, weight: .semibold)
+    static let shelfTitle = Font.system(.title2, design: .default, weight: .bold)
     static let rowTitle = Font.system(.subheadline, design: .default, weight: .semibold)
+    static let listRowTitle = Font.system(.body, design: .default, weight: .medium)
     static let rowSubtitle = Font.system(.caption, design: .default)
     static let caption = Font.system(.caption, design: .default)
     static let technical = Font.system(.caption, design: .monospaced, weight: .medium)
     static let micro = Font.system(.caption2, design: .monospaced, weight: .semibold)
     static let time = Font.system(.caption, design: .monospaced, weight: .medium)
+    static let value = Font.system(.subheadline, design: .monospaced, weight: .medium)
 
     // MARK: Motion
 
     static let quick = Animation.easeOut(duration: 0.18)
     static let standard = Animation.easeInOut(duration: 0.28)
+    static let artwork = Animation.easeOut(duration: 0.32)
 
     private static func adaptive(light: UIColor, dark: UIColor) -> Color {
         Color(uiColor: UIColor { traits in

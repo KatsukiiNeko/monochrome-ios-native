@@ -48,6 +48,72 @@ struct DotMatrixText: View {
     }
 }
 
+/// Display-only dot-matrix label. At accessibility sizes it falls back to the
+/// scalable monospaced label, so the decorative face never blocks reading.
+struct DotMatrixLabel: View {
+    let text: String
+    var color: Color = Theme.secondaryText
+    var dotSize: CGFloat = 1.7
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .caption2) private var scale: CGFloat = 1
+
+    private var usesDotMatrix: Bool {
+        !dynamicTypeSize.isAccessibilitySize && DotMatrix.supports(text.uppercased())
+    }
+
+    private var matrix: some View {
+        DotMatrixText(
+            text: text.uppercased(),
+            dotSize: dotSize * min(scale, 1.25),
+            dotSpacing: 1,
+            characterSpacing: 3,
+            color: color
+        )
+        .accessibilityLabel(text)
+    }
+
+    var body: some View {
+        if usesDotMatrix {
+            // Long headings and narrow columns fall back to the scalable mono
+            // label rather than clipping a fixed-width dot grid.
+            ViewThatFits(in: .horizontal) {
+                matrix
+                TechnicalLabel(text: text, color: color)
+            }
+        } else {
+            TechnicalLabel(text: text, color: color)
+        }
+    }
+}
+
+/// Structural heading shared by native lists: technical marker, dot-matrix
+/// label and optional compact metadata.
+struct TechnicalSectionHeader: View {
+    let title: String
+    var meta: String?
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 8) {
+            Rectangle()
+                .fill(Theme.accent)
+                .frame(width: Theme.sectionMarker, height: Theme.markerHeight)
+                .accessibilityHidden(true)
+
+            DotMatrixLabel(text: title)
+
+            Spacer(minLength: 8)
+
+            if let meta {
+                TechnicalLabel(text: meta)
+            }
+        }
+        .textCase(nil)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
 struct CacheSlotMeter: View {
     let used: Int
     let total: Int

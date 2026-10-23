@@ -4,7 +4,7 @@ import Testing
 
 @Suite("DotMatrix")
 struct DotMatrixTests {
-    private let required = Array("0123456789/ACEHLOST")
+    private let required = Array(" 0123456789/.:-ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
     @Test func everyRequiredGlyphIsFiveBySeven() {
         for character in required {
@@ -37,16 +37,19 @@ struct DotMatrixTests {
 
     @Test func supportsKnownText() {
         #expect(DotMatrix.supports("0123456789"))
-        #expect(DotMatrix.supports("ACEHLOST"))
+        #expect(DotMatrix.supports("ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
         #expect(DotMatrix.supports("12/48"))
+        #expect(DotMatrix.supports("MONOCHROME"))
+        #expect(DotMatrix.supports("NOW PLAYING"))
+        #expect(DotMatrix.supports("STREAMING ENDPOINT"))
+        #expect(DotMatrix.supports("16/44.1"))
         #expect(DotMatrix.supports(""))
     }
 
     @Test func unsupportedCharacterReturnsNil() {
-        #expect(DotMatrix.glyph(for: "B") == nil)
-        #expect(DotMatrix.glyph(for: "Z") == nil)
-        #expect(DotMatrix.glyph(for: "a") == nil)
-        #expect(DotMatrix.supports("B") == false)
-        #expect(DotMatrix.supports("A1Z") == false)
+        #expect(DotMatrix.glyph(for: "b") == nil)
+        #expect(DotMatrix.glyph(for: "@") == nil)
+        #expect(DotMatrix.supports("b") == false)
+        #expect(DotMatrix.supports("A1@") == false)
     }
 }
