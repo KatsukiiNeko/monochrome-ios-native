@@ -117,8 +117,8 @@ changes are now on `development`:
 | Now Playing | core snapshot and remote-command routing, download/cache source badges | L1 + host tests |
 
 Host tests: 212 tests in 26 suites passed at the last recorded run. The iOS
-arm64 build-only check passed after every commit. No device is attached, so no
-screen reached L4 or Human verification.
+arm64 build-only check passed after every commit. The 0.2.0 release reached L4:
+the maintainer verified it on an iPhone 12 Pro Max.
 
 ## Settings simplification pass
 
