@@ -1,4 +1,4 @@
-// LibraryView.swift: imported files and favorites, with import and delete.
+// LibraryView.swift: library filters, sort, pinned favorites and imported files.
 #if canImport(SwiftUI)
 import MonochromeCore
 import SwiftUI
@@ -6,36 +6,79 @@ import UniformTypeIdentifiers
 
 struct LibraryView: View {
     let model: AppModel
-    var onOpenPlayer: () -> Void
     var onOpenSettings: () -> Void
 
-    @State private var scope: Scope = .imported
+    @State private var filter: LibraryFilter = .all
+    @State private var sort: LibrarySort = .recent
     @State private var isShowingImporter = false
     @State private var pendingDeletion: Track?
 
-    private enum Scope: String, CaseIterable, Identifiable {
-        case imported = "Imported"
-        case favorites = "Favorites"
-
-        var id: String { rawValue }
+    private var rows: [Track] {
+        LibraryQuery.rows(
+            tracks: model.tracks,
+            favorites: model.favorites,
+            filter: filter,
+            sort: sort
+        )
     }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                Picker("Source", selection: $scope) {
-                    ForEach(Scope.allCases) { scope in
-                        Text(scope.rawValue).tag(scope)
+                filterChips
+                favoritesPinnedRow
+                    .padding(.horizontal, Theme.screenPadding)
+                    .padding(.bottom, 8)
+
+                List {
+                    ForEach(rows) { track in
+                        Button {
+                            Task { await model.play(track, in: rows) }
+                        } label: {
+                            TrackRow(
+                                track: track,
+                                localArtworkURL: model.artworkURL(for: track),
+                                isCurrent: model.player.currentTrack?.id == track.id,
+                                showsFavorite: true,
+                                isFavorite: model.isFavorite(track)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .swipeActions(edge: .leading) {
+                            Button(
+                                model.isFavorite(track) ? "Unfavorite" : "Favorite",
+                                systemImage: model.isFavorite(track) ? "heart.slash" : "heart"
+                            ) {
+                                model.toggleFavorite(track)
+                            }
+                        }
+                        .swipeActions {
+                            if track.provider == Track.localProvider {
+                                Button("Delete", role: .destructive) {
+                                    pendingDeletion = track
+                                }
+                            }
+                        }
                     }
                 }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, Theme.screenPadding)
-                .padding(.bottom, 8)
-
-                content
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .overlay {
+                    if model.isImporting {
+                        ProgressView("Importing…")
+                            .padding()
+                            .glassSurface(cornerRadius: Theme.cardRadius)
+                    } else if rows.isEmpty {
+                        emptyState
+                    }
+                }
             }
+            .background(Theme.background.ignoresSafeArea())
             .navigationTitle("Library")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    sortMenu
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button("Import audio files", systemImage: "plus") {
                         isShowingImporter = true
@@ -77,93 +120,95 @@ struct LibraryView: View {
         }
     }
 
+    private var filterChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(LibraryFilter.allCases) { option in
+                    Chip(title: option.title, isSelected: filter == option) {
+                        filter = option
+                    }
+                }
+            }
+            .padding(.horizontal, Theme.screenPadding)
+            .padding(.vertical, 8)
+        }
+    }
+
+    private var favoritesPinnedRow: some View {
+        Button {
+            filter = .favorites
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "heart.fill")
+                    .font(.headline)
+                    .foregroundStyle(Theme.primaryText)
+                    .frame(width: 48, height: 48)
+                    .background(Theme.elevated, in: RoundedRectangle(cornerRadius: Theme.tileRadius))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Favorites")
+                        .font(Theme.rowTitle)
+                        .foregroundStyle(Theme.primaryText)
+                    Text(model.favorites.count == 1 ? "1 song" : "\(model.favorites.count) songs")
+                        .font(Theme.rowSubtitle)
+                        .foregroundStyle(Theme.secondaryText)
+                }
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(Theme.tertiaryText)
+            }
+            .padding(8)
+            .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Favorites, \(model.favorites.count) songs")
+        .accessibilityHint("Shows favorite tracks")
+    }
+
+    private var sortMenu: some View {
+        Menu {
+            Picker("Sort", selection: $sort) {
+                ForEach(LibrarySort.allCases) { option in
+                    Text(option.title).tag(option)
+                }
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+        }
+        .accessibilityLabel("Sort library")
+        .accessibilityValue(sort.title)
+    }
+
     @ViewBuilder
-    private var content: some View {
-        switch scope {
-        case .imported: importedList
-        case .favorites: favoritesList
-        }
-    }
-
-    private var importedList: some View {
-        List {
-            ForEach(model.tracks) { track in
-                Button {
-                    Task { await model.play(track, in: model.tracks) }
-                } label: {
-                    TrackRow(
-                        track: track,
-                        localArtworkURL: model.artworkURL(for: track),
-                        isCurrent: model.player.currentTrack?.id == track.id,
-                        showsFavorite: true,
-                        isFavorite: model.isFavorite(track)
-                    )
-                }
-                .buttonStyle(.plain)
-                .swipeActions(edge: .leading) {
-                    Button(
-                        model.isFavorite(track) ? "Unfavorite" : "Favorite",
-                        systemImage: model.isFavorite(track) ? "heart.slash" : "heart"
-                    ) {
-                        model.toggleFavorite(track)
-                    }
-                }
-                .swipeActions {
-                    Button("Delete", role: .destructive) {
-                        pendingDeletion = track
-                    }
-                }
+    private var emptyState: some View {
+        switch filter {
+        case .all:
+            ContentUnavailableView {
+                Label("No music yet", systemImage: "music.note.list")
+            } description: {
+                Text("Import audio files from the Files app, or search the catalog.")
+            } actions: {
+                Button("Import audio files") { isShowingImporter = true }
+                    .buttonStyle(.borderedProminent)
             }
-        }
-        .listStyle(.plain)
-        .overlay {
-            if model.isImporting {
-                ProgressView("Importing…")
-                    .padding()
-                    .glassSurface(cornerRadius: 12)
-            } else if model.tracks.isEmpty {
-                ContentUnavailableView {
-                    Label("No music yet", systemImage: "music.note.list")
-                } description: {
-                    Text("Import audio files from the Files app, or search the catalog.")
-                } actions: {
-                    Button("Import audio files") { isShowingImporter = true }
-                        .buttonStyle(.borderedProminent)
-                }
+        case .favorites:
+            ContentUnavailableView {
+                Label("No favorites yet", systemImage: "heart")
+            } description: {
+                Text("Tap the heart in the player, or swipe a track to the right.")
             }
-        }
-    }
-
-    private var favoritesList: some View {
-        List {
-            ForEach(model.favorites) { track in
-                Button {
-                    Task { await model.play(track, in: model.favorites) }
-                } label: {
-                    TrackRow(
-                        track: track,
-                        localArtworkURL: model.artworkURL(for: track),
-                        isCurrent: model.player.currentTrack?.id == track.id,
-                        showsFavorite: true,
-                        isFavorite: true
-                    )
-                }
-                .buttonStyle(.plain)
-                .swipeActions {
-                    Button("Unfavorite", systemImage: "heart.slash", role: .destructive) {
-                        model.toggleFavorite(track)
-                    }
-                }
-            }
-        }
-        .listStyle(.plain)
-        .overlay {
-            if model.favorites.isEmpty {
-                ContentUnavailableView {
-                    Label("No favorites yet", systemImage: "heart")
-                } description: {
-                    Text("Tap the heart in the player, or swipe a track to the right.")
-                }
+        case .local:
+            ContentUnavailableView {
+                Label("No local files", systemImage: "folder")
+            } description: {
+                Text("Import audio files from the Files app.")
+            } actions: {
+                Button("Import audio files") { isShowingImporter = true }
+                    .buttonStyle(.borderedProminent)
             }
         }
     }

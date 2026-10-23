@@ -32,7 +32,6 @@ struct ContentView: View {
 
             LibraryView(
                 model: model,
-                onOpenPlayer: { isShowingPlayer = true },
                 onOpenSettings: { isShowingSettings = true }
             )
             .tabItem { Label("Library", systemImage: "music.note.list") }
