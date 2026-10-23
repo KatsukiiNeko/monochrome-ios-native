@@ -29,7 +29,7 @@ struct HomeView: View {
                 .padding(.horizontal, Theme.screenPadding)
                 .padding(.bottom, 24)
             }
-            .background(Color(white: 0.05).ignoresSafeArea())
+            .background(Theme.background.ignoresSafeArea())
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { logo }

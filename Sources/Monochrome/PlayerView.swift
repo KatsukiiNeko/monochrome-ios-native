@@ -37,7 +37,7 @@ struct PlayerView: View {
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, Theme.screenPadding)
-            .background(Color(white: 0.05).ignoresSafeArea())
+            .background(Theme.background.ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Close", systemImage: "chevron.down") { dismiss() }

@@ -118,7 +118,7 @@ struct ArtistDetailView: View {
                             if let image = phase.image {
                                 image.resizable().scaledToFill()
                             } else {
-                                Circle().fill(Color(white: 0.14))
+                                Circle().fill(Theme.elevated)
                             }
                         }
                         .frame(width: 88, height: 88)

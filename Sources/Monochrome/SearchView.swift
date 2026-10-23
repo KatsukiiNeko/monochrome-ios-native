@@ -35,11 +35,11 @@ struct SearchView: View {
                     .padding(.horizontal, Theme.screenPadding)
                     .padding(.bottom, 24)
                 }
-                .background(Color(white: 0.05))
+                .background(Theme.background)
                 .overlay { stateOverlay }
                 .task(id: query) { await runSearch() }
             }
-            .background(Color(white: 0.05).ignoresSafeArea())
+            .background(Theme.background.ignoresSafeArea())
             .navigationTitle("Search")
             .sheet(item: $selectedRelease) { release in
                 ReleaseDetailView(model: model, release: release)
@@ -74,7 +74,7 @@ struct SearchView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Color(white: 0.12), in: RoundedRectangle(cornerRadius: 12))
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
     }
 
     private var trimmedQuery: String {
@@ -230,7 +230,7 @@ struct SearchView: View {
                             if let image = phase.image {
                                 image.resizable().scaledToFill()
                             } else {
-                                Circle().fill(Color(white: 0.14))
+                                Circle().fill(Theme.elevated)
                             }
                         }
                         .frame(width: 52, height: 52)
