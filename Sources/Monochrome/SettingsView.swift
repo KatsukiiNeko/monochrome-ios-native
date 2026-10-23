@@ -74,13 +74,7 @@ struct SettingsView: View {
             }
         }
         .onAppear { host = model.streamingHost }
-        .task {
-            // A download can finish while this sheet is open; keep the row current.
-            while !Task.isCancelled {
-                await model.refreshCacheSize()
-                try? await Task.sleep(for: .milliseconds(250))
-            }
-        }
+        .task { await model.refreshCacheSize() }
     }
 
     private func save() {
