@@ -122,8 +122,8 @@ struct SearchView: View {
             }
         }
 
-        if activeFilter == .all, let top = sections.tracks.first {
-            topResult(top)
+        if activeFilter == .all {
+            topResultSection
         }
         if !sections.tracks.isEmpty {
             tracksSection
@@ -222,6 +222,17 @@ struct SearchView: View {
         }
     }
 
+    @ViewBuilder
+    private var topResultSection: some View {
+        if let track = sections.tracks.first {
+            topResult(track)
+        } else if let release = sections.releases.first {
+            topResult(release)
+        } else if let artist = sections.artists.first {
+            topResult(artist)
+        }
+    }
+
     private func topResult(_ track: Track) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Top result")
@@ -263,6 +274,98 @@ struct SearchView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Top result: \(track.title) by \(track.displayArtist)")
             .accessibilityHint("Plays this track")
+        }
+    }
+
+    private func topResult(_ release: RemoteRelease) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Top result")
+                .font(Theme.sectionTitle)
+                .foregroundStyle(Theme.primaryText)
+            Button {
+                selectedRelease = release
+            } label: {
+                HStack(spacing: 12) {
+                    TrackArtwork(
+                        track: Track(
+                            title: release.title,
+                            artist: release.artist,
+                            artworkURL: release.artworkURL
+                        ),
+                        cornerRadius: Theme.albumRadius
+                    )
+                    .frame(width: 76, height: 76)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(release.title)
+                            .font(.headline)
+                            .foregroundStyle(Theme.primaryText)
+                            .lineLimit(2)
+                        Text("Album · \(release.artist)")
+                            .font(.subheadline)
+                            .foregroundStyle(Theme.secondaryText)
+                            .lineLimit(1)
+                    }
+
+                    Spacer(minLength: 8)
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(Theme.tertiaryText)
+                }
+                .padding(10)
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Top result: album \(release.title) by \(release.artist)")
+            .accessibilityHint("Opens album")
+        }
+    }
+
+    private func topResult(_ artist: RemoteArtist) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Top result")
+                .font(Theme.sectionTitle)
+                .foregroundStyle(Theme.primaryText)
+            Button {
+                selectedArtist = artist
+            } label: {
+                HStack(spacing: 12) {
+                    AsyncImage(url: artist.avatarURL) { phase in
+                        if let image = phase.image {
+                            image.resizable().scaledToFill()
+                        } else {
+                            Circle().fill(Theme.elevated)
+                        }
+                    }
+                    .frame(width: 76, height: 76)
+                    .clipShape(Circle())
+                    .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(artist.name)
+                            .font(.headline)
+                            .foregroundStyle(Theme.primaryText)
+                            .lineLimit(2)
+                        Text("Artist")
+                            .font(.subheadline)
+                            .foregroundStyle(Theme.secondaryText)
+                    }
+
+                    Spacer(minLength: 8)
+
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(Theme.tertiaryText)
+                }
+                .padding(10)
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Top result: artist \(artist.name)")
+            .accessibilityHint("Opens artist")
         }
     }
 
