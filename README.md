@@ -37,22 +37,23 @@ The app includes Home, Search, and Library tabs; a persistent mini-player; a ful
 | Streaming | Resolve a playable track URL at playback time and retry resolution once after a playback failure. |
 | Playback | Play/pause, seeking, next/previous, queue management, and repeat modes. |
 | Library | Local library, favorites, and recently played history persisted on-device. |
-| Audio cache | Temporary five-track on-disk LRU cache; caching over cellular is opt-in. Cache cleanup never touches imported files. |
+| Permanent downloads | User-chosen songs are saved under Application Support/Downloads and play offline until removed. Downloads are separate from the temporary cache and imported files. |
+| Audio cache | A five-song rolling on-disk LRU buffer. Playing songs 1–5 keeps all five; playing song 6 evicts song 1, so songs 2–6 still start from cache without re-streaming. Caching over cellular is opt-in. Cache cleanup never touches downloads or imported files. |
 | Audio metadata | Displays the detected audio format and quality where available. |
 | iOS integration | Background audio, Now Playing metadata with album and artwork, Lock Screen controls, remote commands, interruption handling, and route-change handling. |
-| Preferences | System/Light/Dark appearance, streaming host, and temporary-cache controls. |
+| Preferences | System/Light/Dark appearance, streaming host, download management, and temporary-cache controls. |
 | Privacy | No account system, analytics, or tracking SDK. No credentials are embedded in the source. |
 
-Permanent catalog downloads are not offered. The catalog has no authorized download API, and the app does not treat temporary cache entries as downloads. YouTube Music is not integrated; the Monochrome catalog and user-imported files are the only playback sources. Lyrics, cloud playlists, account login, and cross-device synchronization are not implemented.
+Monochrome downloads are available because the upstream web client downloads the same progressive FLAC stream (`js/api.js:3050`, `js/downloads.js:348`). That is capability evidence, not a content licence: the rights caveat below still applies. The YouTube Music companion source has no server configured in this build and never downloads. Lyrics, cloud playlists, account login, and cross-device synchronization are not implemented. See [`docs/SOURCES.md`](docs/SOURCES.md).
 
 ## Verification
 
-The maintainer completed the physical-device test checklist for the earlier UI pass and reports successful results. The current settings, five-track cache and Now Playing changes were compiled and host-tested, but not installed or run on a device.
+The maintainer completed the physical-device test checklist for the earlier UI pass and reports successful results. The current downloads, five-song cache, settings and Now Playing changes were compiled and host-tested, but not installed or run on a device.
 
 | Level | Meaning | Status |
 |---|---|---|
 | **L1 — Compile** | Swift sources compile for the target platform. | Passed |
-| **L2 — Unit tests** | Portable core behavior is tested on Linux. | Passed: 152 tests across 21 suites at the last recorded run. |
+| **L2 — Unit tests** | Portable core behavior is tested on Linux. | Passed: 198 tests across 26 suites at the last recorded run. |
 | **L3 — Live service** | Catalog search and stream resolution are checked against the live catalog. | Passed in the recorded live-service checks; the opt-in live test is not run by default. |
 | **L4 — Physical device** | Playback and iOS-specific behavior are checked on a real iPhone. | Passed for the earlier UI pass; the current settings/cache/Now Playing changes are not device-validated. |
 
@@ -72,7 +73,7 @@ The native client uses HTTPS and a truthful `User-Agent`; it does not spoof `Ori
 
 In Settings, you can configure a different HTTPS host (for example, your own instance or a supported paid endpoint) or clear the host to disable online streaming while retaining local playback.
 
-“Hi-Fi” in this app is a quality label, not a separate catalogue or provider: the catalog path exposes one lossless tier (FLAC 16-bit / 44.1 kHz). YouTube Music has no authorized integration here. Permanent downloads are also not implemented because the catalog provides no authorized download entitlement; the temporary cache is disposable and separate from imported files.
+“Hi-Fi” in this app is a quality label, not a separate catalogue or provider: the catalog path exposes one lossless tier (FLAC 16-bit / 44.1 kHz). YouTube Music has no authorized integration here; it is a companion-server design with no default URL. Permanent downloads store the same progressive FLAC stream the app plays, and the temporary cache is a separate disposable buffer.
 
 ### Content and distribution notice
 
@@ -129,7 +130,7 @@ Package.swift                    Swift package and targets
 Resources/Info.plist             App display name and background audio capability
 Branding/                        Upstream icon and logo attribution
 scripts/build.sh                 Linux iOS compile check
-Sources/MonochromeCore/          Portable models, stores, API client, cache, and player state
+Sources/MonochromeCore/          Portable models, stores, API client, cache, downloads, and player state
 Sources/Monochrome/              SwiftUI interface and iOS audio integration
 Tests/MonochromeCoreTests/        Unit tests and JSON fixtures
 docs/                            Streaming, toolchain, migration, and device-test notes

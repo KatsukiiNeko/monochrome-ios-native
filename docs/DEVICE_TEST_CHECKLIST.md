@@ -150,6 +150,25 @@ unverified until someone looks at the screen.
 - [ ] Interactive targets are at least 44 pt where practical.
 - [ ] Controls are not obscured by the mini-player, tab bar or safe areas.
 
+## Permanent downloads
+
+- [ ] Search for a catalog track and choose Download from its menu. Settings →
+      Downloads shows it while downloading and then as a completed offline song.
+- [ ] Play the downloaded track, enable airplane mode, then play it again: it
+      starts and Now Playing shows `Downloaded`.
+- [ ] Delete the app's temporary cache: the downloaded song still plays offline.
+- [ ] Remove the download from Library, Search or Settings: the row disappears,
+      the file is gone, and the song streams again when online.
+- [ ] Start three downloads quickly: no more than two transfer at once and the
+      third waits rather than failing.
+- [ ] Interrupt a download by force-quitting the app; reopen it: no partial file
+      appears as a completed download and the record is repaired.
+- [ ] With the YouTube Music companion source unconfigured, no download action
+      is offered for it.
+- [ ] Check a downloaded track after relaunching the app: it is still listed and
+      still plays offline.
+- [ ] Check the Downloads list and Settings show the same count and byte total.
+
 ## Cache and loop
 
 - [ ] Play song A for a few seconds, then song B, then A again and B again.
@@ -165,9 +184,15 @@ unverified until someone looks at the screen.
 - [ ] Tap the trash button on one cached song: only that row disappears, the
       count drops by one, and the other cached song still starts instantly.
 - [ ] Play the deleted song again: it downloads again and returns to the list.
-- [ ] Play six distinct catalog tracks: the temporary cache never shows more
-      than five, and the least recently used track is the one removed.
-- [ ] Clear the temporary cache: imported files in Library still play offline.
+- [ ] Play songs 1, 2, 3, 4, 5 in order: Settings shows five cached songs.
+      Play song 6: the cache still shows five, song 1 is gone, and songs 2–6
+      start from cache without re-streaming.
+- [ ] With airplane mode on, play song 2 through song 6: all five start.
+- [ ] Clear the temporary cache: permanent downloads and imported files in
+      Library still play offline.
+- [ ] Turn on Clear on launch, relaunch the app: the temporary cache is empty
+      and permanent downloads remain.
+- [ ] Turn Clear on launch off, relaunch the app: valid cache entries survive.
 - [ ] Play the same track again: Now Playing shows `Cached` beside the badge.
 - [ ] Turn repeat-one on and let the track end: the next pass starts
       immediately and still shows `Cached`.

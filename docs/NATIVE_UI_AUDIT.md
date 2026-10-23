@@ -7,19 +7,22 @@ screen was rendered; visual results remain L1 unless a person inspects them.
 
 | screen / component | file | state |
 |---|---|---|
-| App entry | `Sources/Monochrome/App.swift` | `@main`; currently forces `.dark` |
+| App entry | `Sources/Monochrome/App.swift` | `@main`; appearance comes from `AppearanceSettings`, not a forced scheme |
 | Shell | `Sources/Monochrome/ContentView.swift` | `AppTab` (no `Tab` shadowing); player is a large sheet; one mini-player inset on the `TabView` |
 | Mini player | `Sources/Monochrome/MiniPlayerView.swift` | floating artwork-tinted card, favorite, play/pause, next, progress, retry |
 | Now Playing | `Sources/Monochrome/PlayerView.swift` | tinted background, chevron, artwork, favorite, scrubber, transport, queue, badge, AirPlay |
 | Queue | `Sources/Monochrome/QueueView.swift` | medium/large sheet; now playing and upcoming; jump, reorder, remove |
 | Home | `Sources/Monochrome/HomeView.swift` | greeting, logo, quick-access grid, Listen again, Your favorites, empty state |
 | Search | `Sources/Monochrome/SearchView.swift` | pinned field, persisted recents, result-type chips, top result, rows, menus |
-| Library | `Sources/Monochrome/LibraryView.swift` | All/Favorites/Local chips, sort menu, pinned Favorites, import, local delete |
+| Library | `Sources/Monochrome/LibraryView.swift` | All/Favorites/Downloaded/Local chips, sort menu, pinned Favorites, import, download and local delete |
 | Album and artist | `Sources/Monochrome/CatalogDetailViews.swift` | detail sheets with real catalog data |
-| Settings | `Sources/Monochrome/SettingsView.swift` | host, cache summary, cached-song list |
+| Settings | `Sources/Monochrome/SettingsView.swift` | appearance, host, downloads, five-slot cache meter, cached-song list, Done only |
 | Shared row | `Sources/Monochrome/TrackRow.swift` | artwork, title, artist, badge, favorite marker, duration |
 | Shared artwork | `Sources/Monochrome/TrackArtwork.swift` | remote image, local embedded image, placeholder |
-| Tokens | `Sources/Monochrome/Theme.swift` | dark-only colors, spacing, radii, type, glass helper |
+| Tokens | `Sources/Monochrome/Theme.swift` | adaptive palette from `ThemePalette`, spacing, radii, type, glass helper |
+| Downloads | `Sources/Monochrome/DownloadsView.swift` | permanent offline files, play, remove with confirmation |
+| Source detail | `Sources/Monochrome/SourceDetailView.swift` | real capability matrix, configuration and companion limitation |
+| Dot matrix | `Sources/Monochrome/DotMatrixView.swift` | 5×7 numerals and five-slot cache meter |
 | Bar model | `Sources/MonochromeCore/NowPlayingBar.swift` | derived title, subtitle, badge, progress, loading/failure |
 
 ## Confirmed findings
@@ -65,7 +68,7 @@ screen was rendered; visual results remain L1 unless a person inspects them.
 | Home | technical greeting, two-column quick access, Listen again, Your favorites, real empty state |
 | Search | pinned field, recent searches, returned-type chips, top result, shared rows, real menus |
 | Library | filter chips, sort menu, pinned Favorites, import, shared rows, real empty states |
-| Settings | preserve host and cache behavior; add the appearance selector only where it fits |
+| Settings | host, appearance, downloads and cache controls; one Done action; no Save |
 | Shared | `Chip`, `ShelfHeader`, `ArtworkTile`, `TrackRow`, `RoundPlayButton`, `Scrubber`, badge |
 
 ## Needs eyes on a device
@@ -106,11 +109,16 @@ changes are now on `development`:
 | Queue | medium/large sheet, marked section headers, real jump/reorder/remove | L1 |
 | Home | technical greeting, two-column quick access, marked shelves, active-track marker, separators | L1 |
 | Search | focused-field accent, marked top result, result-type chips, separated rows and recents | L1 |
-| Library | marked favorites row, accent heart, filter chips, sort and separators | L1 |
+| Library | marked favorites row, accent heart, filter chips, download swipe, sort and separators | L1 |
+| Downloads | permanent store under Application Support, explicit removal, no cache overlap | L1 + host tests |
+| Source detail | Monochrome and YouTube Music capability screens; no fake setup controls | L1 |
+| Cache | five-song rolling LRU, protected loaded entry, clear-on-launch opt-in, five-dot meter and dot-matrix numerals | L1 + host tests |
+| Theme | `ThemePalette` light/dark tokens, WCAG contrast tests, 20 pt cards, 56 pt rows, 16 pt screen padding, 24 pt sections | L1 + host tests |
+| Now Playing | core snapshot and remote-command routing, download/cache source badges | L1 + host tests |
 
-Host tests: 148 tests in 21 suites passed. The iOS arm64 build-only check passed
-after every commit. No device is attached, so no screen reached L4 or Human
-verification.
+Host tests: 198 tests in 26 suites passed at the last recorded run. The iOS
+arm64 build-only check passed after every commit. No device is attached, so no
+screen reached L4 or Human verification.
 
 ### What still needs a person
 
