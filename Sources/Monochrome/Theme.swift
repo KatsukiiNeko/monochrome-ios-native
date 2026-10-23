@@ -1,5 +1,6 @@
 // Theme.swift: shared design tokens and the single availability gate for system surfaces.
 #if canImport(SwiftUI)
+import MonochromeCore
 import SwiftUI
 
 enum Theme {
@@ -53,6 +54,12 @@ enum Theme {
     static let time = Font.caption.monospacedDigit()
 }
 
+extension Color {
+    init(_ tint: ArtworkTintColor) {
+        self.init(.sRGB, red: tint.red, green: tint.green, blue: tint.blue, opacity: 1)
+    }
+}
+
 extension View {
     /// iOS 26 glass buttons; bordered buttons on older systems. One gate for the whole app.
     @ViewBuilder
@@ -69,7 +76,7 @@ extension View {
         modifier(GlassSurface(cornerRadius: cornerRadius))
     }
 
-    /// Sits above the tab bar on every iOS version.
+    /// Sits above the tab bar on every iOS version. The content supplies its own card.
     @ViewBuilder
     func nowPlayingBarInset<Content: View>(
         isPresented: Bool,
@@ -78,8 +85,6 @@ extension View {
         safeAreaInset(edge: .bottom, spacing: 0) {
             if isPresented {
                 content()
-                    .background(.bar)
-                    .overlay(alignment: .top) { Divider() }
             }
         }
     }

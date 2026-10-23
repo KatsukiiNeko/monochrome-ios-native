@@ -34,6 +34,7 @@ final class AppModel {
     private let mediaDirectory: URL
     private let audioSession: AudioSessionController
     private let nowPlaying: NowPlayingController
+    private let artworkTints = ArtworkTintStore()
 
     init() {
         let base = FileManager.default
@@ -286,6 +287,11 @@ final class AppModel {
     func artworkURL(for track: Track?) -> URL? {
         guard let name = track?.artworkFileName else { return nil }
         return mediaDirectory.appendingPathComponent(name)
+    }
+
+    func artworkTint(for track: Track?) async -> ArtworkTintColor {
+        guard let track else { return .neutral }
+        return await artworkTints.tint(for: track, localURL: artworkURL(for: track))
     }
 
     // MARK: - Favorites
