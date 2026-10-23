@@ -118,21 +118,43 @@ struct SearchView: View {
 
     private var recentSearchesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader("Recent searches")
-            ForEach(model.searchRecents) { track in
-                Button {
-                    Task {
-                        model.recordSearch(track)
-                        await model.play(track, in: model.searchRecents)
-                    }
-                } label: {
-                    TrackRow(
-                        track: track,
-                        isCurrent: model.player.currentTrack?.id == track.id
-                    )
-                    .padding(.vertical, 2)
+            HStack {
+                sectionHeader("Recent searches")
+                Spacer()
+                Button("Clear all") {
+                    model.clearSearchRecents()
                 }
-                .buttonStyle(.plain)
+                .font(.caption)
+            }
+            ForEach(model.searchRecents) { track in
+                HStack(spacing: 8) {
+                    Button {
+                        Task {
+                            model.recordSearch(track)
+                            await model.play(track, in: model.searchRecents)
+                        }
+                    } label: {
+                        TrackRow(
+                            track: track,
+                            isCurrent: model.player.currentTrack?.id == track.id
+                        )
+                        .padding(.vertical, 2)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Button {
+                        model.removeSearchRecent(track)
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+                    .accessibilityLabel("Delete \(track.title) from recent searches")
+                }
             }
         }
     }

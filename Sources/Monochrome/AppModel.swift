@@ -20,6 +20,7 @@ final class AppModel {
     private(set) var isStreamingConfigured: Bool
     private(set) var cacheSizeBytes = 0
     private(set) var cacheEntryCount = 0
+    private(set) var cachedTracks: [CachedTrackSummary] = []
     var allowsCellularCaching: Bool { cacheSettings.allowsCellular }
 
     private let service: LocalFileService
@@ -143,6 +144,16 @@ final class AppModel {
         searchRecents = (try? searchHistoryStore.record(track)) ?? searchRecents
     }
 
+    func removeSearchRecent(_ track: Track) {
+        searchRecents.removeAll { $0.id == track.id }
+        try? searchHistoryStore.save(searchRecents)
+    }
+
+    func clearSearchRecents() {
+        searchRecents = []
+        try? searchHistoryStore.save([])
+    }
+
     private func requireClient() throws -> TracksAPIClient {
         guard let streamingClient else { throw TracksAPIError.notConfigured }
         return streamingClient
@@ -232,9 +243,27 @@ final class AppModel {
     // MARK: - Cache
 
     func refreshCacheSize() async {
-        let stats = await cache.stats()
-        cacheEntryCount = stats.count
-        cacheSizeBytes = stats.bytes
+        let tracks = await cache.cachedTracks()
+        // Old sidecars have no display metadata; fill it from anything already loaded.
+        var known: [String: Track] = [:]
+        for track in self.tracks + recents + searchRecents + favorites {
+            known[track.id] = track
+        }
+        cachedTracks = tracks.map { summary in
+            guard let track = known[summary.trackID] else { return summary }
+            var enriched = summary
+            if enriched.title == nil { enriched.title = track.title }
+            if enriched.artist == nil { enriched.artist = track.displayArtist }
+            if enriched.artworkURL == nil { enriched.artworkURL = track.artworkURL }
+            return enriched
+        }
+        cacheEntryCount = cachedTracks.count
+        cacheSizeBytes = cachedTracks.reduce(0) { $0 + $1.byteSize }
+    }
+
+    func removeCachedTrack(_ track: CachedTrackSummary) async {
+        await cache.remove(trackID: track.trackID, qualityName: track.quality)
+        await refreshCacheSize()
     }
 
     func clearCache() async {

@@ -43,6 +43,10 @@ item by hand.
 - [ ] Search for a song, tap it, then clear the field: the song appears under
       Recent searches with its title, artist and artwork.
 - [ ] Relaunch the app: recent searches are still listed.
+- [ ] Tap the trash button on one recent search: only that row disappears, and
+      it stays gone after relaunching.
+- [ ] Tap Clear all: the Recent searches section disappears, and it stays empty
+      after relaunching.
 
 ## Cache and loop
 
@@ -53,7 +57,12 @@ item by hand.
 - [ ] Play a catalog track once and wait for it to start; after a few seconds,
       Settings shows a non-zero cached size.
 - [ ] Keep Settings open while a track finishes downloading: the song count and
-      size update without closing the sheet.
+      size update on the next open, not while the sheet stays open.
+- [ ] Open Settings with two cached songs: both are listed under Cached songs
+      with title, artist and size.
+- [ ] Tap the trash button on one cached song: only that row disappears, the
+      count drops by one, and the other cached song still starts instantly.
+- [ ] Play the deleted song again: it downloads again and returns to the list.
 - [ ] Play the same track again: Now Playing shows `Cached` beside the badge.
 - [ ] Turn repeat-one on and let the track end: the next pass starts
       immediately and still shows `Cached`.

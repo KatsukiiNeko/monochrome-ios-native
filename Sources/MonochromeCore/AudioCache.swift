@@ -28,6 +28,10 @@ public struct AudioCacheEntry: Codable, Equatable, Sendable {
     public var duration: Double?
     public var byteSize: Int
     public var lastUsedAt: Date
+    /// Display metadata; older sidecars decode these as nil.
+    public var title: String?
+    public var artist: String?
+    public var artworkURL: URL?
 
     public init(
         trackID: String,
@@ -36,13 +40,52 @@ public struct AudioCacheEntry: Codable, Equatable, Sendable {
         format: AudioFormat? = nil,
         duration: Double? = nil,
         byteSize: Int,
-        lastUsedAt: Date = .now
+        lastUsedAt: Date = .now,
+        title: String? = nil,
+        artist: String? = nil,
+        artworkURL: URL? = nil
     ) {
         self.trackID = trackID
         self.quality = quality
         self.fileName = fileName
         self.format = format
         self.duration = duration
+        self.byteSize = byteSize
+        self.lastUsedAt = lastUsedAt
+        self.title = title
+        self.artist = artist
+        self.artworkURL = artworkURL
+    }
+}
+
+/// One row for the Settings cache list.
+public struct CachedTrackSummary: Identifiable, Equatable, Sendable {
+    public var id: String { fileName }
+    public var trackID: String
+    public var quality: String
+    public var fileName: String
+    public var title: String?
+    public var artist: String?
+    public var artworkURL: URL?
+    public var byteSize: Int
+    public var lastUsedAt: Date
+
+    public init(
+        trackID: String,
+        quality: String,
+        fileName: String,
+        title: String? = nil,
+        artist: String? = nil,
+        artworkURL: URL? = nil,
+        byteSize: Int,
+        lastUsedAt: Date
+    ) {
+        self.trackID = trackID
+        self.quality = quality
+        self.fileName = fileName
+        self.title = title
+        self.artist = artist
+        self.artworkURL = artworkURL
         self.byteSize = byteSize
         self.lastUsedAt = lastUsedAt
     }
@@ -186,6 +229,10 @@ public actor AudioCache: AudioCaching {
             return nil
         }
         entry.lastUsedAt = .now
+        // Fill metadata for entries written before the Settings list existed.
+        if entry.title == nil { entry.title = track.title }
+        if entry.artist == nil { entry.artist = track.displayArtist }
+        if entry.artworkURL == nil { entry.artworkURL = track.artworkURL }
         Self.write(entry: entry, named: name, in: directory)
         log("cache hit track=\(track.id) quality=\(Self.qualityName(quality)) bytes=\(size)")
         return CachedAudio(url: fileURL, format: entry.format, duration: entry.duration, byteSize: size)
@@ -291,7 +338,10 @@ public actor AudioCache: AudioCaching {
                 fileName: fileName,
                 format: format,
                 duration: duration,
-                byteSize: result.bytesWritten
+                byteSize: result.bytesWritten,
+                title: track.title,
+                artist: track.displayArtist,
+                artworkURL: track.artworkURL
             )
             ensureDirectory()
             Self.write(entry: entry, named: name, in: directory)
@@ -311,34 +361,75 @@ public actor AudioCache: AudioCaching {
     // MARK: - Maintenance
 
     public func sizeBytes() -> Int {
-        Self.entries(in: directory).reduce(0) { $0 + $1.byteSize }
+        cachedTracks().reduce(0) { $0 + $1.byteSize }
     }
 
     /// Count and bytes in one directory scan for the Settings row.
     public func stats() -> (count: Int, bytes: Int) {
-        let entries = Self.entries(in: directory)
-        return (entries.count, entries.reduce(0) { $0 + $1.byteSize })
+        let tracks = cachedTracks()
+        return (tracks.count, tracks.reduce(0) { $0 + $1.byteSize })
     }
 
     public func entryCount() -> Int {
-        Self.entries(in: directory).count
+        cachedTracks().count
+    }
+
+    /// Complete entries only, newest use first. Used by the Settings list.
+    public func cachedTracks() -> [CachedTrackSummary] {
+        Self.entries(in: directory).compactMap { entry in
+            let fileURL = directory.appendingPathComponent(entry.fileName)
+            guard let size = Self.fileSize(fileURL), size == entry.byteSize, size > 0 else {
+                return nil
+            }
+            return CachedTrackSummary(
+                trackID: entry.trackID,
+                quality: entry.quality,
+                fileName: entry.fileName,
+                title: entry.title,
+                artist: entry.artist,
+                artworkURL: entry.artworkURL,
+                byteSize: entry.byteSize,
+                lastUsedAt: entry.lastUsedAt
+            )
+        }
+        .sorted { $0.lastUsedAt > $1.lastUsedAt }
     }
 
     public func cancelDownload(for track: Track, quality: AudioQuality?, reason: String) async {
         let name = Self.storageBaseName(track: track, quality: quality)
+        if cancelInFlight(named: name, reason: reason) {
+            log("cache cancel key=\(name) reason=\(reason)")
+        }
+    }
+
+    /// Removes one cached song without touching the rest of the cache.
+    public func remove(trackID: String, qualityName: String) async {
+        let name = Self.storageBaseName(trackID: trackID, qualityName: qualityName)
+        _ = cancelInFlight(named: name, reason: "removed")
+        guard let entry = Self.readEntry(named: name, in: directory) else {
+            log("cache remove key=\(name) reason=not-found")
+            return
+        }
+        removeFiles(named: name, entry: entry)
+        log("cache remove key=\(name) bytes=\(entry.byteSize)")
+    }
+
+    @discardableResult
+    private func cancelInFlight(named name: String, reason: String) -> Bool {
+        let hadWork = inFlight[name] != nil || waiters.contains { $0.name == name }
+        guard hadWork else { return false }
         cancelReasons[name] = reason
         if let entry = inFlight.removeValue(forKey: name) {
             entry.task.cancel()
             if activeTokens.remove(entry.id) != nil {
                 admitWaiters()
             }
-            log("cache cancel key=\(name) reason=\(reason)")
         }
         if let index = waiters.firstIndex(where: { $0.name == name }) {
             let queued = waiters.remove(at: index)
             queued.continuation.resume(returning: false)
-            log("cache cancel key=\(name) reason=\(reason)")
         }
+        return true
     }
 
     public func clear() {
