@@ -9,7 +9,6 @@ final class NowPlayingController {
     private let player: PlayerController
     private let artworkURL: (Track) -> URL?
     private let invalidated = CallbackRelay<Void>()
-    private let seekRelay = CallbackRelay<Double>()
     private let commandRelay = CallbackRelay<RemoteCommand>()
 
     private var artworkTask: Task<Void, Never>?
@@ -21,7 +20,6 @@ final class NowPlayingController {
         self.artworkURL = artworkURL
         invalidated.handler = { [weak self] _ in self?.observe() }
         commandRelay.handler = { [weak self] command in self?.handle(command) }
-        seekRelay.handler = { [weak self] time in self?.player.seek(to: time) }
         configureCommands()
         observe()
     }
@@ -57,32 +55,52 @@ final class NowPlayingController {
             artwork = nil
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             MPNowPlayingInfoCenter.default().playbackState = .stopped
-            updateCommandAvailability(hasTrack: false)
+            updateCommandAvailability(NowPlayingSnapshot.make(
+                track: nil,
+                state: player.state,
+                position: 0,
+                duration: 0,
+                hasNext: false,
+                hasPrevious: false
+            ))
             return
         }
 
         loadArtworkIfNeeded(for: track)
+        let snapshot = NowPlayingSnapshot.make(
+            track: track,
+            state: player.state,
+            position: player.position,
+            duration: player.duration,
+            hasNext: player.queue.canAdvance,
+            hasPrevious: player.queue.canRewind
+        )
 
         var info: [String: Any] = [
-            MPMediaItemPropertyTitle: track.title,
-            MPMediaItemPropertyArtist: track.displayArtist,
-            MPNowPlayingInfoPropertyElapsedPlaybackTime: player.position,
-            MPNowPlayingInfoPropertyPlaybackRate: player.isPlaying ? 1.0 : 0.0,
+            MPMediaItemPropertyTitle: snapshot.title,
+            MPMediaItemPropertyArtist: snapshot.artist,
+            MPNowPlayingInfoPropertyElapsedPlaybackTime: snapshot.elapsed,
+            MPNowPlayingInfoPropertyPlaybackRate: snapshot.rate,
             MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
             MPNowPlayingInfoPropertyMediaType: MPNowPlayingInfoMediaType.audio.rawValue,
         ]
-        if !track.album.isEmpty {
-            info[MPMediaItemPropertyAlbumTitle] = track.album
+        if !snapshot.album.isEmpty {
+            info[MPMediaItemPropertyAlbumTitle] = snapshot.album
         }
-        if player.duration > 0 {
-            info[MPMediaItemPropertyPlaybackDuration] = player.duration
+        if snapshot.duration > 0 {
+            info[MPMediaItemPropertyPlaybackDuration] = snapshot.duration
         }
         if let artwork {
             info[MPMediaItemPropertyArtwork] = artwork
         }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
-        MPNowPlayingInfoCenter.default().playbackState = player.isPlaying ? .playing : .paused
-        updateCommandAvailability(hasTrack: true)
+        switch snapshot.playbackState {
+        case .playing: MPNowPlayingInfoCenter.default().playbackState = .playing
+        case .paused: MPNowPlayingInfoCenter.default().playbackState = .paused
+        case .stopped: MPNowPlayingInfoCenter.default().playbackState = .stopped
+        }
+        updateCommandAvailability(snapshot)
+        player.log?("nowplaying publish track=\(track.id) state=\(snapshot.playbackState) next=\(snapshot.canNext) previous=\(snapshot.canPrevious)")
     }
 
     /// Loads one artwork image per track. A failed image is not retried until the
@@ -108,14 +126,14 @@ final class NowPlayingController {
         }
     }
 
-    private func updateCommandAvailability(hasTrack: Bool) {
+    private func updateCommandAvailability(_ snapshot: NowPlayingSnapshot) {
         let center = MPRemoteCommandCenter.shared()
-        center.playCommand.isEnabled = hasTrack && !player.isPlaying
-        center.pauseCommand.isEnabled = hasTrack && player.isPlaying
-        center.togglePlayPauseCommand.isEnabled = hasTrack
-        center.nextTrackCommand.isEnabled = hasTrack
-        center.previousTrackCommand.isEnabled = hasTrack
-        center.changePlaybackPositionCommand.isEnabled = hasTrack && player.duration > 0
+        center.playCommand.isEnabled = snapshot.canPlay
+        center.pauseCommand.isEnabled = snapshot.canPause
+        center.togglePlayPauseCommand.isEnabled = snapshot.canPlay || snapshot.canPause
+        center.nextTrackCommand.isEnabled = snapshot.canNext
+        center.previousTrackCommand.isEnabled = snapshot.canPrevious
+        center.changePlaybackPositionCommand.isEnabled = snapshot.canSeek
     }
 
     // MARK: - Remote commands
@@ -150,32 +168,17 @@ final class NowPlayingController {
             commandRelay.send(.previous)
             return .success
         }
-        center.changePlaybackPositionCommand.addTarget { [seekRelay] event in
+        center.changePlaybackPositionCommand.addTarget { [commandRelay] event in
             guard let event = event as? MPChangePlaybackPositionCommandEvent else { return .commandFailed }
-            seekRelay.send(event.positionTime)
+            commandRelay.send(.seek(event.positionTime))
             return .success
         }
     }
 
     private func handle(_ command: RemoteCommand) {
         Task {
-            switch command {
-            case .play:
-                if !player.isPlaying { await player.togglePlayPause() }
-            case .pause:
-                if player.isPlaying { await player.togglePlayPause() }
-            case .toggle:
-                await player.togglePlayPause()
-            case .next:
-                await player.next()
-            case .previous:
-                await player.previous()
-            }
+            await perform(command, on: player)
         }
     }
-}
-
-enum RemoteCommand: Sendable {
-    case play, pause, toggle, next, previous
 }
 #endif

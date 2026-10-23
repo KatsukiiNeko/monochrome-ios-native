@@ -16,13 +16,16 @@ final class AppModel {
 
     let player: PlayerController
     let cache: AudioCache
+    let downloadStore: DownloadStore
     private(set) var streamingHost: String
     private(set) var isStreamingConfigured: Bool
     private(set) var appearanceMode: AppearanceMode
     private(set) var cacheSizeBytes = 0
     private(set) var cacheEntryCount = 0
     private(set) var cachedTracks: [CachedTrackSummary] = []
+    private(set) var downloads: [DownloadItem] = []
     var allowsCellularCaching: Bool { cacheSettings.allowsCellular }
+    var clearTemporaryCacheOnLaunch: Bool { cacheSettings.clearOnLaunch }
 
     private let service: LocalFileService
     private let favoritesStore: FavoritesStore
@@ -39,6 +42,7 @@ final class AppModel {
     private let artworkTints = ArtworkTintStore()
     /// Cache cleanup is launch-only; import/delete reloads must not touch a download.
     private var didReconcileCache = false
+    private var didReconcileDownloads = false
 
     init() {
         let base = FileManager.default
@@ -71,13 +75,31 @@ final class AppModel {
             },
             log: { message in playerLog.notice("\(message, privacy: .public)") }
         )
-        let player = PlayerController(engine: AVPlayerEngine(), resolver: resolver, cache: cache)
+        // Permanent downloads live beside the library, not under Caches.
+        let downloadsDirectory = base.appendingPathComponent("Downloads", isDirectory: true)
+        try? FileManager.default.createDirectory(at: downloadsDirectory, withIntermediateDirectories: true)
+        var excludedDownloads = downloadsDirectory
+        var downloadValues = URLResourceValues()
+        downloadValues.isExcludedFromBackup = true
+        try? excludedDownloads.setResourceValues(downloadValues)
+        let downloadStore = DownloadStore(
+            directory: downloadsDirectory,
+            downloader: URLSessionFileDownloader(allowsCellular: { true }),
+            log: { message in playerLog.notice("\(message, privacy: .public)") }
+        )
+        let player = PlayerController(
+            engine: AVPlayerEngine(),
+            resolver: resolver,
+            cache: cache,
+            downloads: downloadStore
+        )
         player.log = { message in playerLog.notice("\(message, privacy: .public)") }
         let settings = StreamingSettings()
         let appearanceSettings = AppearanceSettings()
         self.service = service
         self.player = player
         self.cache = cache
+        self.downloadStore = downloadStore
         self.cacheSettings = cacheSettings
         self.resolver = resolver
         self.streamingSettings = settings
@@ -190,8 +212,16 @@ final class AppModel {
     func loadTracks() async {
         // Launch is the safe boundary for interrupted-write and orphan cleanup.
         if !didReconcileCache {
-            await cache.reconcile()
+            if cacheSettings.clearOnLaunch {
+                await cache.clear()
+            } else {
+                await cache.reconcile()
+            }
             didReconcileCache = true
+        }
+        if !didReconcileDownloads {
+            await downloadStore.reconcile()
+            didReconcileDownloads = true
         }
         do {
             tracks = try await service.allTracks()
@@ -203,6 +233,7 @@ final class AppModel {
         recents = (try? historyStore.load()) ?? []
         searchRecents = (try? searchHistoryStore.load()) ?? []
         await refreshCacheSize()
+        await refreshDownloads()
     }
 
     private func loadFavorites() -> [Track] {
@@ -301,6 +332,76 @@ final class AppModel {
 
     func setAllowsCellularCaching(_ allowed: Bool) {
         cacheSettings.setAllowsCellular(allowed)
+    }
+
+    func setClearTemporaryCacheOnLaunch(_ clear: Bool) {
+        cacheSettings.setClearOnLaunch(clear)
+    }
+
+    // MARK: - Permanent downloads
+
+    var completedDownloads: [DownloadItem] {
+        downloads.filter { $0.state == .completed }
+    }
+
+    var downloadsBytes: Int {
+        completedDownloads.reduce(0) { $0 + ($1.record?.byteSize ?? 0) }
+    }
+
+    func isDownloaded(_ track: Track) -> Bool {
+        completedDownloads.contains { $0.track.id == track.id }
+    }
+
+    func downloadState(for track: Track) -> DownloadState? {
+        downloads.first { $0.track.id == track.id }?.state
+    }
+
+    func startDownload(_ track: Track) {
+        guard track.source.supportsDownloads else {
+            errorMessage = track.source.downloadUnavailableReason
+            return
+        }
+        Task { await performDownload(track) }
+    }
+
+    private func performDownload(_ track: Track) async {
+        do {
+            let url = try await resolver.url(for: track)
+            let contentType = await resolver.contentType(for: track)
+            let poll = Task {
+                while !Task.isCancelled {
+                    await refreshDownloads()
+                    try? await Task.sleep(for: .milliseconds(300))
+                }
+            }
+            defer {
+                poll.cancel()
+                Task { await refreshDownloads() }
+            }
+            try await downloadStore.download(
+                track: track,
+                url: url,
+                contentType: contentType,
+                format: nil,
+                duration: track.durationSeconds
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        await refreshDownloads()
+    }
+
+    func refreshDownloads() async {
+        downloads = await downloadStore.items()
+    }
+
+    func removeDownload(_ item: DownloadItem) async {
+        do {
+            try await downloadStore.remove(id: item.id)
+            await refreshDownloads()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func clearError() {

@@ -28,6 +28,8 @@ public struct AudioCacheEntry: Codable, Equatable, Sendable {
     public var duration: Double?
     public var byteSize: Int
     public var lastUsedAt: Date
+    /// Stable tie-breaker for entries written at the same instant.
+    public var createdAt: Date
     /// Display metadata; older sidecars decode these as nil.
     public var title: String?
     public var artist: String?
@@ -41,6 +43,7 @@ public struct AudioCacheEntry: Codable, Equatable, Sendable {
         duration: Double? = nil,
         byteSize: Int,
         lastUsedAt: Date = .now,
+        createdAt: Date = .now,
         title: String? = nil,
         artist: String? = nil,
         artworkURL: URL? = nil
@@ -52,9 +55,30 @@ public struct AudioCacheEntry: Codable, Equatable, Sendable {
         self.duration = duration
         self.byteSize = byteSize
         self.lastUsedAt = lastUsedAt
+        self.createdAt = createdAt
         self.title = title
         self.artist = artist
         self.artworkURL = artworkURL
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case trackID, quality, fileName, format, duration, byteSize
+        case lastUsedAt, createdAt, title, artist, artworkURL
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        trackID = try container.decode(String.self, forKey: .trackID)
+        quality = try container.decode(String.self, forKey: .quality)
+        fileName = try container.decode(String.self, forKey: .fileName)
+        format = try container.decodeIfPresent(AudioFormat.self, forKey: .format)
+        duration = try container.decodeIfPresent(Double.self, forKey: .duration)
+        byteSize = try container.decode(Int.self, forKey: .byteSize)
+        lastUsedAt = try container.decode(Date.self, forKey: .lastUsedAt)
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? .distantPast
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+        artist = try container.decodeIfPresent(String.self, forKey: .artist)
+        artworkURL = try container.decodeIfPresent(URL.self, forKey: .artworkURL)
     }
 }
 
@@ -69,6 +93,7 @@ public struct CachedTrackSummary: Identifiable, Equatable, Sendable {
     public var artworkURL: URL?
     public var byteSize: Int
     public var lastUsedAt: Date
+    public var createdAt: Date
 
     public init(
         trackID: String,
@@ -78,7 +103,8 @@ public struct CachedTrackSummary: Identifiable, Equatable, Sendable {
         artist: String? = nil,
         artworkURL: URL? = nil,
         byteSize: Int,
-        lastUsedAt: Date
+        lastUsedAt: Date,
+        createdAt: Date = .distantPast
     ) {
         self.trackID = trackID
         self.quality = quality
@@ -88,6 +114,7 @@ public struct CachedTrackSummary: Identifiable, Equatable, Sendable {
         self.artworkURL = artworkURL
         self.byteSize = byteSize
         self.lastUsedAt = lastUsedAt
+        self.createdAt = createdAt
     }
 }
 
@@ -103,12 +130,36 @@ public struct DownloadResult: Equatable, Sendable {
 }
 
 public protocol FileDownloader: Sendable {
-    /// Writes the response body to `destination`; caching owns the partial file.
+    /// Writes the response body to `destination`; the caller owns the partial file.
     func download(
         from url: URL,
         to destination: URL,
         allowsExpensiveNetwork: Bool
     ) async throws -> DownloadResult
+    /// Same transfer with byte progress for user-initiated downloads.
+    func download(
+        from url: URL,
+        to destination: URL,
+        allowsExpensiveNetwork: Bool,
+        onProgress: @escaping @Sendable (Int, Int?) -> Void
+    ) async throws -> DownloadResult
+}
+
+public extension FileDownloader {
+    func download(
+        from url: URL,
+        to destination: URL,
+        allowsExpensiveNetwork: Bool,
+        onProgress: @escaping @Sendable (Int, Int?) -> Void
+    ) async throws -> DownloadResult {
+        let result = try await download(
+            from: url,
+            to: destination,
+            allowsExpensiveNetwork: allowsExpensiveNetwork
+        )
+        onProgress(result.bytesWritten, result.expectedBytes)
+        return result
+    }
 }
 
 /// What the player needs from a cache; faked in host tests.
@@ -124,11 +175,16 @@ public protocol AudioCaching: Sendable {
     ) async
     /// Cancels a background download that belongs to a track the user left.
     func cancelDownload(for track: Track, quality: AudioQuality?, reason: String) async
+    /// Marks the entry the player currently has open so eviction never deletes it.
+    func protect(track: Track, quality: AudioQuality?) async
+    func clearProtection() async
 }
 
 public extension AudioCaching {
     /// A cache that does not download in the background has nothing to cancel.
     func cancelDownload(for track: Track, quality: AudioQuality?, reason: String) async {}
+    func protect(track: Track, quality: AudioQuality?) async {}
+    func clearProtection() async {}
 }
 
 public enum AudioFileType {
@@ -196,6 +252,8 @@ public actor AudioCache: AudioCaching {
     private var activeTokens: Set<UUID> = []
     private var waiters: [Waiter] = []
     private var cancelReasons: [String: String] = [:]
+    /// The player's current cache key; eviction skips it.
+    private var protectedKey: String?
     private static let maxConcurrentDownloads = 2
 
     public init(
@@ -220,6 +278,14 @@ public actor AudioCache: AudioCaching {
 
     // MARK: - Lookup
 
+    public func protect(track: Track, quality: AudioQuality?) async {
+        protectedKey = Self.storageBaseName(track: track, quality: quality)
+    }
+
+    public func clearProtection() async {
+        protectedKey = nil
+    }
+
     public func cachedAudio(for track: Track, quality: AudioQuality?) -> CachedAudio? {
         let name = Self.storageBaseName(track: track, quality: quality)
         guard var entry = Self.readEntry(named: name, in: directory) else {
@@ -234,6 +300,7 @@ public actor AudioCache: AudioCaching {
             return nil
         }
         entry.lastUsedAt = .now
+        protectedKey = name
         // Fill metadata for entries written before the Settings list existed.
         if entry.title == nil { entry.title = track.title }
         if entry.artist == nil { entry.artist = track.displayArtist }
@@ -344,6 +411,7 @@ public actor AudioCache: AudioCaching {
                 format: format,
                 duration: duration,
                 byteSize: result.bytesWritten,
+                createdAt: .now,
                 title: track.title,
                 artist: track.displayArtist,
                 artworkURL: track.artworkURL
@@ -394,11 +462,13 @@ public actor AudioCache: AudioCaching {
                 artist: entry.artist,
                 artworkURL: entry.artworkURL,
                 byteSize: entry.byteSize,
-                lastUsedAt: entry.lastUsedAt
+                lastUsedAt: entry.lastUsedAt,
+                createdAt: entry.createdAt
             )
         }
         .sorted {
             if $0.lastUsedAt != $1.lastUsedAt { return $0.lastUsedAt > $1.lastUsedAt }
+            if $0.createdAt != $1.createdAt { return $0.createdAt > $1.createdAt }
             if $0.trackID != $1.trackID { return $0.trackID < $1.trackID }
             return $0.quality < $1.quality
         }
@@ -428,6 +498,7 @@ public actor AudioCache: AudioCaching {
             return
         }
         removeFiles(named: name, entry: entry)
+        if protectedKey == name { protectedKey = nil }
         log("cache remove key=\(name) bytes=\(entry.byteSize)")
     }
 
@@ -463,6 +534,7 @@ public actor AudioCache: AudioCaching {
         }
         waiters.removeAll()
         activeTokens.removeAll()
+        protectedKey = nil
         try? FileManager.default.removeItem(at: directory)
         ensureDirectory()
         log("cache clear removed=\(entries.count) bytes=\(bytes)")
@@ -524,29 +596,41 @@ public actor AudioCache: AudioCaching {
     }
 
     private func evictIfNeeded() {
-        // Deterministic LRU: oldest use first, then stable identity for equal dates.
-        // Only complete entries count; a corrupt sidecar must not evict a good file.
-        var entries = Self.entries(in: directory)
+        // Deterministic LRU: oldest use first, then creation time, then identity.
+        // The loaded entry is sorted last and never removed. Only complete entries
+        // count; a corrupt sidecar must not evict a good file.
+        let entries = Self.entries(in: directory)
             .filter { entry in
                 guard let size = Self.fileSize(directory.appendingPathComponent(entry.fileName)),
                       size == entry.byteSize,
                       size > 0 else { return false }
                 return true
             }
-            .sorted {
-                if $0.lastUsedAt != $1.lastUsedAt { return $0.lastUsedAt < $1.lastUsedAt }
-                if $0.trackID != $1.trackID { return $0.trackID < $1.trackID }
-                return $0.quality < $1.quality
+            .sorted { lhs, rhs in
+                let lhsProtected = isProtected(lhs)
+                let rhsProtected = isProtected(rhs)
+                if lhsProtected != rhsProtected { return !lhsProtected }
+                if lhs.lastUsedAt != rhs.lastUsedAt { return lhs.lastUsedAt < rhs.lastUsedAt }
+                if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
+                if lhs.trackID != rhs.trackID { return lhs.trackID < rhs.trackID }
+                return lhs.quality < rhs.quality
             }
         var total = entries.reduce(0) { $0 + $1.byteSize }
-        while !entries.isEmpty, entries.count > entryLimit || total > sizeLimitBytes {
-            let oldest = entries.removeFirst()
+        var remaining = entries
+        while !remaining.isEmpty, remaining.count > entryLimit || total > sizeLimitBytes {
+            guard let oldest = remaining.first(where: { !isProtected($0) }) else { break }
+            remaining.removeAll { $0.fileName == oldest.fileName && $0.trackID == oldest.trackID }
             try? FileManager.default.removeItem(at: directory.appendingPathComponent(oldest.fileName))
             let name = Self.storageBaseName(trackID: oldest.trackID, qualityName: oldest.quality)
             try? FileManager.default.removeItem(at: directory.appendingPathComponent("\(name).json"))
             total -= oldest.byteSize
             log("cache evict track=\(oldest.trackID) bytes=\(oldest.byteSize)")
         }
+    }
+
+    private func isProtected(_ entry: AudioCacheEntry) -> Bool {
+        guard let protectedKey else { return false }
+        return protectedKey == Self.storageBaseName(trackID: entry.trackID, qualityName: entry.quality)
     }
 
     private func hasFreeSpace() -> Bool {

@@ -4,6 +4,7 @@ import Foundation
 public enum LibraryFilter: String, CaseIterable, Identifiable, Sendable {
     case all
     case favorites
+    case downloaded
     case local
 
     public var id: String { rawValue }
@@ -12,6 +13,7 @@ public enum LibraryFilter: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .all: "All"
         case .favorites: "Favorites"
+        case .downloaded: "Downloaded"
         case .local: "Local files"
         }
     }
@@ -37,6 +39,7 @@ public enum LibraryQuery {
     public static func rows(
         tracks: [Track],
         favorites: [Track],
+        downloads: [Track] = [],
         filter: LibraryFilter,
         sort: LibrarySort
     ) -> [Track] {
@@ -46,6 +49,8 @@ public enum LibraryQuery {
             selected = merged(tracks: tracks, favorites: favorites)
         case .favorites:
             selected = favorites
+        case .downloaded:
+            selected = downloads
         case .local:
             selected = tracks
         }

@@ -294,6 +294,66 @@ struct AudioCacheTests {
         #expect(entry.title == nil)
         #expect(entry.artist == nil)
         #expect(entry.artworkURL == nil)
+        #expect(entry.createdAt == .distantPast)
+    }
+
+    @Test func loadedEntryIsNeverEvicted() async throws {
+        let directory = temporaryDirectory()
+        let cache = makeCache(directory: directory, downloader: FakeDownloader(), entryLimit: 2)
+        let first = streamTrack("1")
+        await store(cache, first)
+        await cache.protect(track: first, quality: .lossless)
+
+        for id in 2...6 {
+            await store(cache, streamTrack(String(id)))
+            try? await Task.sleep(for: .milliseconds(5))
+        }
+
+        #expect(await cache.entryCount() == 2)
+        #expect(await cache.cachedAudio(for: first, quality: .lossless) != nil)
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    @Test func equalTimestampsUseCreationTimeThenKey() async throws {
+        let directory = temporaryDirectory()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let stamp = Date(timeIntervalSince1970: 100)
+        for (id, name) in [("stream:2", "stream_2-lossless"), ("stream:1", "stream_1-lossless")] {
+            try Data(repeating: 3, count: 32).write(
+                to: directory.appendingPathComponent("\(name).flac")
+            )
+            let entry = AudioCacheEntry(
+                trackID: id,
+                quality: "lossless",
+                fileName: "\(name).flac",
+                byteSize: 32,
+                lastUsedAt: stamp,
+                createdAt: stamp
+            )
+            let data = try JSONEncoder().encode(entry)
+            try data.write(to: directory.appendingPathComponent("\(name).json"))
+        }
+
+        let cache = makeCache(directory: directory, downloader: FakeDownloader(), entryLimit: 1)
+        await cache.reconcile()
+
+        // Same use/creation time: the lexicographically smallest track id goes first.
+        #expect(await cache.cachedAudio(for: streamTrack("2"), quality: .lossless) != nil)
+        #expect(await cache.cachedAudio(for: streamTrack("1"), quality: .lossless) == nil)
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    @Test func clearOnLaunchPreferencePersistsAndDefaultsOff() {
+        let suite = "AudioCacheSettingsTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.removePersistentDomain(forName: suite)
+        let settings = AudioCacheSettings(defaults: defaults)
+
+        #expect(settings.clearOnLaunch == false)
+        settings.setClearOnLaunch(true)
+        #expect(AudioCacheSettings(defaults: defaults).clearOnLaunch)
+        settings.setClearOnLaunch(false)
+        #expect(AudioCacheSettings(defaults: defaults).clearOnLaunch == false)
     }
 
     @Test func downloaderFailureLeavesNothingBehind() async throws {

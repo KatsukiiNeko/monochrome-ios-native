@@ -15,6 +15,8 @@ public final class PlayerController {
     public private(set) var repeatMode: RepeatMode = .off
     /// True when the engine is playing a file served from the audio cache.
     public private(set) var isCurrentFromCache = false
+    /// True when the engine is playing a permanent download.
+    public private(set) var isCurrentFromDownload = false
 
     /// Called once per successful start; the app uses it to record history.
     public var onTrackStarted: ((Track) -> Void)?
@@ -24,6 +26,7 @@ public final class PlayerController {
     private let engine: any PlaybackEngine
     private let resolver: any TrackURLResolver
     private let cache: (any AudioCaching)?
+    private let downloads: (any DownloadedAudioProviding)?
     private let now: @Sendable () -> Date
     /// A download may be cancelled only while the track has just started.
     private static let skipCancellationWindow: TimeInterval = 10
@@ -52,11 +55,13 @@ public final class PlayerController {
         engine: any PlaybackEngine,
         resolver: any TrackURLResolver,
         cache: (any AudioCaching)? = nil,
+        downloads: (any DownloadedAudioProviding)? = nil,
         now: @escaping @Sendable () -> Date = { .now }
     ) {
         self.engine = engine
         self.resolver = resolver
         self.cache = cache
+        self.downloads = downloads
         self.now = now
         engine.onEvent = { [weak self] event in
             guard let self else { return }
@@ -105,6 +110,7 @@ public final class PlayerController {
             position = 0
             state = .idle
             isCurrentFromCache = false
+            isCurrentFromDownload = false
             currentItemIsLocal = false
         }
     }
@@ -257,12 +263,14 @@ public final class PlayerController {
             position = 0
             state = .idle
             isCurrentFromCache = false
+            isCurrentFromDownload = false
             currentItemIsLocal = false
         }
     }
 
     private func loadCurrent(retrying: Bool = false, forLoop: Bool = false) async {
         await cancelCacheDownloadIfSkippedEarly()
+        if let cache { await cache.clearProtection() }
         playbackStartedAt = nil
         guard let track = queue.current else {
             engine.stop()
@@ -271,6 +279,7 @@ public final class PlayerController {
             duration = 0
             currentItemIsLocal = false
             isCurrentFromCache = false
+            isCurrentFromDownload = false
             pendingCache = nil
             return
         }
@@ -281,7 +290,30 @@ public final class PlayerController {
         position = 0
         duration = track.durationSeconds ?? 0
         isCurrentFromCache = false
+        isCurrentFromDownload = false
         pendingCache = nil
+
+        if track.isStreaming, let downloads,
+           let downloaded = await downloads.downloadedFile(for: track) {
+            do {
+                try await engine.load(url: downloaded.url, contentType: nil)
+                engine.play()
+                state = .playing
+                format = downloaded.format
+                if let downloadedDuration = downloaded.duration, downloadedDuration > 0 {
+                    duration = downloadedDuration
+                }
+                currentItemIsLocal = true
+                isCurrentFromDownload = true
+                playbackStartedAt = now()
+                if forLoop { log?("loop source=download") }
+                log?("download source=file track=\(track.id)")
+                onTrackStarted?(track)
+                return
+            } catch {
+                log?("download unusable track=\(track.id)")
+            }
+        }
 
         if track.isStreaming, let cache,
            let cached = await cache.cachedAudio(for: track, quality: track.audioQuality) {
@@ -332,3 +364,5 @@ public final class PlayerController {
         }
     }
 }
+
+extension PlayerController: RemoteCommandTarget {}

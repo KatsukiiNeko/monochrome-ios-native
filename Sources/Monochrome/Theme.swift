@@ -9,54 +9,57 @@ enum Theme {
 
     /// Near-black in dark appearance, off-white in light appearance.
     static let background = adaptive(
-        light: UIColor(white: 0.98, alpha: 1),
-        dark: UIColor(white: 0.02, alpha: 1)
+        light: ThemePalette.light.background,
+        dark: ThemePalette.dark.background
     )
     /// Default surface for cards, fields and chips.
     static let surface = adaptive(
-        light: UIColor(white: 0.94, alpha: 1),
-        dark: UIColor(white: 0.07, alpha: 1)
+        light: ThemePalette.light.surface,
+        dark: ThemePalette.dark.surface
     )
     /// A surface one step above `surface`.
     static let elevated = adaptive(
-        light: .white,
-        dark: UIColor(white: 0.12, alpha: 1)
+        light: ThemePalette.light.elevated,
+        dark: ThemePalette.dark.elevated
     )
     /// Recessed control surface, used for fields and selected segments.
     static let sunken = adaptive(
-        light: UIColor(white: 0.90, alpha: 1),
-        dark: UIColor(white: 0.045, alpha: 1)
+        light: ThemePalette.light.sunken,
+        dark: ThemePalette.dark.sunken
     )
     /// Low-intensity red wash for a selected control; never a page background.
     static let accentSurface = adaptive(
-        light: UIColor(red: 0.69, green: 0.00, blue: 0.06, alpha: 0.10),
-        dark: UIColor(red: 0.88, green: 0.10, blue: 0.14, alpha: 0.18)
+        light: ThemePalette.light.accentSurface,
+        dark: ThemePalette.dark.accentSurface
     )
     /// Thin rules and card outlines.
     static let border = adaptive(
-        light: UIColor.black.withAlphaComponent(0.12),
-        dark: UIColor.white.withAlphaComponent(0.14)
+        light: ThemePalette.light.border,
+        dark: ThemePalette.dark.border
     )
     /// Quiet separators and idle progress tracks.
     static let separator = adaptive(
-        light: UIColor.black.withAlphaComponent(0.09),
-        dark: UIColor.white.withAlphaComponent(0.10)
+        light: ThemePalette.light.separator,
+        dark: ThemePalette.dark.separator
     )
 
-    static let primaryText = adaptive(light: .black, dark: .white)
+    static let primaryText = adaptive(
+        light: ThemePalette.light.primaryText,
+        dark: ThemePalette.dark.primaryText
+    )
     static let secondaryText = adaptive(
-        light: UIColor.black.withAlphaComponent(0.60),
-        dark: UIColor.white.withAlphaComponent(0.62)
+        light: ThemePalette.light.secondaryText,
+        dark: ThemePalette.dark.secondaryText
     )
     static let tertiaryText = adaptive(
-        light: UIColor.black.withAlphaComponent(0.42),
-        dark: UIColor.white.withAlphaComponent(0.38)
+        light: ThemePalette.light.tertiaryText,
+        dark: ThemePalette.dark.tertiaryText
     )
 
     /// The one meaningful accent: selection, progress and active playback state.
     static let accent = adaptive(
-        light: UIColor(red: 0.69, green: 0.00, blue: 0.06, alpha: 1),
-        dark: UIColor(red: 0.88, green: 0.10, blue: 0.14, alpha: 1)
+        light: ThemePalette.light.accent,
+        dark: ThemePalette.dark.accent
     )
     static let onAccent = Color.white
     static let destructive = accent
@@ -73,18 +76,18 @@ enum Theme {
 
     // MARK: Spacing
 
-    static let sectionSpacing: CGFloat = 28
-    static let screenPadding: CGFloat = 20
+    static let sectionSpacing: CGFloat = 24
+    static let screenPadding: CGFloat = 16
     static let rowSpacing: CGFloat = 12
     static let hairline: CGFloat = 1
     static let cardPadding: CGFloat = 14
-    static let rowMinHeight: CGFloat = 52
+    static let rowMinHeight: CGFloat = 56
     static let iconSize: CGFloat = 32
 
     // MARK: Radii
 
     static let corner: CGFloat = 12
-    static let cardRadius: CGFloat = 10
+    static let cardRadius: CGFloat = 20
     static let artworkRadius: CGFloat = 2
     static let albumRadius: CGFloat = 4
     static let tileRadius: CGFloat = 6
@@ -116,6 +119,18 @@ enum Theme {
     private static func adaptive(light: UIColor, dark: UIColor) -> Color {
         Color(uiColor: UIColor { traits in
             traits.userInterfaceStyle == .dark ? dark : light
+        })
+    }
+
+    private static func adaptive(light: PaletteColor, dark: PaletteColor) -> Color {
+        Color(uiColor: UIColor { traits in
+            let color = traits.userInterfaceStyle == .dark ? dark : light
+            return UIColor(
+                red: color.red,
+                green: color.green,
+                blue: color.blue,
+                alpha: color.alpha
+            )
         })
     }
 }

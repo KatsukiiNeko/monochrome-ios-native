@@ -11,6 +11,7 @@ struct SettingsView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var host = ""
     @State private var errorMessage: String?
+    @State private var isConfirmingClearCache = false
 
     var body: some View {
         ScrollView {
@@ -18,7 +19,7 @@ struct SettingsView: View {
                 header
                 appearanceSection
                 sourcesSection
-                offlineSection
+                downloadsSection
                 cacheSection
                 playbackSection
                 aboutSection
@@ -32,25 +33,36 @@ struct SettingsView: View {
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Close") { dismiss() }
-                    .foregroundStyle(Theme.secondaryText)
-            }
             ToolbarItem(placement: .confirmationAction) {
-                Button("Save") { save() }
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Theme.primaryText)
+                Button("Done") {
+                    if applyHost() { dismiss() }
+                }
+                .fontWeight(.semibold)
+                .foregroundStyle(Theme.primaryText)
             }
         }
         .onAppear { host = model.streamingHost }
         .onChange(of: host) { _, _ in errorMessage = nil }
         .task {
             await model.refreshCacheSize()
+            await model.refreshDownloads()
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(2))
                 guard !Task.isCancelled else { break }
                 await model.refreshCacheSize()
             }
+        }
+        .confirmationDialog(
+            "Clear the temporary cache?",
+            isPresented: $isConfirmingClearCache,
+            titleVisibility: .visible
+        ) {
+            Button("Clear cache", role: .destructive) {
+                Task { await model.clearCache() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Cached songs are removed. Permanent downloads and imported files are not affected.")
         }
         // The sheet has its own presentation environment; apply the authoritative
         // appearance here as well as at the root so an open sheet re-resolves now.
@@ -155,18 +167,24 @@ struct SettingsView: View {
         settingsSection(
             "Streaming sources",
             meta: "NETWORK",
-            footer: "Only the Monochrome catalog and files you import can play. The catalog is a third-party relay; this app does not assume download rights or a YouTube Music integration."
+            footer: "Monochrome is the configured catalog source. Its upstream client downloads the same progressive FLAC stream, so permanent downloads are available for it. The YouTube Music companion source has no server configured here and never downloads."
         ) {
             settingsCard {
-                settingsRow(
-                    icon: "dot.radiowaves.left.and.right",
-                    title: "Monochrome catalog",
-                    detail: model.isStreamingConfigured
-                        ? "Public FLAC catalog · \(hostName)"
-                        : "Streaming is off; imported files still play."
-                ) {
-                    StatusBadge(text: model.isStreamingConfigured ? "On" : "Off", isActive: model.isStreamingConfigured)
+                NavigationLink {
+                    SourceDetailView(model: model, source: .monochrome)
+                } label: {
+                    settingsRow(
+                        icon: "dot.radiowaves.left.and.right",
+                        title: "Monochrome catalog",
+                        detail: model.isStreamingConfigured
+                            ? "Public FLAC catalog · \(hostName)"
+                            : "Streaming is off; imported files still play."
+                    ) {
+                        StatusBadge(text: model.isStreamingConfigured ? "On" : "Off", isActive: model.isStreamingConfigured)
+                    }
                 }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens source details")
                 settingsDivider()
                 settingsRow(
                     icon: "waveform",
@@ -176,13 +194,19 @@ struct SettingsView: View {
                     TechnicalLabel(text: "FLAC 16/44.1")
                 }
                 settingsDivider()
-                settingsRow(
-                    icon: "play.rectangle",
-                    title: "YouTube Music",
-                    detail: "No authorized integration is present in this build."
-                ) {
-                    StatusBadge(text: "Unavailable", isActive: false)
+                NavigationLink {
+                    SourceDetailView(model: model, source: .youTubeMusic)
+                } label: {
+                    settingsRow(
+                        icon: "play.rectangle",
+                        title: MusicSourceID.youTubeMusic.displayName,
+                        detail: "No companion server is configured. Downloads stay off."
+                    ) {
+                        StatusBadge(text: "Needs setup", isActive: false)
+                    }
                 }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens source details")
             }
 
             settingsCard {
@@ -204,7 +228,7 @@ struct SettingsView: View {
                             .autocorrectionDisabled()
                             .keyboardType(.URL)
                             .submitLabel(.done)
-                            .onSubmit { save() }
+                            .onSubmit { _ = applyHost() }
                             .accessibilityLabel("Catalog endpoint")
                     }
                     .padding(.horizontal, 10)
@@ -221,7 +245,7 @@ struct SettingsView: View {
                     HStack(spacing: 8) {
                         Button("Use default") {
                             host = StreamingSettings.defaultBaseURL.absoluteString
-                            save()
+                            _ = applyHost()
                         }
                         .font(Theme.technical)
                         .foregroundStyle(Theme.secondaryText)
@@ -229,7 +253,7 @@ struct SettingsView: View {
 
                         Button("Turn off", role: .destructive) {
                             host = ""
-                            save()
+                            _ = applyHost()
                         }
                         .font(Theme.technical)
                         .foregroundStyle(Theme.destructive)
@@ -250,17 +274,36 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Offline music
+    // MARK: - Downloads
 
-    // No Download action is exposed: the catalog has no authorized download
-    // entitlement (docs/ONLINE_STREAMING_AUDIT.md). Imported files are permanent.
-    private var offlineSection: some View {
+    private var downloadsSection: some View {
         settingsSection(
-            "Offline music",
-            meta: "PERMANENT",
-            footer: "Permanent files are separate from the temporary cache. Imported files are never evicted by cache cleanup, and this build does not fake catalog downloads."
+            "Downloads",
+            meta: model.completedDownloads.isEmpty
+                ? "NONE"
+                : "\(model.completedDownloads.count) OFFLINE",
+            footer: "Downloads are permanent offline files. They are separate from the five-song temporary cache and are only removed when you remove them."
         ) {
             settingsCard {
+                NavigationLink {
+                    DownloadsView(model: model)
+                } label: {
+                    settingsRow(
+                        icon: "arrow.down.circle",
+                        title: "Manage downloads",
+                        detail: model.completedDownloads.isEmpty
+                            ? "No permanent downloads yet."
+                            : "\(model.completedDownloads.count == 1 ? "1 song" : "\(model.completedDownloads.count) songs") · \(byteText(model.downloadsBytes))"
+                    ) {
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Theme.tertiaryText)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .buttonStyle(.plain)
+
+                settingsDivider()
                 settingsRow(
                     icon: "internaldrive",
                     title: "Imported files",
@@ -270,9 +313,17 @@ struct SettingsView: View {
                 }
                 settingsDivider()
                 settingsRow(
-                    icon: "arrow.down.circle",
-                    title: "Catalog downloads",
-                    detail: "Not available: the catalog has no authorized download API."
+                    icon: "waveform",
+                    title: MusicSourceID.monochrome.displayName,
+                    detail: "Downloads the same progressive FLAC stream the catalog plays."
+                ) {
+                    StatusBadge(text: "Available", isActive: true)
+                }
+                settingsDivider()
+                settingsRow(
+                    icon: "play.rectangle",
+                    title: MusicSourceID.youTubeMusic.displayName,
+                    detail: MusicSourceID.youTubeMusic.downloadUnavailableReason
                 ) {
                     StatusBadge(text: "Unavailable", isActive: false)
                 }
@@ -314,18 +365,20 @@ struct SettingsView: View {
                                 .foregroundStyle(Theme.secondaryText)
                         }
                         Spacer(minLength: 8)
-                        TechnicalLabel(text: byteText(model.cacheSizeBytes))
-                    }
-
-                    HStack(spacing: 4) {
-                        ForEach(0..<AudioCache.defaultEntryLimit, id: \.self) { index in
-                            RoundedRectangle(cornerRadius: 1, style: .continuous)
-                                .fill(index < model.cacheEntryCount ? Theme.accent : Theme.sunken)
-                                .frame(height: 3)
+                        VStack(alignment: .trailing, spacing: 4) {
+                            DotMatrixText(
+                                text: "\(model.cacheEntryCount)/\(AudioCache.defaultEntryLimit)",
+                                dotSize: 1.7,
+                                color: Theme.primaryText
+                            )
+                            TechnicalLabel(text: byteText(model.cacheSizeBytes))
                         }
                     }
-                    .animation(reduceMotion ? nil : Theme.quick, value: model.cacheEntryCount)
-                    .accessibilityHidden(true)
+
+                    CacheSlotMeter(
+                        used: model.cacheEntryCount,
+                        total: AudioCache.defaultEntryLimit
+                    )
                 }
                 .padding(.horizontal, Theme.cardPadding)
                 .padding(.vertical, 12)
@@ -347,12 +400,27 @@ struct SettingsView: View {
 
                 settingsDivider()
                 settingsRow(
+                    icon: "power",
+                    title: "Clear on launch",
+                    detail: "Off by default; valid cache entries survive a relaunch."
+                ) {
+                    Toggle("Clear temporary cache on launch", isOn: Binding(
+                        get: { model.clearTemporaryCacheOnLaunch },
+                        set: { model.setClearTemporaryCacheOnLaunch($0) }
+                    ))
+                    .labelsHidden()
+                    .tint(Theme.accent)
+                    .accessibilityLabel("Clear temporary cache on launch")
+                }
+
+                settingsDivider()
+                settingsRow(
                     icon: "trash",
                     title: "Clear temporary cache",
                     detail: "\(model.cacheEntryCount == 1 ? "1 track" : "\(model.cacheEntryCount) tracks") · \(byteText(model.cacheSizeBytes))"
                 ) {
                     Button("Clear", role: .destructive) {
-                        Task { await model.clearCache() }
+                        isConfirmingClearCache = true
                     }
                     .font(Theme.technical)
                     .foregroundStyle(Theme.destructive)
@@ -507,7 +575,11 @@ struct SettingsView: View {
                 }
                 settingsDivider()
                 settingsRow(icon: "arrow.down.circle", title: "Permanent downloads") {
-                    TechnicalLabel(text: "Unavailable")
+                    TechnicalLabel(
+                        text: model.completedDownloads.isEmpty
+                            ? "NONE"
+                            : "\(model.completedDownloads.count) · \(byteText(model.downloadsBytes))"
+                    )
                 }
             }
         }
@@ -618,13 +690,14 @@ struct SettingsView: View {
 
     // MARK: - Actions and values
 
-    private func save() {
+    @discardableResult
+    private func applyHost() -> Bool {
         if model.saveStreamingHost(host) {
             errorMessage = nil
-            dismiss()
-        } else {
-            errorMessage = "Enter an HTTPS address, for example https://tracks.monochrome.st."
+            return true
         }
+        errorMessage = "Enter an HTTPS address, for example https://tracks.monochrome.st."
+        return false
     }
 
     private var hostName: String {

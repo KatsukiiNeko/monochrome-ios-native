@@ -15,6 +15,7 @@ struct SearchView: View {
     @State private var filter: SearchResultKind = .all
     @State private var selectedRelease: RemoteRelease?
     @State private var selectedArtist: RemoteArtist?
+    @State private var pendingDownloadRemoval: DownloadItem?
     @FocusState private var isSearchFocused: Bool
 
     var body: some View {
@@ -48,6 +49,23 @@ struct SearchView: View {
             }
             .sheet(item: $selectedArtist) { artist in
                 ArtistDetailView(model: model, artist: artist)
+            }
+            .confirmationDialog(
+                "Remove “\(pendingDownloadRemoval?.track.title ?? "this download")”?",
+                isPresented: Binding(
+                    get: { pendingDownloadRemoval != nil },
+                    set: { if !$0 { pendingDownloadRemoval = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Remove download", role: .destructive) {
+                    guard let item = pendingDownloadRemoval else { return }
+                    pendingDownloadRemoval = nil
+                    Task { await model.removeDownload(item) }
+                }
+                Button("Cancel", role: .cancel) { pendingDownloadRemoval = nil }
+            } message: {
+                Text("The offline copy is deleted. You can download it again later.")
             }
         }
     }
@@ -433,6 +451,10 @@ struct SearchView: View {
             ) {
                 model.toggleFavorite(track)
             }
+            if track.source.supportsDownloads {
+                Divider()
+                downloadAction(track)
+            }
         } label: {
             Image(systemName: "ellipsis")
                 .font(.body)
@@ -441,6 +463,34 @@ struct SearchView: View {
                 .contentShape(Rectangle())
         }
         .accessibilityLabel("More actions for \(track.title)")
+    }
+
+    @ViewBuilder
+    private func downloadAction(_ track: Track) -> some View {
+        if let state = model.downloadState(for: track) {
+            switch state {
+            case .completed:
+                Button("Remove download", systemImage: "trash", role: .destructive) {
+                    pendingDownloadRemoval = model.downloads.first {
+                        $0.track.id == track.id && $0.state == .completed
+                    }
+                }
+            case .queued, .downloading:
+                Label("Downloading…", systemImage: "arrow.down.circle")
+            case .failed:
+                Button("Retry download", systemImage: "arrow.clockwise") {
+                    model.startDownload(track)
+                }
+            case .cancelled:
+                Button("Download", systemImage: "arrow.down.circle") {
+                    model.startDownload(track)
+                }
+            }
+        } else {
+            Button("Download", systemImage: "arrow.down.circle") {
+                model.startDownload(track)
+            }
+        }
     }
 
     private var releasesSection: some View {

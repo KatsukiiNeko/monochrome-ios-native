@@ -46,6 +46,20 @@ struct LibraryQueryTests {
         )
     }
 
+    @Test func downloadedUsesOnlyThePermanentList() {
+        let local = track("a", title: "A")
+        let downloaded = track("b", title: "B", local: false)
+        #expect(
+            LibraryQuery.rows(
+                tracks: [local],
+                favorites: [local],
+                downloads: [downloaded],
+                filter: .downloaded,
+                sort: .title
+            ).map(\.id) == ["b"]
+        )
+    }
+
     @Test func sortsByTitleArtistAndRecentlyAdded() {
         let a = track("a", title: "Alpha", artist: "Zed", added: 10)
         let b = track("b", title: "Beta", artist: "Amy", added: 20)

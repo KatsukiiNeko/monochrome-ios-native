@@ -12,11 +12,13 @@ struct LibraryView: View {
     @State private var sort: LibrarySort = .recent
     @State private var isShowingImporter = false
     @State private var pendingDeletion: Track?
+    @State private var pendingDownloadRemoval: DownloadItem?
 
     private var rows: [Track] {
         LibraryQuery.rows(
             tracks: model.tracks,
             favorites: model.favorites,
+            downloads: model.completedDownloads.map(\.track),
             filter: filter,
             sort: sort
         )
@@ -56,6 +58,18 @@ struct LibraryView: View {
                             if track.provider == Track.localProvider {
                                 Button("Delete", role: .destructive) {
                                     pendingDeletion = track
+                                }
+                            } else if track.source.supportsDownloads {
+                                if let item = model.downloads.first(where: {
+                                    $0.track.id == track.id && $0.state == .completed
+                                }) {
+                                    Button("Remove", role: .destructive) {
+                                        pendingDownloadRemoval = item
+                                    }
+                                } else {
+                                    Button("Download", systemImage: "arrow.down.circle") {
+                                        model.startDownload(track)
+                                    }
                                 }
                             }
                         }
@@ -119,6 +133,23 @@ struct LibraryView: View {
                 Button("Cancel", role: .cancel) { pendingDeletion = nil }
             } message: {
                 Text("This removes the app's copy. The original file in Files is untouched.")
+            }
+            .confirmationDialog(
+                "Remove “\(pendingDownloadRemoval?.track.title ?? "this download")”?",
+                isPresented: Binding(
+                    get: { pendingDownloadRemoval != nil },
+                    set: { if !$0 { pendingDownloadRemoval = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Remove download", role: .destructive) {
+                    guard let item = pendingDownloadRemoval else { return }
+                    pendingDownloadRemoval = nil
+                    Task { await model.removeDownload(item) }
+                }
+                Button("Cancel", role: .cancel) { pendingDownloadRemoval = nil }
+            } message: {
+                Text("The offline copy is deleted. You can download it again later.")
             }
         }
     }
@@ -209,6 +240,12 @@ struct LibraryView: View {
                 Label("No favorites yet", systemImage: "heart")
             } description: {
                 Text("Tap the heart in the player, or swipe a track to the right.")
+            }
+        case .downloaded:
+            ContentUnavailableView {
+                Label("No downloads yet", systemImage: "arrow.down.circle")
+            } description: {
+                Text("Download a song from its menu to keep it available offline.")
             }
         case .local:
             ContentUnavailableView {
