@@ -1,28 +1,38 @@
-// HomeView.swift: greeting, recently played and favorites, all from persisted data.
+// HomeView.swift: greeting, quick access, recently played and favorites.
 #if canImport(SwiftUI)
 import MonochromeCore
 import SwiftUI
 
 struct HomeView: View {
     let model: AppModel
-    var onOpenPlayer: () -> Void
     var onOpenSearch: () -> Void
     var onOpenLibrary: () -> Void
     var onOpenSettings: () -> Void
 
+    private var quickAccess: [Track] {
+        QuickAccess.merge(recents: model.recents, favorites: model.favorites)
+    }
+
+    private var hasContent: Bool {
+        !model.recents.isEmpty || !model.favorites.isEmpty
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
+                VStack(alignment: .leading, spacing: Theme.sectionSpacing) {
                     greeting
 
+                    if !quickAccess.isEmpty {
+                        quickAccessGrid
+                    }
                     if !model.recents.isEmpty {
-                        recentsSection
+                        listenAgainSection
                     }
                     if !model.favorites.isEmpty {
                         favoritesSection
                     }
-                    if model.recents.isEmpty && model.favorites.isEmpty {
+                    if !hasContent {
                         emptyState
                     }
                 }
@@ -43,10 +53,11 @@ struct HomeView: View {
     private var greeting: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(Self.greeting(for: .now))
-                .font(.largeTitle.bold())
+                .font(Theme.screenTitle)
+                .foregroundStyle(Theme.primaryText)
             Text("Pick up where you left off.")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Theme.secondaryText)
         }
         .padding(.top, 8)
     }
@@ -63,35 +74,59 @@ struct HomeView: View {
         }
     }
 
-    private var recentsSection: some View {
+    private var quickAccessGrid: some View {
+        LazyVGrid(
+            columns: [
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8),
+            ],
+            spacing: 8
+        ) {
+            ForEach(quickAccess) { track in
+                Button {
+                    Task { await model.play(track, in: quickAccess) }
+                } label: {
+                    HStack(spacing: 8) {
+                        TrackArtwork(
+                            track: track,
+                            localURL: model.artworkURL(for: track),
+                            cornerRadius: Theme.tileRadius
+                        )
+                        .frame(width: 48, height: 48)
+
+                        Text(track.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Theme.primaryText)
+                            .lineLimit(2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(6)
+                    .background(
+                        Theme.surface,
+                        in: RoundedRectangle(cornerRadius: Theme.tileRadius, style: .continuous)
+                    )
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(track.title) by \(track.displayArtist)")
+                .accessibilityHint("Plays this track")
+            }
+        }
+    }
+
+    private var listenAgainSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("Recently played")
+            ShelfHeader(title: "Listen again")
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(model.recents) { track in
-                        Button {
+                HStack(alignment: .top, spacing: 12) {
+                    ForEach(model.recents.prefix(10)) { track in
+                        ArtworkTile(
+                            track: track,
+                            localArtworkURL: model.artworkURL(for: track),
+                            width: 132
+                        ) {
                             Task { await model.play(track, in: model.recents) }
-                        } label: {
-                            VStack(alignment: .leading, spacing: 6) {
-                                TrackArtwork(
-                                    track: track,
-                                    localURL: model.artworkURL(for: track),
-                                    cornerRadius: 10
-                                )
-                                .frame(width: 132, height: 132)
-                                Text(track.title)
-                                    .font(.caption.weight(.medium))
-                                    .lineLimit(1)
-                                Text(track.displayArtist)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(1)
-                            }
-                            .frame(width: 132, alignment: .leading)
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("\(track.title) by \(track.displayArtist)")
-                        .accessibilityHint("Plays this track")
                     }
                 }
                 .padding(.vertical, 2)
@@ -101,11 +136,8 @@ struct HomeView: View {
 
     private var favoritesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                sectionHeader("Favorites")
-                Spacer()
-                Button("See all") { onOpenLibrary() }
-                    .font(.caption)
+            ShelfHeader(title: "Your favorites", actionTitle: "See all") {
+                onOpenLibrary()
             }
             VStack(spacing: 0) {
                 ForEach(model.favorites.prefix(5)) { track in
@@ -137,11 +169,6 @@ struct HomeView: View {
                 .buttonStyle(.borderedProminent)
         }
         .padding(.top, 40)
-    }
-
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.title3.weight(.semibold))
     }
 
     private static func greeting(for date: Date) -> String {

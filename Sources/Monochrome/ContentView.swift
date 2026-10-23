@@ -19,7 +19,6 @@ struct ContentView: View {
         TabView(selection: $tab) {
             HomeView(
                 model: model,
-                onOpenPlayer: { isShowingPlayer = true },
                 onOpenSearch: { tab = .search },
                 onOpenLibrary: { tab = .library },
                 onOpenSettings: { isShowingSettings = true }
