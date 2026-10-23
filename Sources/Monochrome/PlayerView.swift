@@ -8,6 +8,7 @@ struct PlayerView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var isShowingQueue = false
     @State private var tint = Color(ArtworkTintColor.neutral)
@@ -16,6 +17,7 @@ struct PlayerView: View {
 
     var body: some View {
         ZStack {
+            Theme.background.ignoresSafeArea()
             background
 
             VStack(spacing: 0) {
@@ -55,12 +57,15 @@ struct PlayerView: View {
 
     private var background: some View {
         LinearGradient(
-            colors: [tint, Theme.background],
+            colors: [
+                colorScheme == .light ? tint.opacity(0.28) : tint,
+                Theme.background
+            ],
             startPoint: .top,
             endPoint: .center
         )
         .ignoresSafeArea()
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.45), value: tint)
+        .animation(reduceMotion ? nil : Theme.standard, value: tint)
     }
 
     private var topBar: some View {
@@ -70,7 +75,8 @@ struct PlayerView: View {
             } label: {
                 Image(systemName: "chevron.down")
                     .font(.headline)
-                    .frame(width: 44, height: 44)
+                    .foregroundStyle(Theme.primaryText)
+                    .frame(width: Theme.controlSize, height: Theme.controlSize)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -78,10 +84,13 @@ struct PlayerView: View {
 
             Spacer(minLength: 0)
 
-            Text(sourceCaption)
-                .font(.caption)
-                .foregroundStyle(Theme.secondaryText)
-                .lineLimit(1)
+            HStack(spacing: 6) {
+                Rectangle()
+                    .fill(Theme.accent)
+                    .frame(width: 4, height: 4)
+                    .accessibilityHidden(true)
+                TechnicalLabel(text: sourceCaption)
+            }
 
             Spacer(minLength: 0)
 
@@ -91,12 +100,13 @@ struct PlayerView: View {
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.headline)
-                        .frame(width: 44, height: 44)
+                        .foregroundStyle(Theme.primaryText)
+                        .frame(width: Theme.controlSize, height: Theme.controlSize)
                         .contentShape(Rectangle())
                 }
                 .accessibilityLabel("More actions")
             } else {
-                Color.clear.frame(width: 44, height: 44)
+                Color.clear.frame(width: Theme.controlSize, height: Theme.controlSize)
             }
         }
         .padding(.horizontal, Theme.screenPadding)
@@ -117,6 +127,10 @@ struct PlayerView: View {
         )
         .frame(maxWidth: 360)
         .frame(maxWidth: .infinity)
+        .overlay {
+            RoundedRectangle(cornerRadius: Theme.albumRadius, style: .continuous)
+                .stroke(Theme.border, lineWidth: Theme.hairline)
+        }
         .shadow(color: .black.opacity(0.35), radius: 24, y: 12)
         .scaleEffect(player.isPlaying || reduceMotion ? 1 : 0.96)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.35), value: player.isPlaying)
@@ -127,9 +141,10 @@ struct PlayerView: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(player.currentTrack?.title ?? "Nothing playing")
-                    .font(.title.bold())
+                    .font(Theme.heroTitle)
                     .foregroundStyle(Theme.primaryText)
                     .lineLimit(2)
+                    .accessibilityAddTraits(.isHeader)
                 Text(player.currentTrack?.displayArtist ?? "")
                     .font(.subheadline)
                     .foregroundStyle(Theme.secondaryText)
@@ -143,8 +158,8 @@ struct PlayerView: View {
                 } label: {
                     Image(systemName: model.isFavorite(track) ? "heart.fill" : "heart")
                         .font(.title3)
-                        .foregroundStyle(Theme.primaryText)
-                        .frame(width: 44, height: 44)
+                        .foregroundStyle(model.isFavorite(track) ? Theme.accent : Theme.primaryText)
+                        .frame(width: Theme.controlSize, height: Theme.controlSize)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -154,7 +169,7 @@ struct PlayerView: View {
     }
 
     private func errorBlock(_ message: String) -> some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             Text(message)
                 .font(.footnote)
                 .foregroundStyle(Theme.secondaryText)
@@ -164,6 +179,13 @@ struct PlayerView: View {
                 Task { await player.retry() }
             }
             .glassControlStyle()
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
+                .stroke(Theme.border, lineWidth: Theme.hairline)
         }
     }
 
@@ -207,7 +229,7 @@ struct PlayerView: View {
             .frame(maxWidth: .infinity)
 
             Color.clear
-                .frame(width: 44, height: 44)
+                .frame(width: Theme.controlSize, height: Theme.controlSize)
                 .frame(maxWidth: .infinity)
         }
     }
@@ -218,8 +240,8 @@ struct PlayerView: View {
         } label: {
             Image(systemName: player.repeatMode.symbolName)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(player.repeatMode == .off ? Theme.secondaryText : Theme.primaryText)
-                .frame(width: 44, height: 44)
+                .foregroundStyle(player.repeatMode == .off ? Theme.secondaryText : Theme.accent)
+                .frame(width: Theme.controlSize, height: Theme.controlSize)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -227,55 +249,62 @@ struct PlayerView: View {
     }
 
     private var bottomRow: some View {
-        HStack(spacing: 12) {
-            if !player.queue.isEmpty {
-                Button {
-                    isShowingQueue = true
-                } label: {
-                    if dynamicTypeSize.isAccessibilitySize {
-                        Image(systemName: "list.bullet")
-                            .font(.caption.weight(.semibold))
+        VStack(spacing: 10) {
+            Rectangle()
+                .fill(Theme.separator)
+                .frame(height: Theme.hairline)
+                .accessibilityHidden(true)
+
+            HStack(spacing: 12) {
+                if !player.queue.isEmpty {
+                    Button {
+                        isShowingQueue = true
+                    } label: {
+                        if dynamicTypeSize.isAccessibilitySize {
+                            Image(systemName: "list.bullet")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Theme.secondaryText)
+                                .frame(width: Theme.controlSize, height: Theme.controlSize)
+                        } else {
+                            HStack(spacing: 6) {
+                                Image(systemName: "list.bullet")
+                                    .font(.caption.weight(.semibold))
+                                TechnicalLabel(text: "Queue")
+                            }
                             .foregroundStyle(Theme.secondaryText)
-                            .frame(width: 44, height: 44)
-                    } else {
-                        Label("Queue", systemImage: "list.bullet")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(Theme.secondaryText)
+                        }
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open queue")
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Open queue")
-            }
 
-            if let badge = AudioBadge.text(
-                format: player.format,
-                quality: player.currentTrack?.audioQuality
-            ) {
-                QualityBadgeLabel(
-                    text: badge,
-                    spokenText: AudioBadge.accessibilityLabel(
-                        format: player.format,
-                        quality: player.currentTrack?.audioQuality
+                if let badge = AudioBadge.text(
+                    format: player.format,
+                    quality: player.currentTrack?.audioQuality
+                ) {
+                    QualityBadgeLabel(
+                        text: badge,
+                        spokenText: AudioBadge.accessibilityLabel(
+                            format: player.format,
+                            quality: player.currentTrack?.audioQuality
+                        )
                     )
-                )
+                }
+
+                if player.isCurrentFromCache {
+                    QualityBadgeLabel(
+                        text: "Cached",
+                        spokenText: "Playing from the local cache"
+                    )
+                }
+
+                Spacer(minLength: 8)
+
+                #if canImport(AVKit)
+                AirPlayRoutePicker()
+                    .frame(width: Theme.controlSize, height: Theme.controlSize)
+                #endif
             }
-
-            if player.isCurrentFromCache {
-                Text("Cached")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(Theme.secondaryText)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 4))
-                    .accessibilityLabel("Playing from the local cache")
-            }
-
-            Spacer(minLength: 8)
-
-            #if canImport(AVKit)
-            AirPlayRoutePicker()
-                .frame(width: 44, height: 44)
-            #endif
         }
         .padding(.top, 4)
     }

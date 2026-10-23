@@ -91,6 +91,7 @@ enum Theme {
     // MARK: Type
 
     static let screenTitle = Font.system(.largeTitle, design: .default, weight: .bold)
+    static let heroTitle = Font.system(.title, design: .default, weight: .bold)
     static let sectionTitle = Font.system(.title3, design: .default, weight: .semibold)
     static let title = Font.system(.title2, design: .default, weight: .bold)
     static let rowTitle = Font.system(.subheadline, design: .default, weight: .semibold)

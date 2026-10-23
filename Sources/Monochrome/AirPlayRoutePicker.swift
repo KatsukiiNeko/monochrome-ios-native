@@ -6,8 +6,8 @@ import SwiftUI
 struct AirPlayRoutePicker: UIViewRepresentable {
     func makeUIView(context: Context) -> AVRoutePickerView {
         let view = AVRoutePickerView()
-        view.tintColor = .white
-        view.activeTintColor = .white
+        view.tintColor = .label
+        view.activeTintColor = .label
         view.prioritizesVideoDevices = false
         view.accessibilityLabel = "AirPlay"
         return view
