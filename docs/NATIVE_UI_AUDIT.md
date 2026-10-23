@@ -116,7 +116,7 @@ changes are now on `development`:
 | Theme | `ThemePalette` light/dark tokens, WCAG contrast tests, 20 pt cards, 56 pt rows, 16 pt screen padding, 24 pt sections | L1 + host tests |
 | Now Playing | core snapshot and remote-command routing, download/cache source badges | L1 + host tests |
 
-Host tests: 198 tests in 26 suites passed at the last recorded run. The iOS
+Host tests: 199 tests in 26 suites passed at the last recorded run. The iOS
 arm64 build-only check passed after every commit. No device is attached, so no
 screen reached L4 or Human verification.
 
