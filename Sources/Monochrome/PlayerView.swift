@@ -47,6 +47,7 @@ struct PlayerView: View {
             tint = Color(await model.artworkTint(for: player.currentTrack))
         }
         .sensoryFeedback(.selection, trigger: player.isPlaying)
+        .preferredColorScheme(model.appearanceMode.colorScheme)
         .sheet(isPresented: $isShowingQueue) {
             QueueView(model: model)
                 .presentationDetents([.medium, .large])

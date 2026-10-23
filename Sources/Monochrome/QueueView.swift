@@ -106,6 +106,7 @@ struct QueueView: View {
                         .foregroundStyle(Theme.primaryText)
                 }
             }
+            .preferredColorScheme(model.appearanceMode.colorScheme)
         }
     }
 

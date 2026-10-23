@@ -46,11 +46,14 @@ struct ContentView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.hidden)
                 .presentationBackground(Theme.background)
+                .preferredColorScheme(model.appearanceMode.colorScheme)
         }
         .sheet(isPresented: $isShowingSettings) {
             NavigationStack {
                 SettingsView(model: model)
             }
+            .presentationBackground(Theme.background)
+            .preferredColorScheme(model.appearanceMode.colorScheme)
         }
         .alert(
             "Something went wrong",

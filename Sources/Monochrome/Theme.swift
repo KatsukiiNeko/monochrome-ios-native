@@ -22,6 +22,16 @@ enum Theme {
         light: .white,
         dark: UIColor(white: 0.12, alpha: 1)
     )
+    /// Recessed control surface, used for fields and selected segments.
+    static let sunken = adaptive(
+        light: UIColor(white: 0.90, alpha: 1),
+        dark: UIColor(white: 0.045, alpha: 1)
+    )
+    /// Low-intensity red wash for a selected control; never a page background.
+    static let accentSurface = adaptive(
+        light: UIColor(red: 0.69, green: 0.00, blue: 0.06, alpha: 0.10),
+        dark: UIColor(red: 0.88, green: 0.10, blue: 0.14, alpha: 0.18)
+    )
     /// Thin rules and card outlines.
     static let border = adaptive(
         light: UIColor.black.withAlphaComponent(0.12),
@@ -67,6 +77,9 @@ enum Theme {
     static let screenPadding: CGFloat = 20
     static let rowSpacing: CGFloat = 12
     static let hairline: CGFloat = 1
+    static let cardPadding: CGFloat = 14
+    static let rowMinHeight: CGFloat = 52
+    static let iconSize: CGFloat = 32
 
     // MARK: Radii
 
