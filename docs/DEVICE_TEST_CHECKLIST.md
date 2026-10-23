@@ -1,6 +1,6 @@
 # Device test checklist
 
-Build under test: `dev`, installed with `xtool dev` on the connected iPhone.
+Build under test: `development`, installed with `xtool dev` on the connected iPhone.
 Playback and the visual result can only be confirmed by a person, so tick each
 item by hand.
 
