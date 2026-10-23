@@ -49,7 +49,6 @@ enum Theme {
         dark: UIColor(red: 0.88, green: 0.10, blue: 0.14, alpha: 1)
     )
     static let onAccent = Color.white
-    static let accentMuted = accent.opacity(0.18)
     static let destructive = accent
 
     /// High-contrast transport surface, independent of the red state accent.
@@ -64,8 +63,6 @@ enum Theme {
 
     // MARK: Spacing
 
-    static let spacing: CGFloat = 16
-    static let tight: CGFloat = 8
     static let sectionSpacing: CGFloat = 28
     static let screenPadding: CGFloat = 20
     static let rowSpacing: CGFloat = 12
@@ -84,8 +81,6 @@ enum Theme {
 
     static let controlSize: CGFloat = 44
     static let miniArtworkSize: CGFloat = 42
-    static let miniPlayerHeight: CGFloat = 64
-    static let iconSize: CGFloat = 18
     static let sectionMarker: CGFloat = 5
 
     // MARK: Type
@@ -93,7 +88,6 @@ enum Theme {
     static let screenTitle = Font.system(.largeTitle, design: .default, weight: .bold)
     static let heroTitle = Font.system(.title, design: .default, weight: .bold)
     static let sectionTitle = Font.system(.title3, design: .default, weight: .semibold)
-    static let title = Font.system(.title2, design: .default, weight: .bold)
     static let rowTitle = Font.system(.subheadline, design: .default, weight: .semibold)
     static let rowSubtitle = Font.system(.caption, design: .default)
     static let caption = Font.system(.caption, design: .default)
