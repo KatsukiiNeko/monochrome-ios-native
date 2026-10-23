@@ -33,6 +33,20 @@ struct LibraryView: View {
                     .padding(.bottom, 8)
 
                 List {
+                    if filter == .downloaded, !model.completedDownloads.isEmpty {
+                        NavigationLink {
+                            DownloadsView(model: model)
+                        } label: {
+                            LabeledContent(
+                                "Manage Downloads",
+                                value: model.completedDownloads.count == 1
+                                    ? "1 song"
+                                    : "\(model.completedDownloads.count) songs"
+                            )
+                            .font(Theme.rowTitle)
+                        }
+                    }
+
                     ForEach(rows) { track in
                         Button {
                             Task { await model.play(track, in: rows) }

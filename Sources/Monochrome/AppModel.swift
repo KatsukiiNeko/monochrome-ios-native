@@ -18,14 +18,17 @@ final class AppModel {
     let cache: AudioCache
     let downloadStore: DownloadStore
     private(set) var streamingHost: String
+    /// The catalog is usable: enabled and pointed at a valid host.
     private(set) var isStreamingConfigured: Bool
+    private(set) var isMonochromeEnabled: Bool
+    private(set) var streamingSettingsError: String?
     private(set) var appearanceMode: AppearanceMode
     private(set) var cacheSizeBytes = 0
     private(set) var cacheEntryCount = 0
     private(set) var cachedTracks: [CachedTrackSummary] = []
     private(set) var downloads: [DownloadItem] = []
-    var allowsCellularCaching: Bool { cacheSettings.allowsCellular }
-    var clearTemporaryCacheOnLaunch: Bool { cacheSettings.clearOnLaunch }
+    private(set) var downloadsMetadataError: String?
+    private(set) var isRefreshingDownloads = false
 
     private let service: LocalFileService
     private let favoritesStore: FavoritesStore
@@ -107,6 +110,7 @@ final class AppModel {
         self.appearanceMode = appearanceSettings.mode
         self.streamingHost = settings.rawValue
         self.isStreamingConfigured = settings.baseURL != nil
+        self.isMonochromeEnabled = settings.isEnabled
         self.mediaDirectory = media
         self.favoritesStore = FavoritesStore(fileURL: base.appendingPathComponent("favorites.json"))
         self.historyStore = HistoryStore(fileURL: base.appendingPathComponent("history.json"))
@@ -140,27 +144,49 @@ final class AppModel {
     private func applyStreamingSettings() {
         let baseURL = streamingSettings.baseURL
         isStreamingConfigured = baseURL != nil
+        isMonochromeEnabled = streamingSettings.isEnabled
         let client = baseURL.map { TracksAPIClient(baseURL: $0) }
         streamingClient = client
         Task { await resolver.useStreamingClient(client) }
     }
 
+    var hasCustomStreamingEndpoint: Bool {
+        streamingSettings.hasCustomEndpoint
+    }
+
+    /// Disabling removes the client immediately, so search, playback resolution
+    /// and download resolution all fail until the catalog is enabled again.
+    func setMonochromeEnabled(_ enabled: Bool) {
+        streamingSettings.setEnabled(enabled)
+        applyStreamingSettings()
+        streamingSettingsError = streamingSettings.isEnabled == enabled
+            ? nil
+            : "The streaming preference could not be saved."
+        if !enabled, player.currentTrack?.isStreaming == true, player.isPlaying {
+            // The resolved stream keeps fetching while it plays, so pause remote
+            // playback when the catalog is switched off. The queue is preserved.
+            Task { await player.togglePlayPause() }
+        }
+    }
+
     func saveStreamingHost(_ raw: String) -> Bool {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        // Empty input is a deliberate "streaming off", not an invalid host.
-        if !trimmed.isEmpty, StreamingSettings.baseURL(from: trimmed) == nil {
-            return false
-        }
+        guard StreamingSettings.baseURL(from: trimmed) != nil else { return false }
         streamingSettings.setBaseURL(trimmed)
         streamingHost = streamingSettings.rawValue
         applyStreamingSettings()
+        streamingSettingsError = nil
         return true
     }
 
-    func resetStreamingHost() {
+    /// Restores only the endpoint. Appearance, cache, downloads and history are untouched.
+    func resetStreamingEndpoint() {
         streamingSettings.reset()
         streamingHost = streamingSettings.rawValue
         applyStreamingSettings()
+        streamingSettingsError = streamingSettings.configuredBaseURL == StreamingSettings.defaultBaseURL
+            ? nil
+            : "The endpoint could not be reset."
     }
 
     func searchTracks(_ query: String) async throws -> [Track] {
@@ -223,6 +249,7 @@ final class AppModel {
             await downloadStore.reconcile()
             didReconcileDownloads = true
         }
+        downloadsMetadataError = await downloadStore.metadataError()
         do {
             tracks = try await service.allTracks()
         } catch {
@@ -330,14 +357,6 @@ final class AppModel {
         await refreshCacheSize()
     }
 
-    func setAllowsCellularCaching(_ allowed: Bool) {
-        cacheSettings.setAllowsCellular(allowed)
-    }
-
-    func setClearTemporaryCacheOnLaunch(_ clear: Bool) {
-        cacheSettings.setClearOnLaunch(clear)
-    }
-
     // MARK: - Permanent downloads
 
     var completedDownloads: [DownloadItem] {
@@ -359,6 +378,10 @@ final class AppModel {
     func startDownload(_ track: Track) {
         guard track.source.supportsDownloads else {
             errorMessage = track.source.downloadUnavailableReason
+            return
+        }
+        guard !track.isStreaming || isStreamingConfigured else {
+            errorMessage = "Enable Monochrome in Settings to download catalog tracks."
             return
         }
         Task { await performDownload(track) }
@@ -392,15 +415,21 @@ final class AppModel {
     }
 
     func refreshDownloads() async {
+        isRefreshingDownloads = true
         downloads = await downloadStore.items()
+        downloadsMetadataError = await downloadStore.metadataError()
+        isRefreshingDownloads = false
     }
 
-    func removeDownload(_ item: DownloadItem) async {
+    @discardableResult
+    func removeDownload(_ item: DownloadItem) async -> Bool {
         do {
             try await downloadStore.remove(id: item.id)
             await refreshDownloads()
+            return true
         } catch {
             errorMessage = error.localizedDescription
+            return false
         }
     }
 
