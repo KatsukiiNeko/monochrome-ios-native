@@ -391,6 +391,24 @@ struct AudioCacheTests {
         try? FileManager.default.removeItem(at: directory)
     }
 
+    @Test func playingSixInOrderEvictsTheFirstAndKeepsTwoThroughSix() async throws {
+        let directory = temporaryDirectory()
+        let cache = makeCache(directory: directory, downloader: FakeDownloader())
+        let tracks = (1...6).map { streamTrack(String($0)) }
+
+        for track in tracks {
+            await store(cache, track)
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(await cache.entryCount() == 5)
+        #expect(await cache.cachedAudio(for: tracks[0], quality: .lossless) == nil)
+        for track in tracks[1...] {
+            #expect(await cache.cachedAudio(for: track, quality: .lossless) != nil)
+        }
+        try? FileManager.default.removeItem(at: directory)
+    }
+
     @Test func reconcileRemovesInterruptedAndOrphanedFiles() async throws {
         let directory = temporaryDirectory()
         let cache = makeCache(directory: directory, downloader: FakeDownloader())
