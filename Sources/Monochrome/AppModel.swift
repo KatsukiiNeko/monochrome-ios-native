@@ -37,6 +37,8 @@ final class AppModel {
     private let audioSession: AudioSessionController
     private let nowPlaying: NowPlayingController
     private let artworkTints = ArtworkTintStore()
+    /// Cache cleanup is launch-only; import/delete reloads must not touch a download.
+    private var didReconcileCache = false
 
     init() {
         let base = FileManager.default
@@ -50,6 +52,8 @@ final class AppModel {
         )
         let resolver = DefaultTrackResolver(localDirectory: media)
         let cacheSettings = AudioCacheSettings()
+        // Temporary cache only. Permanent user files live in Application Support
+        // and must never be moved under this directory.
         let cacheDirectory = FileManager.default
             .urls(for: .cachesDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("AudioCache", isDirectory: true)
@@ -179,6 +183,11 @@ final class AppModel {
     }
 
     func loadTracks() async {
+        // Launch is the safe boundary for interrupted-write and orphan cleanup.
+        if !didReconcileCache {
+            await cache.reconcile()
+            didReconcileCache = true
+        }
         do {
             tracks = try await service.allTracks()
         } catch {
@@ -188,6 +197,7 @@ final class AppModel {
         favorites = loadFavorites()
         recents = (try? historyStore.load()) ?? []
         searchRecents = (try? searchHistoryStore.load()) ?? []
+        await refreshCacheSize()
     }
 
     private func loadFavorites() -> [Track] {

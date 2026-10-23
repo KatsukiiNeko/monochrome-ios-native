@@ -170,10 +170,13 @@ public enum CacheEligibility {
 
 /// LRU cache of complete audio files with a sidecar per entry.
 public actor AudioCache: AudioCaching {
+    /// Temporary cache is deliberately small: five complete tracks, LRU.
+    public static let defaultEntryLimit = 5
     public static let defaultSizeLimitBytes = 500 * 1024 * 1024
     public static let minimumFreeSpaceBytes = 200 * 1024 * 1024
 
     private let directory: URL
+    private let entryLimit: Int
     private let sizeLimitBytes: Int
     private let minimumFreeSpaceBytes: Int
     private let downloader: any FileDownloader
@@ -198,6 +201,7 @@ public actor AudioCache: AudioCaching {
     public init(
         directory: URL,
         downloader: any FileDownloader,
+        entryLimit: Int = AudioCache.defaultEntryLimit,
         sizeLimitBytes: Int = AudioCache.defaultSizeLimitBytes,
         minimumFreeSpaceBytes: Int = AudioCache.minimumFreeSpaceBytes,
         allowsExpensiveNetwork: @escaping @Sendable () -> Bool = { false },
@@ -205,6 +209,7 @@ public actor AudioCache: AudioCaching {
     ) {
         self.directory = directory
         self.downloader = downloader
+        self.entryLimit = max(1, entryLimit)
         self.sizeLimitBytes = sizeLimitBytes
         self.minimumFreeSpaceBytes = minimumFreeSpaceBytes
         self.allowsExpensiveNetwork = allowsExpensiveNetwork
@@ -392,7 +397,19 @@ public actor AudioCache: AudioCaching {
                 lastUsedAt: entry.lastUsedAt
             )
         }
-        .sorted { $0.lastUsedAt > $1.lastUsedAt }
+        .sorted {
+            if $0.lastUsedAt != $1.lastUsedAt { return $0.lastUsedAt > $1.lastUsedAt }
+            if $0.trackID != $1.trackID { return $0.trackID < $1.trackID }
+            return $0.quality < $1.quality
+        }
+    }
+
+    /// Safe launch boundary: drop interrupted writes, orphaned sidecars/files and
+    /// any entries beyond the current policy. Never touches a permanent download.
+    public func reconcile() {
+        Self.removePartials(in: directory)
+        Self.removeOrphans(in: directory)
+        evictIfNeeded()
     }
 
     public func cancelDownload(for track: Track, quality: AudioQuality?, reason: String) async {
@@ -507,9 +524,22 @@ public actor AudioCache: AudioCaching {
     }
 
     private func evictIfNeeded() {
-        var entries = Self.entries(in: directory).sorted { $0.lastUsedAt < $1.lastUsedAt }
+        // Deterministic LRU: oldest use first, then stable identity for equal dates.
+        // Only complete entries count; a corrupt sidecar must not evict a good file.
+        var entries = Self.entries(in: directory)
+            .filter { entry in
+                guard let size = Self.fileSize(directory.appendingPathComponent(entry.fileName)),
+                      size == entry.byteSize,
+                      size > 0 else { return false }
+                return true
+            }
+            .sorted {
+                if $0.lastUsedAt != $1.lastUsedAt { return $0.lastUsedAt < $1.lastUsedAt }
+                if $0.trackID != $1.trackID { return $0.trackID < $1.trackID }
+                return $0.quality < $1.quality
+            }
         var total = entries.reduce(0) { $0 + $1.byteSize }
-        while total > sizeLimitBytes, !entries.isEmpty {
+        while !entries.isEmpty, entries.count > entryLimit || total > sizeLimitBytes {
             let oldest = entries.removeFirst()
             try? FileManager.default.removeItem(at: directory.appendingPathComponent(oldest.fileName))
             let name = Self.storageBaseName(trackID: oldest.trackID, qualityName: oldest.quality)
@@ -585,6 +615,32 @@ public actor AudioCache: AudioCaching {
         let urls = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
         for url in urls where url.pathExtension == "partial" {
             try? FileManager.default.removeItem(at: url)
+        }
+    }
+
+    /// Removes sidecars without a complete file and files without a valid sidecar.
+    private static func removeOrphans(in directory: URL) {
+        let urls = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        var referenced = Set<String>()
+
+        for sidecar in urls where sidecar.pathExtension == "json" {
+            let name = sidecar.deletingPathExtension().lastPathComponent
+            guard let entry = readEntry(named: name, in: directory),
+                  let size = fileSize(directory.appendingPathComponent(entry.fileName)),
+                  size == entry.byteSize,
+                  size > 0 else {
+                try? FileManager.default.removeItem(at: sidecar)
+                continue
+            }
+            referenced.insert(entry.fileName)
+        }
+
+        for url in urls where url.pathExtension != "json" {
+            if url.pathExtension == "partial" {
+                try? FileManager.default.removeItem(at: url)
+            } else if !referenced.contains(url.lastPathComponent) {
+                try? FileManager.default.removeItem(at: url)
+            }
         }
     }
 }
