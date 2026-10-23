@@ -48,14 +48,14 @@ Monochrome downloads are available because the upstream web client downloads the
 
 ## Verification
 
-The maintainer completed the physical-device test checklist for the earlier UI pass and reports successful results. The current downloads, five-song cache, settings and Now Playing changes were compiled and host-tested, but not installed or run on a device.
+The maintainer completed the physical-device test checklist and reports successful results for the 0.2.0 release, including the downloads, five-song cache, settings and Now Playing changes, on an iPhone 12 Pro Max.
 
 | Level | Meaning | Status |
 |---|---|---|
 | **L1 — Compile** | Swift sources compile for the target platform. | Passed |
 | **L2 — Unit tests** | Portable core behavior is tested on Linux. | Passed: 212 tests across 26 suites at the last recorded run. |
 | **L3 — Live service** | Catalog search and stream resolution are checked against the live catalog. | Passed in the recorded live-service checks; the opt-in live test is not run by default. |
-| **L4 — Physical device** | Playback and iOS-specific behavior are checked on a real iPhone. | Passed for the earlier UI pass; the current settings/cache/Now Playing changes are not device-validated. |
+| **L4 — Physical device** | Playback and iOS-specific behavior are checked on a real iPhone. | Passed: the 0.2.0 release was verified on an iPhone 12 Pro Max. |
 
 CI runs the portable `swift test` suite. It does **not** run the live catalog test, build/sign an IPA, or install the app on a device. The iOS cross-compile check remains a separate local step because this workflow does not provision Apple's Darwin SDK.
 

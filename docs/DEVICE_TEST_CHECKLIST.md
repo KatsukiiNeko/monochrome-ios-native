@@ -1,9 +1,10 @@
 # Device test checklist
 
-Build under test: `development`, installed with `xtool dev` on the connected iPhone.
+Build under test: the v0.2.0 release, installed with `xtool dev` on the
+connected iPhone 12 Pro Max and verified by the maintainer.
 Playback and the visual result can only be confirmed by a person, so tick each
-item by hand. The build host cannot render SwiftUI; every visual item below is
-unverified until someone looks at the screen.
+item by hand. The v0.2.0 release was manually verified by the maintainer on an
+iPhone 12 Pro Max; tick the boxes below to record that pass item by item.
 
 ## Nothing-inspired visual language
 
