@@ -60,7 +60,15 @@ public final class PlayerController {
         self.now = now
         engine.onEvent = { [weak self] event in
             guard let self else { return }
-            Task { await self.handle(event) }
+            if case .ready(let duration, let format) = event {
+                // Handle ready on the spot: a deferred handler can consume the next
+                // track's pending cache after a quick skip.
+                MainActor.assumeIsolated {
+                    self.handleReady(duration: duration, format: format)
+                }
+            } else {
+                Task { await self.handle(event) }
+            }
         }
     }
 
@@ -162,11 +170,7 @@ public final class PlayerController {
     func handle(_ event: PlaybackEvent) async {
         switch event {
         case .ready(let engineDuration, let engineFormat):
-            if let engineFormat { format = engineFormat }
-            if let engineDuration, engineDuration > 0 {
-                duration = engineDuration
-            }
-            startCacheStoreIfReady(format: engineFormat, duration: engineDuration ?? duration)
+            handleReady(duration: engineDuration, format: engineFormat)
         case .position(let seconds):
             position = seconds
         case .finished:
@@ -183,6 +187,14 @@ public final class PlayerController {
     }
 
     // MARK: - Internals
+
+    private func handleReady(duration engineDuration: Double?, format engineFormat: AudioFormat?) {
+        if let engineFormat { format = engineFormat }
+        if let engineDuration, engineDuration > 0 {
+            duration = engineDuration
+        }
+        startCacheStoreIfReady(format: engineFormat, duration: engineDuration ?? duration)
+    }
 
     private func startCacheStoreIfReady(format: AudioFormat?, duration: Double) {
         guard let cache, let pending = pendingCache else { return }

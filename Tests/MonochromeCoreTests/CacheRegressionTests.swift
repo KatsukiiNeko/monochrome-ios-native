@@ -193,7 +193,7 @@ struct AudioCacheRegressionTests {
         try? FileManager.default.removeItem(at: directory)
     }
 
-    @Test func aThirdDownloadWaitsAtMostOneBehindTheActiveOne() async {
+    @Test func twoDownloadsStartWithoutWaitingForTheFirst() async {
         let directory = makeDirectory()
         let downloader = GateDownloader()
         let cache = AudioCache(directory: directory, downloader: downloader, minimumFreeSpaceBytes: 0)
@@ -201,21 +201,41 @@ struct AudioCacheRegressionTests {
         let first = Task { await store(cache, streamTrack("1")) }
         #expect(await downloader.waitForCalls(1))
         let second = Task { await store(cache, streamTrack("2")) }
+        #expect(await downloader.waitForCalls(2))
+
+        await downloader.release()
+        await first.value
+        await second.value
+
+        #expect(await cache.cachedAudio(for: streamTrack("1"), quality: .lossless) != nil)
+        #expect(await cache.cachedAudio(for: streamTrack("2"), quality: .lossless) != nil)
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    @Test func aThirdDownloadWaitsForOneOfTwoSlots() async {
+        let directory = makeDirectory()
+        let downloader = GateDownloader()
+        let cache = AudioCache(directory: directory, downloader: downloader, minimumFreeSpaceBytes: 0)
+
+        let first = Task { await store(cache, streamTrack("1")) }
+        #expect(await downloader.waitForCalls(1))
+        let second = Task { await store(cache, streamTrack("2")) }
+        #expect(await downloader.waitForCalls(2))
         let third = Task { await store(cache, streamTrack("3")) }
         try? await Task.sleep(for: .milliseconds(100))
         let callsBeforeRelease = await downloader.calls
-        #expect(callsBeforeRelease == 1)
+        #expect(callsBeforeRelease == 2)
 
         await downloader.release()
-        #expect(await downloader.waitForCalls(2))
+        #expect(await downloader.waitForCalls(3))
         await downloader.release()
         await first.value
         await second.value
         await third.value
 
         let callsAfter = await downloader.calls
-        #expect(callsAfter == 2)
-        #expect(await cache.entryCount() == 2)
+        #expect(callsAfter == 3)
+        #expect(await cache.entryCount() == 3)
         try? FileManager.default.removeItem(at: directory)
     }
 

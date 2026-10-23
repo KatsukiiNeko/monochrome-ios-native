@@ -48,6 +48,8 @@ item by hand.
       Settings again: it shows 1 song.
 - [ ] Play a catalog track once and wait for it to start; after a few seconds,
       Settings shows a non-zero cached size.
+- [ ] Keep Settings open while a track finishes downloading: the song count and
+      size update without closing the sheet.
 - [ ] Play the same track again: Now Playing shows `Cached` beside the badge.
 - [ ] Turn repeat-one on and let the track end: the next pass starts
       immediately and still shows `Cached`.

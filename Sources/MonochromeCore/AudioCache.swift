@@ -146,11 +146,11 @@ public actor AudioCache: AudioCaching {
         let continuation: CheckedContinuation<Bool, Never>
     }
     private var inFlight: [String: InFlight] = [:]
-    /// One download at a time; a single waiter may queue behind it.
-    private var activeToken: UUID?
-    private var waiter: Waiter?
+    /// Two downloads may run at once so a new track is not stuck behind a long one.
+    private var activeTokens: Set<UUID> = []
+    private var waiters: [Waiter] = []
     private var cancelReasons: [String: String] = [:]
-    private static let maxWaitingDownloads = 1
+    private static let maxConcurrentDownloads = 2
 
     public init(
         directory: URL,
@@ -247,6 +247,10 @@ public actor AudioCache: AudioCaching {
         name: String,
         id: UUID
     ) async {
+        guard !Task.isCancelled else {
+            log("cache cancel key=\(name) reason=\(cancelReason(for: name))")
+            return
+        }
         guard let token = await acquireSlot(id: id, name: name) else { return }
         defer { releaseSlot(token: token) }
         guard !Task.isCancelled else {
@@ -325,10 +329,13 @@ public actor AudioCache: AudioCaching {
         cancelReasons[name] = reason
         if let entry = inFlight.removeValue(forKey: name) {
             entry.task.cancel()
+            if activeTokens.remove(entry.id) != nil {
+                admitWaiters()
+            }
             log("cache cancel key=\(name) reason=\(reason)")
         }
-        if let queued = waiter, queued.name == name {
-            waiter = nil
+        if let index = waiters.firstIndex(where: { $0.name == name }) {
+            let queued = waiters.remove(at: index)
             queued.continuation.resume(returning: false)
             log("cache cancel key=\(name) reason=\(reason)")
         }
@@ -343,11 +350,11 @@ public actor AudioCache: AudioCaching {
             cancelReasons[name] = "clear"
             entry.task.cancel()
         }
-        if let queued = waiter {
-            waiter = nil
+        for queued in waiters {
             queued.continuation.resume(returning: false)
         }
-        activeToken = nil
+        waiters.removeAll()
+        activeTokens.removeAll()
         try? FileManager.default.removeItem(at: directory)
         ensureDirectory()
         log("cache clear removed=\(entries.count) bytes=\(bytes)")
@@ -363,16 +370,17 @@ public actor AudioCache: AudioCaching {
     // MARK: - Download slot
 
     private func acquireSlot(id: UUID, name: String) async -> UUID? {
-        if activeToken == nil {
-            activeToken = id
-            return id
-        }
-        guard waiter == nil, Self.maxWaitingDownloads > 0 else {
-            log("cache skip key=\(name) reason=queue-full")
+        guard !Task.isCancelled else {
+            log("cache cancel key=\(name) reason=\(cancelReason(for: name))")
             return nil
         }
+        if activeTokens.count < Self.maxConcurrentDownloads {
+            activeTokens.insert(id)
+            return id
+        }
+        log("cache wait key=\(name) active=\(activeTokens.count) waiting=\(waiters.count)")
         let admitted = await withCheckedContinuation { continuation in
-            waiter = Waiter(id: id, name: name, continuation: continuation)
+            waiters.append(Waiter(id: id, name: name, continuation: continuation))
         }
         guard admitted else { return nil }
         guard !Task.isCancelled else {
@@ -384,14 +392,18 @@ public actor AudioCache: AudioCaching {
     }
 
     private func releaseSlot(token: UUID) {
-        guard activeToken == token else { return }
-        if let queued = waiter {
-            waiter = nil
-            activeToken = queued.id
-            queued.continuation.resume(returning: true)
-        } else {
-            activeToken = nil
+        guard activeTokens.remove(token) != nil else { return }
+        admitWaiters()
+        if activeTokens.isEmpty {
             log("cache slot released")
+        }
+    }
+
+    private func admitWaiters() {
+        while activeTokens.count < Self.maxConcurrentDownloads, !waiters.isEmpty {
+            let queued = waiters.removeFirst()
+            activeTokens.insert(queued.id)
+            queued.continuation.resume(returning: true)
         }
     }
 
