@@ -128,4 +128,23 @@ struct LyricsMatcherTests {
         let instrumental = candidate(synced: false, plain: false, instrumental: true)
         #expect(LyricsMatcher.bestMatch(for: query(), in: [instrumental])?.instrumental == true)
     }
+
+    @Test func aTrackBuildsAQueryOnlyWhenTitleAndArtistExist() {
+        let complete = Track(
+            id: "stream:42",
+            title: "  Synthetic Song  ",
+            artist: " Synthetic Artist ",
+            album: "  ",
+            durationSeconds: 200
+        )
+        let query = complete.lyricsQuery
+        #expect(query?.trackID == "stream:42")
+        #expect(query?.title == "Synthetic Song")
+        #expect(query?.artist == "Synthetic Artist")
+        #expect(query?.album == nil)
+        #expect(query?.duration == 200)
+
+        #expect(Track(title: "Title", artist: "").lyricsQuery == nil)
+        #expect(Track(title: "", artist: "Artist").lyricsQuery == nil)
+    }
 }

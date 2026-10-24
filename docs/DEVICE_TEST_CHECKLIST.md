@@ -127,6 +127,30 @@ item by hand.
 - [ ] VoiceOver reads each row as a sentence, for example "Sample rate, 44.1
       kilohertz", and the sheet works at the largest text size.
 
+## Lyrics
+
+- [ ] Open Now Playing for a track with a title and artist: the Lyrics control
+      is enabled. Open it; the sheet takes the large detent and shows a loading
+      placeholder before any text.
+- [ ] For a synced track, the active line is emphasized and follows playback;
+      the rest of the list stays dimmed.
+- [ ] Tap a line: playback seeks to that timestamp.
+- [ ] Scroll the lyrics by hand: auto-follow stops and a Follow button appears.
+      Tap Follow: the sheet returns to the active line and follow resumes.
+- [ ] With Reduce Motion on, following still moves the list but without an
+      animated scroll.
+- [ ] Open a track with only plain lyrics, an instrumental track, and a track
+      the provider does not know. Each state reads distinctly; not found and
+      error states offer Retry.
+- [ ] Enable airplane mode. A track opened before shows its cached lyrics; a
+      track that was never opened says lyrics are not available offline.
+- [ ] Try a Vietnamese track with diacritics; a wrong-language or wrong-version
+      match must not appear.
+- [ ] The footer names the source. No lyric text appears anywhere outside the
+      sheet.
+- [ ] Both appearances, the largest text size and VoiceOver line navigation are
+      usable.
+
 ## Now-playing bar
 
 - [ ] With a track loaded, the bar is visible on Home, Search and Library,

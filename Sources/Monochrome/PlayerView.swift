@@ -13,6 +13,7 @@ struct PlayerView: View {
     @Environment(\.accentColor) private var accent
     @State private var isShowingQueue = false
     @State private var isShowingAudioSpec = false
+    @State private var isShowingLyrics = false
     @State private var outputMonitor = AudioOutputMonitor()
     @State private var tint = Color(ArtworkTintColor.neutral)
     @State private var pendingDownloadRemoval: DownloadItem?
@@ -80,6 +81,12 @@ struct PlayerView: View {
         .sheet(isPresented: $isShowingAudioSpec) {
             AudioSpecView(spec: audioSpec, outputMonitor: outputMonitor)
                 .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.background)
+        }
+        .sheet(isPresented: $isShowingLyrics) {
+            LyricsView(model: model)
+                .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.background)
         }
@@ -347,6 +354,33 @@ struct PlayerView: View {
         .accessibilityLabel(player.repeatMode.label)
     }
 
+    private func lyricsControl(_ track: Track) -> some View {
+        let available = track.lyricsQuery != nil
+        return Button {
+            isShowingLyrics = true
+        } label: {
+            if dynamicTypeSize.isAccessibilitySize {
+                Image(systemName: "quote.bubble")
+                    .font(.caption.weight(.semibold))
+                    .frame(width: Theme.controlSize, height: Theme.controlSize)
+            } else {
+                HStack(spacing: 6) {
+                    Image(systemName: "quote.bubble")
+                        .font(.caption.weight(.semibold))
+                    TechnicalLabel(text: "Lyrics")
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(Theme.secondaryText)
+        .disabled(!available)
+        .opacity(available ? 1 : 0.4)
+        .accessibilityLabel("Lyrics")
+        .accessibilityHint(
+            available ? "Opens lyrics for this track" : "Lyrics need a track title and artist"
+        )
+    }
+
     private var bottomRow: some View {
         VStack(spacing: 10) {
             Rectangle()
@@ -384,6 +418,10 @@ struct PlayerView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Open queue")
+                }
+
+                if let track = player.currentTrack {
+                    lyricsControl(track)
                 }
 
                 if let badge = AudioBadge.text(

@@ -17,6 +17,7 @@ final class AppModel {
     let player: PlayerController
     let cache: AudioCache
     let downloadStore: DownloadStore
+    let lyricsService: LyricsService
     private(set) var streamingHost: String
     /// The catalog is usable: enabled and pointed at a valid host.
     private(set) var isStreamingConfigured: Bool
@@ -91,6 +92,17 @@ final class AppModel {
             downloads: downloadStore
         )
         player.log = { message in playerLog.notice("\(message, privacy: .public)") }
+        let lyricsDirectory = cacheDirectory
+            .deletingLastPathComponent()
+            .appendingPathComponent("Lyrics", isDirectory: true)
+        let appVersion = Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString"
+        ) as? String ?? "0.0.0"
+        let lyricsService = LyricsService(
+            provider: LRCLIBClient(version: appVersion),
+            cache: LyricsCache(directory: lyricsDirectory),
+            log: { message in playerLog.notice("\(message, privacy: .public)") }
+        )
         let settings = StreamingSettings()
         let appearanceSettings = AppearanceSettings()
         let accentSettings = AccentSettings()
@@ -98,6 +110,7 @@ final class AppModel {
         self.player = player
         self.cache = cache
         self.downloadStore = downloadStore
+        self.lyricsService = lyricsService
         self.resolver = resolver
         self.streamingSettings = settings
         self.appearanceSettings = appearanceSettings

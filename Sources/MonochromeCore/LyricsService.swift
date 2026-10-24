@@ -29,17 +29,20 @@ public actor LyricsService {
     private let cache: LyricsCache
     private let now: @Sendable () -> Date
     private let retryDelay: Duration
+    private let log: (@Sendable (String) -> Void)?
 
     public init(
         provider: any LyricsProviding,
         cache: LyricsCache,
         now: @escaping @Sendable () -> Date = { .now },
-        retryDelay: Duration = .milliseconds(250)
+        retryDelay: Duration = .milliseconds(250),
+        log: (@Sendable (String) -> Void)? = nil
     ) {
         self.provider = provider
         self.cache = cache
         self.now = now
         self.retryDelay = retryDelay
+        self.log = log
     }
 
     public var sourceName: String { provider.sourceName }
@@ -50,15 +53,19 @@ public actor LyricsService {
         let providerName = provider.sourceName
 
         if let cached = await cache.result(for: query, provider: providerName, now: now()) {
+            log?("lyrics cache hit track=\(query.trackID) state=\(Self.stateLabel(cached))")
             return cached
         }
 
+        log?("lyrics request track=\(query.trackID)")
         do {
             let result = try await fetchWithRetry(query)
             try Task.checkCancellation()
             await cache.store(result, for: query, provider: providerName, now: now())
+            log?("lyrics result track=\(query.trackID) state=\(Self.stateLabel(result))")
             return result
         } catch is CancellationError {
+            log?("lyrics cancelled track=\(query.trackID)")
             throw CancellationError()
         } catch let error as LyricsProviderError {
             if let stale = await cache.result(
@@ -67,8 +74,10 @@ public actor LyricsService {
                 now: now(),
                 allowExpired: true
             ) {
+                log?("lyrics cache stale track=\(query.trackID) state=\(Self.stateLabel(stale)) reason=\(error)")
                 return stale
             }
+            log?("lyrics error track=\(query.trackID) reason=\(error)")
             switch error {
             case .offline, .transient:
                 throw LyricsLoadError.offline
@@ -84,9 +93,19 @@ public actor LyricsService {
         do {
             return try await provider.fetch(query)
         } catch let error as LyricsProviderError where error.shouldRetry {
+            log?("lyrics retry track=\(query.trackID) reason=\(error)")
             try await Task.sleep(for: retryDelay)
             try Task.checkCancellation()
             return try await provider.fetch(query)
+        }
+    }
+
+    private static func stateLabel(_ result: LyricsResult) -> String {
+        switch result.content {
+        case .synced(let lines): "synced lines=\(lines.count)"
+        case .plain(let text): "plain chars=\(text.count)"
+        case .instrumental: "instrumental"
+        case .notFound: "notFound"
         }
     }
 }

@@ -99,6 +99,11 @@ verified from a Linux build.
     largest Dynamic Type size and with VoiceOver.
 11. Audio sheet provenance labels stay legible as secondary text in both
     appearances, and rows with no measured value are absent rather than empty.
+12. Lyrics: the large sheet opens from Now Playing, the active line stays
+    centered while following, tapping a line seeks, dragging pauses follow and
+    Follow resumes it. Check loading, instrumental, not-found, offline and error
+    states, plus the source footer, in both appearances and at the largest text
+    size. Confirm VoiceOver can reach and activate every line.
 
 ## Implementation status
 
@@ -113,7 +118,8 @@ changes are now on `development`:
 | Shell | one mini-player definition applied to each tab root so scroll content is inset on every tab | L1 |
 | Mini player | dark artwork-tinted surface with white text, 44 pt controls, red progress and favorite state | L1 |
 | Now Playing | artwork-derived background with an intentional light treatment, technical source caption, bordered artwork, accent repeat marker, queue, badge, cache and AirPlay | L1 |
-| Audio sheet | badge opens a medium sheet with codec, sample rate, bit depth, channels, bitrate, requested quality, source and output, each with measured/reported provenance | L1 + host tests || Queue | medium/large sheet, marked section headers, real jump/reorder/remove | L1 |
+| Audio sheet | badge opens a medium sheet with codec, sample rate, bit depth, channels, bitrate, requested quality, source and output, each with measured/reported provenance | L1 + host tests |
+| Lyrics | on-demand large sheet with synced auto-follow, tap-to-seek, follow pause/resume, plain text, instrumental/not-found/offline/error states and LRCLIB attribution | L1 + host tests || Queue | medium/large sheet, marked section headers, real jump/reorder/remove | L1 |
 | Home | technical greeting, two-column quick access, marked shelves, active-track marker, separators | L1 |
 | Search | focused-field accent, marked top result, result-type chips, separated rows and recents | L1 |
 | Library | marked favorites row, accent heart, filter chips, download swipe, sort and separators | L1 |

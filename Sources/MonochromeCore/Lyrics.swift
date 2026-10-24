@@ -63,6 +63,23 @@ public struct LyricsResult: Codable, Equatable, Sendable {
     }
 }
 
+extension Track {
+    /// nil when the track cannot be queried safely without inventing metadata.
+    public var lyricsQuery: LyricsQuery? {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedArtist = artist.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty, !trimmedArtist.isEmpty else { return nil }
+        let trimmedAlbum = album.trimmingCharacters(in: .whitespacesAndNewlines)
+        return LyricsQuery(
+            trackID: id,
+            title: trimmedTitle,
+            artist: trimmedArtist,
+            album: trimmedAlbum.isEmpty ? nil : trimmedAlbum,
+            duration: durationSeconds
+        )
+    }
+}
+
 public protocol LyricsProviding: Sendable {
     var sourceName: String { get }
     func fetch(_ query: LyricsQuery) async throws -> LyricsResult
