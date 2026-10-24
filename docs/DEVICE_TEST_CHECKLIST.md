@@ -107,6 +107,16 @@ item by hand.
 Layout and feel can only be judged by a person; the host tests cover only the
 chip variants and the build check covers compilation.
 
+## Sleep timer
+
+- [ ] Open Now Playing, use the `•••` menu, choose Sleep Timer → 5 minutes.
+- [ ] A moon countdown row appears under the scrubber and updates every second.
+- [ ] Cancel removes the countdown and playback keeps running.
+- [ ] Arming a second duration replaces the first; only the newest expires.
+- [ ] Change tracks while armed: the timer keeps counting down.
+- [ ] At expiry playback pauses in the app and on the Lock Screen/Control Center,
+      and reopening Now Playing keeps the position.
+
 ## Playback
 
 - [ ] Search for a track and open the results list.

@@ -17,6 +17,8 @@ public final class PlayerController {
     public private(set) var isCurrentFromCache = false
     /// True when the engine is playing a permanent download.
     public private(set) var isCurrentFromDownload = false
+    /// When the sleep timer will pause playback; nil when no timer is armed.
+    public private(set) var sleepTimerEnd: Date?
 
     /// Called once per successful start; the app uses it to record history.
     public var onTrackStarted: ((Track) -> Void)?
@@ -40,6 +42,7 @@ public final class PlayerController {
     private var playbackStartedAt: Date?
     /// The track whose background download belongs to the current item.
     private var cacheDownloadTrack: Track?
+    private var sleepTimerTask: Task<Void, Never>?
 
     private struct PendingCache {
         var track: Track
@@ -169,6 +172,42 @@ public final class PlayerController {
 
     public func cycleRepeatMode() {
         repeatMode = repeatMode.next
+    }
+
+    /// Arms a one-shot timer that pauses playback; setting a new one replaces the old.
+    public func startSleepTimer(seconds: TimeInterval) {
+        cancelSleepTimer()
+        guard seconds > 0 else { return }
+        let deadline = now().addingTimeInterval(seconds)
+        sleepTimerEnd = deadline
+        log?("sleep timer armed seconds=\(Int(seconds.rounded()))")
+        sleepTimerTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled else { return }
+            self?.fireSleepTimer(deadline: deadline)
+        }
+    }
+
+    public func cancelSleepTimer() {
+        sleepTimerTask?.cancel()
+        sleepTimerTask = nil
+        guard sleepTimerEnd != nil else { return }
+        sleepTimerEnd = nil
+        log?("sleep timer cancelled")
+    }
+
+    /// A replaced or cancelled timer leaves its task behind; the deadline rejects it.
+    private func fireSleepTimer(deadline: Date) {
+        guard sleepTimerEnd == deadline else { return }
+        sleepTimerEnd = nil
+        sleepTimerTask = nil
+        guard isPlaying else {
+            log?("sleep timer expired state=\(state)")
+            return
+        }
+        engine.pause()
+        state = .paused
+        log?("sleep timer fired")
     }
 
     // MARK: - Engine events

@@ -58,6 +58,9 @@ struct PlayerView: View {
                             duration: player.duration,
                             onSeek: { player.seek(to: $0) }
                         )
+                        if player.sleepTimerEnd != nil {
+                            sleepTimerRow
+                        }
                         transportBlock
                         actionRow
                     }
@@ -183,6 +186,7 @@ struct PlayerView: View {
             if !player.queue.isEmpty {
                 Menu {
                     Button("Queue", systemImage: "list.bullet") { isShowingQueue = true }
+                    sleepTimerMenu
                     if let track = player.currentTrack, track.source.supportsDownloads {
                         Divider()
                         downloadAction(track)
@@ -283,6 +287,43 @@ struct PlayerView: View {
         .overlay {
             RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
                 .stroke(Theme.border, lineWidth: Theme.hairline)
+        }
+    }
+
+    private var sleepTimerMenu: some View {
+        Menu("Sleep Timer", systemImage: "moon.zzz") {
+            if player.sleepTimerEnd != nil {
+                Button("Turn Off") { player.cancelSleepTimer() }
+                Divider()
+            }
+            ForEach([5, 15, 30, 45, 60], id: \.self) { minutes in
+                Button("\(minutes) minutes") {
+                    player.startSleepTimer(seconds: TimeInterval(minutes) * 60)
+                }
+            }
+        }
+    }
+
+    private var sleepTimerRow: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let remaining = max(0, (player.sleepTimerEnd ?? context.date).timeIntervalSince(context.date))
+            HStack(spacing: 8) {
+                Image(systemName: "moon.zzz")
+                    .font(Theme.caption)
+                    .foregroundStyle(accent)
+                    .accessibilityHidden(true)
+                Text("Sleep timer \(formatDuration(remaining))")
+                    .font(Theme.caption)
+                    .foregroundStyle(Theme.secondaryText)
+                    .monospacedDigit()
+                    .accessibilityLabel("Sleep timer, \(formatDuration(remaining)) remaining")
+                Spacer(minLength: 8)
+                Button("Cancel") { player.cancelSleepTimer() }
+                    .font(Theme.caption)
+                    .foregroundStyle(accent)
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Cancel sleep timer")
+            }
         }
     }
 

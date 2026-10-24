@@ -104,6 +104,9 @@ verified from a Linux build.
     Follow resumes it. Check loading, instrumental, not-found, offline and error
     states, plus the source footer, in both appearances and at the largest text
     size. Confirm VoiceOver can reach and activate every line.
+13. Sleep timer: the countdown row and Cancel stay readable in both appearances
+    and at large Dynamic Type, VoiceOver announces the remaining time, and
+    expiry pauses the Lock Screen and Control Center state.
 
 ## Implementation status
 
@@ -129,6 +132,7 @@ changes are now on `development`:
 | Cache | five-song rolling LRU, protected loaded entry, fixed defaults (cellular caching off, no clear-on-launch), one Clear Cache action | L1 + host tests |
 | Theme | `ThemePalette` light/dark tokens, WCAG contrast tests, 20 pt cards, 56 pt rows, 16 pt screen padding, 24 pt sections | L1 + host tests |
 | Now Playing | core snapshot and remote-command routing, download/cache source badges | L1 + host tests |
+| Sleep timer | Now Playing overflow presets, live countdown row with cancel, pauses at expiry; replaced/cancelled deadlines cannot fire | L1 + host tests |
 
 Host tests: 306 tests in 35 suites passed at the last recorded run. The iOS
 arm64 build-only check passed after every commit. The 0.2.0 release reached L4:

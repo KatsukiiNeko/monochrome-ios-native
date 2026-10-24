@@ -596,4 +596,32 @@ struct PlayerControllerTests {
         #expect(controller.format?.bitrateKbps == 1_411)
         #expect(lines.contains("audiospec mismatch field=sampleRate"))
     }
+
+    @Test func sleepTimerPausesPlaybackWhenItExpires() async {
+        let (controller, engine) = makeController()
+        await controller.play(tracks: [track("a")], startingAt: 0)
+
+        controller.startSleepTimer(seconds: 0.02)
+        #expect(controller.sleepTimerEnd != nil)
+        try? await Task.sleep(for: .milliseconds(250))
+
+        #expect(controller.state == .paused)
+        #expect(engine.pauseCount == 1)
+        #expect(controller.sleepTimerEnd == nil)
+    }
+
+    @Test func replacingTheSleepTimerLeavesOnlyTheNewDeadlineArmed() async {
+        let (controller, engine) = makeController()
+        await controller.play(tracks: [track("a")], startingAt: 0)
+
+        controller.startSleepTimer(seconds: 0.02)
+        controller.startSleepTimer(seconds: 60)
+        try? await Task.sleep(for: .milliseconds(250))
+
+        #expect(engine.pauseCount == 0)
+        #expect(controller.sleepTimerEnd != nil)
+
+        controller.cancelSleepTimer()
+        #expect(controller.sleepTimerEnd == nil)
+    }
 }
