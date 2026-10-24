@@ -31,7 +31,17 @@ public enum LyricsTimeline {
                 high = middle - 1
             }
         }
-        return found
+
+        // A timed line with no text marks an instrumental gap. It must not take
+        // the highlight; the last sung line stays active until the next one.
+        guard var index = found else { return nil }
+        while index >= 0 {
+            if !lines[index].text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                return index
+            }
+            index -= 1
+        }
+        return nil
     }
 
     public static func isSorted(_ lines: [LyricLine]) -> Bool {

@@ -69,4 +69,37 @@ struct LyricsTimelineTests {
         #expect(LyricsTimeline.activeIndex(in: one, position: 1.95, lead: 0.1) == 0)
         #expect(LyricsTimeline.activeIndex(in: one, position: 2) == 0)
     }
+
+    @Test func aTimedGapLineKeepsThePreviousLyricActive() {
+        let withGap = [
+            LyricLine(time: 0, text: "First line"),
+            LyricLine(time: 5, text: ""),
+            LyricLine(time: 10, text: "Second line"),
+        ]
+
+        #expect(LyricsTimeline.activeIndex(in: withGap, position: 4.9) == 0)
+        #expect(LyricsTimeline.activeIndex(in: withGap, position: 5) == 0)
+        #expect(LyricsTimeline.activeIndex(in: withGap, position: 9.7) == 0)
+        #expect(LyricsTimeline.activeIndex(in: withGap, position: 10) == 2)
+    }
+
+    @Test func leadingGapLinesDoNotBecomeActive() {
+        let leadingGap = [
+            LyricLine(time: 0, text: "   "),
+            LyricLine(time: 2, text: ""),
+            LyricLine(time: 4, text: "First line"),
+        ]
+
+        #expect(LyricsTimeline.activeIndex(in: leadingGap, position: 0) == nil)
+        #expect(LyricsTimeline.activeIndex(in: leadingGap, position: 3) == nil)
+        #expect(LyricsTimeline.activeIndex(in: leadingGap, position: 4) == 2)
+    }
+
+    @Test func allGapLinesYieldNoActiveLine() {
+        let gaps = [
+            LyricLine(time: 0, text: ""),
+            LyricLine(time: 3, text: " \t "),
+        ]
+        #expect(LyricsTimeline.activeIndex(in: gaps, position: 10) == nil)
+    }
 }
