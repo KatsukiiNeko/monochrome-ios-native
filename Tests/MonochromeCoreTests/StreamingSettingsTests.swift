@@ -104,14 +104,14 @@ struct StreamingSettingsTests {
         defer { defaults.removePersistentDomain(forName: suite) }
 
         defaults.set("dark", forKey: AppearanceSettings.storageKey)
-        defaults.set(true, forKey: AudioCacheSettings.storageKey)
+        defaults.set(true, forKey: "cache.allowsCellular")
         settings.setBaseURL("https://music.example.test")
         settings.setEnabled(false)
 
         settings.reset()
 
         #expect(defaults.string(forKey: AppearanceSettings.storageKey) == "dark")
-        #expect(defaults.bool(forKey: AudioCacheSettings.storageKey))
+        #expect(defaults.bool(forKey: "cache.allowsCellular"))
         #expect(defaults.string(forKey: StreamingSettings.storageKey) == nil)
     }
 

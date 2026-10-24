@@ -13,10 +13,15 @@ public final class PlayerController {
     public private(set) var format: AudioFormat?
     /// Repeat control; `one` restarts the current track at its end.
     public private(set) var repeatMode: RepeatMode = .off
+    /// Measured output-route latency; synced lyrics shift by it so the text
+    /// matches what is heard, not the player clock.
+    public private(set) var outputLatency: TimeInterval = 0
     /// True when the engine is playing a file served from the audio cache.
     public private(set) var isCurrentFromCache = false
     /// True when the engine is playing a permanent download.
     public private(set) var isCurrentFromDownload = false
+    /// When the sleep timer will pause playback; nil when no timer is armed.
+    public private(set) var sleepTimerEnd: Date?
 
     /// Called once per successful start; the app uses it to record history.
     public var onTrackStarted: ((Track) -> Void)?
@@ -40,6 +45,7 @@ public final class PlayerController {
     private var playbackStartedAt: Date?
     /// The track whose background download belongs to the current item.
     private var cacheDownloadTrack: Track?
+    private var sleepTimerTask: Task<Void, Never>?
 
     private struct PendingCache {
         var track: Track
@@ -167,8 +173,50 @@ public final class PlayerController {
         repeatMode = mode
     }
 
+    /// Bluetooth and AirPlay routes buffer audio, so the heard sound lags the
+    /// player clock. Clamped to 0.5 s: a longer route would be unusable for video.
+    public func setOutputLatency(_ seconds: TimeInterval) {
+        outputLatency = min(max(seconds, 0), 0.5)
+    }
+
     public func cycleRepeatMode() {
         repeatMode = repeatMode.next
+    }
+
+    /// Arms a one-shot timer that pauses playback; setting a new one replaces the old.
+    public func startSleepTimer(seconds: TimeInterval) {
+        cancelSleepTimer()
+        guard seconds > 0 else { return }
+        let deadline = now().addingTimeInterval(seconds)
+        sleepTimerEnd = deadline
+        log?("sleep timer armed seconds=\(Int(seconds.rounded()))")
+        sleepTimerTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled else { return }
+            self?.fireSleepTimer(deadline: deadline)
+        }
+    }
+
+    public func cancelSleepTimer() {
+        sleepTimerTask?.cancel()
+        sleepTimerTask = nil
+        guard sleepTimerEnd != nil else { return }
+        sleepTimerEnd = nil
+        log?("sleep timer cancelled")
+    }
+
+    /// A replaced or cancelled timer leaves its task behind; the deadline rejects it.
+    private func fireSleepTimer(deadline: Date) {
+        guard sleepTimerEnd == deadline else { return }
+        sleepTimerEnd = nil
+        sleepTimerTask = nil
+        guard isPlaying else {
+            log?("sleep timer expired state=\(state)")
+            return
+        }
+        engine.pause()
+        state = .paused
+        log?("sleep timer fired")
     }
 
     // MARK: - Engine events
@@ -195,11 +243,41 @@ public final class PlayerController {
     // MARK: - Internals
 
     private func handleReady(duration engineDuration: Double?, format engineFormat: AudioFormat?) {
-        if let engineFormat { format = engineFormat }
+        format = mergedFormat(stored: format, measured: engineFormat)
         if let engineDuration, engineDuration > 0 {
             duration = engineDuration
         }
-        startCacheStoreIfReady(format: engineFormat, duration: engineDuration ?? duration)
+        startCacheStoreIfReady(format: format, duration: engineDuration ?? duration)
+    }
+
+    /// Measured fields win over values stored with a cached or downloaded file; a
+    /// disagreement is logged by field name so an unexpected conversion is visible.
+    private func mergedFormat(stored: AudioFormat?, measured: AudioFormat?) -> AudioFormat? {
+        guard var stored else { return measured }
+        guard let measured else { return stored }
+
+        func pick<T: Equatable>(_ old: T?, _ new: T?, _ name: String) -> T? {
+            guard let new else { return old }
+            if let old, old != new {
+                log?("audiospec mismatch field=\(name)")
+            }
+            return new
+        }
+
+        if !measured.codec.isEmpty {
+            if stored.codec != measured.codec, !stored.codec.isEmpty {
+                log?("audiospec mismatch field=codec")
+            }
+            stored.codec = measured.codec
+        }
+        stored.sampleRateHz = pick(stored.sampleRateHz, measured.sampleRateHz, "sampleRate")
+        stored.bitDepth = pick(stored.bitDepth, measured.bitDepth, "bitDepth")
+        stored.channels = pick(stored.channels, measured.channels, "channels")
+        stored.bitrateKbps = pick(stored.bitrateKbps, measured.bitrateKbps, "bitrate")
+        if measured.bitrateKbps != nil {
+            stored.bitrateIsEstimated = measured.bitrateIsEstimated
+        }
+        return stored
     }
 
     private func startCacheStoreIfReady(format: AudioFormat?, duration: Double) {
@@ -299,7 +377,7 @@ public final class PlayerController {
                 try await engine.load(url: downloaded.url, contentType: nil)
                 engine.play()
                 state = .playing
-                format = downloaded.format
+                format = mergedFormat(stored: downloaded.format, measured: format)
                 if let downloadedDuration = downloaded.duration, downloadedDuration > 0 {
                     duration = downloadedDuration
                 }
@@ -321,7 +399,7 @@ public final class PlayerController {
                 try await engine.load(url: cached.url, contentType: nil)
                 engine.play()
                 state = .playing
-                format = cached.format
+                format = mergedFormat(stored: cached.format, measured: format)
                 if let cachedDuration = cached.duration, cachedDuration > 0 {
                     duration = cachedDuration
                 }

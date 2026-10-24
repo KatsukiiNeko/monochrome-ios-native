@@ -7,8 +7,7 @@ struct SettingsView: View {
     let model: AppModel
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.scenePhase) private var scenePhase
-    @State private var isConfirmingClearCache = false
+    @State private var clearedCache = false
     @State private var isConfirmingEndpointReset = false
 
     var body: some View {
@@ -24,6 +23,8 @@ struct SettingsView: View {
         .listRowBackground(Theme.surface)
         .listRowSeparatorTint(Theme.separator)
         .background(Theme.background.ignoresSafeArea())
+        .environment(\.accentColor, accent)
+        .environment(\.onAccentColor, onAccent)
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -33,23 +34,10 @@ struct SettingsView: View {
                     .foregroundStyle(Theme.primaryText)
             }
         }
-        .task {
-            await refreshStorage()
-            // Keep the usage row honest while playback fills or evicts cache entries.
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(2))
-                guard !Task.isCancelled else { break }
-                await refreshStorage()
-            }
-        }
-        .onChange(of: scenePhase) { _, phase in
-            guard phase == .active else { return }
-            Task { await refreshStorage() }
-        }
         // The sheet has its own presentation environment; apply the authoritative
         // appearance here as well as at the root so an open sheet re-resolves now.
         .preferredColorScheme(model.appearanceMode.colorScheme)
-        .tint(Theme.accent)
+        .tint(accent)
     }
 
     // MARK: - Appearance
@@ -68,11 +56,83 @@ struct SettingsView: View {
                 }
             }
             .pickerStyle(.segmented)
-            .tint(Theme.accent)
+            .tint(accent)
             .accessibilityLabel("Appearance")
+
+            accentChoices
         } header: {
             TechnicalSectionHeader(title: "Appearance")
         }
+    }
+
+    private var accentChoices: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(AccentPreference.allCases.filter { $0 != .artwork }) { preference in
+                        accentSwatch(preference)
+                    }
+                }
+            }
+
+            Button {
+                model.setAccentPreference(.artwork)
+            } label: {
+                HStack(spacing: 10) {
+                    Circle()
+                        .fill(Theme.accentColor(preference: .artwork, artwork: model.artworkAccent))
+                        .frame(width: 22, height: 22)
+                        .overlay {
+                            Circle().stroke(Theme.border, lineWidth: Theme.hairline)
+                        }
+                    Text("Match Artwork")
+                        .font(Theme.listRowTitle)
+                        .foregroundStyle(Theme.primaryText)
+                    Spacer(minLength: 8)
+                    if model.accentPreference == .artwork {
+                        Image(systemName: "checkmark")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(accent)
+                    }
+                }
+                .frame(minHeight: Theme.rowMinHeight)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Accent color: Match artwork")
+            .accessibilityAddTraits(model.accentPreference == .artwork ? .isSelected : [])
+        }
+        .padding(.top, 4)
+    }
+
+    private func accentSwatch(_ preference: AccentPreference) -> some View {
+        let selected = model.accentPreference == preference
+        return Button {
+            model.setAccentPreference(preference)
+        } label: {
+            Circle()
+                .fill(Theme.accentColor(preference: preference, artwork: nil))
+                .frame(width: 30, height: 30)
+                .overlay {
+                    if selected {
+                        Image(systemName: "checkmark")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(
+                                Theme.onAccentColor(preference: preference, artwork: nil)
+                            )
+                    }
+                }
+                .overlay {
+                    Circle()
+                        .stroke(Theme.primaryText, lineWidth: selected ? 2 : 0)
+                        .padding(-4)
+                }
+                .frame(width: 38, height: 38)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Accent color: \(preference.title)")
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     // MARK: - Streaming endpoint
@@ -87,7 +147,7 @@ struct SettingsView: View {
             ) {
                 settingsLabel(icon: "dot.radiowaves.left.and.right", title: "Enable Endpoint")
             }
-            .tint(Theme.accent)
+            .tint(accent)
 
             NavigationLink {
                 StreamingEndpointView(model: model)
@@ -137,39 +197,23 @@ struct SettingsView: View {
 
     private var cacheSection: some View {
         Section {
-            HStack(spacing: 10) {
-                TechnicalIcon(name: "internaldrive")
-                Text("Cache Usage")
-                    .font(Theme.listRowTitle)
-                    .foregroundStyle(Theme.primaryText)
-                Spacer(minLength: 8)
-                TechnicalLabel(text: byteText(model.cacheSizeBytes), color: Theme.primaryText)
-            }
-            .frame(minHeight: Theme.rowMinHeight)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Cache Usage, \(byteText(model.cacheSizeBytes))")
-
             Button(role: .destructive) {
-                isConfirmingClearCache = true
-            } label: {
-                settingsLabel(icon: "trash", title: "Clear Cache", destructive: true)
-            }
-            .confirmationDialog(
-                "Clear the temporary cache?",
-                isPresented: $isConfirmingClearCache,
-                titleVisibility: .visible
-            ) {
-                Button("Clear Cache", role: .destructive) {
-                    Task { await model.clearCache() }
+                Task {
+                    await model.clearCache()
+                    clearedCache = true
+                    try? await Task.sleep(for: .seconds(1.5))
+                    clearedCache = false
                 }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Temporary playback files are removed. Downloads and imported music are not affected.")
+            } label: {
+                settingsLabel(
+                    icon: clearedCache ? "checkmark" : "trash",
+                    title: clearedCache ? "Cleared" : "Clear Cache",
+                    destructive: !clearedCache
+                )
             }
+            .accessibilityLabel(clearedCache ? "Cache cleared" : "Clear Cache")
         } header: {
             TechnicalSectionHeader(title: "Cache")
-        } footer: {
-            Text("Temporary files used for playback. Clearing the cache never removes permanent files.")
         }
     }
 
@@ -224,9 +268,12 @@ struct SettingsView: View {
 
     // MARK: - Actions and values
 
-    private func refreshStorage() async {
-        await model.refreshCacheSize()
-        await model.refreshDownloads()
+    private var accent: Color {
+        Theme.accentColor(preference: model.accentPreference, artwork: model.artworkAccent)
+    }
+
+    private var onAccent: Color {
+        Theme.onAccentColor(preference: model.accentPreference, artwork: model.artworkAccent)
     }
 
     private var endpointValue: String {
@@ -236,14 +283,7 @@ struct SettingsView: View {
 
     private var downloadsValue: String {
         let count = model.completedDownloads.count
-        guard count > 0 else { return "None" }
-        let songs = count == 1 ? "1 song" : "\(count) songs"
-        return "\(songs) · \(byteText(model.downloadsBytes))"
-    }
-
-    private func byteText(_ bytes: Int) -> String {
-        guard bytes > 0 else { return "0 bytes" }
-        return ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+        return count == 1 ? "1 song" : "\(count) songs"
     }
 }
 
@@ -253,6 +293,7 @@ private struct StreamingEndpointView: View {
     let model: AppModel
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accentColor) private var accent
     @State private var host = ""
     @State private var errorMessage: String?
 
@@ -309,7 +350,7 @@ private struct StreamingEndpointView: View {
         }
         .onAppear { host = model.streamingHost }
         .preferredColorScheme(model.appearanceMode.colorScheme)
-        .tint(Theme.accent)
+        .tint(accent)
     }
 
     private func save() {

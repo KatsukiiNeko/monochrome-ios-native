@@ -9,6 +9,7 @@ struct Scrubber: View {
     var onSeek: (Double) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accentColor) private var accent
     @State private var isDragging = false
     @State private var dragPosition: Double?
 
@@ -32,10 +33,10 @@ struct Scrubber: View {
                         .fill(Theme.separator)
                         .frame(height: height)
                     Capsule()
-                        .fill(Theme.accent)
+                        .fill(accent)
                         .frame(width: width * fraction, height: height)
                     Circle()
-                        .fill(Theme.accent)
+                        .fill(accent)
                         .frame(width: thumb, height: thumb)
                         .offset(x: max(0, min(width - thumb, width * fraction - thumb / 2)))
                         .opacity(isDragging ? 1 : 0)

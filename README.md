@@ -22,7 +22,7 @@
 
 A native SwiftUI music player inspired by the [Monochrome web app](https://github.com/monochrome-music/monochrome). It plays audio imported from the iOS Files app and streams FLAC tracks from the public catalog endpoint used by Monochrome.
 
-The app includes Home, Search, and Library tabs; a persistent mini-player; a full Now Playing screen; a queue; favorites; play history; local audio caching; repeat modes; and Lock Screen media controls.
+The app includes Home, Search, and Library tabs; a persistent mini-player; a full Now Playing screen; a queue; a sleep timer; favorites; play history; local audio caching; repeat modes; Lock Screen media controls; an honest audio specification for the current track; and on-demand lyrics.
 
 **Native app, not a WebView wrapper.** No account is required for the documented public catalog path. The app has no analytics or tracking SDKs and has no third-party Swift package dependencies.
 
@@ -38,23 +38,25 @@ The app includes Home, Search, and Library tabs; a persistent mini-player; a ful
 | Playback | Play/pause, seeking, next/previous, queue management, and repeat modes. |
 | Library | Local library, favorites, and recently played history persisted on-device. |
 | Permanent downloads | User-chosen songs are saved under Application Support/Downloads and play offline until removed. Downloads are separate from the temporary cache and imported files. |
-| Audio cache | A five-song rolling on-disk LRU buffer. Playing songs 1–5 keeps all five; playing song 6 evicts song 1, so songs 2–6 still start from cache without re-streaming. Cellular caching stays off by default. Cache cleanup never touches downloads or imported files. |
-| Audio metadata | Displays the detected audio format and quality where available. |
+| Audio cache | A five-song rolling on-disk LRU buffer. Playing songs 1–5 keeps all five; playing song 6 evicts song 1, so songs 2–6 still start from cache without re-streaming. Caching over cellular is disabled, and the cache is never cleared on launch. Cache cleanup never touches downloads or imported files. |
+| Audio metadata | Displays the detected audio format and quality where available. Tapping the badge on Now Playing opens an Audio sheet with the measured codec, sample rate, bit depth, channels, bitrate, playback source and output route. Unknown values are omitted rather than inferred; each format value is marked measured or reported. |
+| Sleep timer | Now Playing's overflow menu arms a 5, 15, 30, 45 or 60 minute timer. A countdown row under the scrubber can cancel it; at expiry playback pauses and keeps its position. The timer lasts for the session and is not persisted. |
+| Lyrics | Synced or plain lyrics from [LRCLIB](https://lrclib.net), fetched only when the Lyrics sheet is opened. Synced lines follow playback, tapping a line seeks, and scrolling pauses follow until Follow is tapped. Lyrics compensate automatically for the active output route's measured latency and keep a per-track manual timing nudge. Loading, instrumental, not-found, offline and error states are explicit. See [`docs/LYRICS.md`](docs/LYRICS.md). |
 | iOS integration | Background audio, Now Playing metadata with album and artwork, Lock Screen controls, remote commands, interruption handling, and route-change handling. |
-| Preferences | System/Light/Dark appearance, an Enable Endpoint on/off switch, endpoint reset, cache usage and clearing, download management, and project/licensing information. |
-| Privacy | No account system, analytics, or tracking SDK. No credentials are embedded in the source. |
+| Preferences | System/Light/Dark appearance, a selectable state accent (Monochrome, Signal, Amber, Mint, Blue, Violet, or the current artwork's colour), an Enable Endpoint on/off switch, endpoint reset, cache clearing, download management, and project/licensing information. |
+| Privacy | No account system, analytics, or tracking SDK. No credentials are embedded in the source. Lyrics are requested only when the lyrics view is opened, not for every song played; the request carries the track title, artist, album and duration, with no account or device identifier. |
 
-Monochrome downloads are available because the upstream web client downloads the same progressive FLAC stream (`js/api.js:3050`, `js/downloads.js:348`). That is capability evidence, not a content licence: the rights caveat below still applies. The YouTube Music companion source has no server configured in this build and never downloads. Lyrics, cloud playlists, account login, and cross-device synchronization are not implemented. See [`docs/SOURCES.md`](docs/SOURCES.md).
+Monochrome downloads are available because the upstream web client downloads the same progressive FLAC stream (`js/api.js:3050`, `js/downloads.js:348`). That is capability evidence, not a content licence: the rights caveat below still applies. The YouTube Music companion source has no server configured in this build and never downloads. Cloud playlists, account login, and cross-device synchronization are not implemented. See [`docs/SOURCES.md`](docs/SOURCES.md).
 
 ## Verification
 
-The maintainer completed the physical-device test checklist and reports successful results for the 0.2.0 release, including the downloads, five-song cache, settings and Now Playing changes, on an iPhone 12 Pro Max.
+The maintainer completed the physical-device test checklist and reports successful results for the 0.2.0 release, including the downloads, five-song cache, settings and Now Playing changes, on an iPhone 12 Pro Max. The accent-color controls and the audio specification and lyrics work were added after that release and have been checked only by host tests and the iOS compile check.
 
 | Level | Meaning | Status |
 |---|---|---|
 | **L1 — Compile** | Swift sources compile for the target platform. | Passed |
-| **L2 — Unit tests** | Portable core behavior is tested on Linux. | Passed: 212 tests across 26 suites at the last recorded run. |
-| **L3 — Live service** | Catalog search and stream resolution are checked against the live catalog. | Passed in the recorded live-service checks; the opt-in live test is not run by default. |
+| **L2 — Unit tests** | Portable core behavior is tested on Linux. | Passed: 306 tests across 35 suites at the last recorded run, including the audio-info chip variants, audio-specification formatters and the lyrics parser, matcher, cache, provider and service. |
+| **L3 — Live service** | Catalog search and stream resolution are checked against the live catalog. | Passed in the recorded live-service checks; the opt-in live test is not run by default. Lyrics response shape and English/Vietnamese coverage were checked against LRCLIB from Linux; see [`docs/LYRICS.md`](docs/LYRICS.md). |
 | **L4 — Physical device** | Playback and iOS-specific behavior are checked on a real iPhone. | Passed: the 0.2.0 release was verified on an iPhone 12 Pro Max. |
 
 CI runs the portable `swift test` suite. It does **not** run the live catalog test, build/sign an IPA, or install the app on a device. The iOS cross-compile check remains a separate local step because this workflow does not provision Apple's Darwin SDK.

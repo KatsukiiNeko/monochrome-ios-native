@@ -16,6 +16,7 @@ struct SearchView: View {
     @State private var selectedRelease: RemoteRelease?
     @State private var selectedArtist: RemoteArtist?
     @State private var pendingDownloadRemoval: DownloadItem?
+    @Environment(\.accentColor) private var accent
     @FocusState private var isSearchFocused: Bool
 
     var body: some View {
@@ -40,7 +41,7 @@ struct SearchView: View {
                 }
                 .background(Theme.background)
                 .overlay { stateOverlay }
-                .task(id: query) { await runSearch() }
+                .task(id: "\(query)|\(model.isStreamingConfigured)") { await runSearch() }
             }
             .background(Theme.background.ignoresSafeArea())
             .navigationTitle("Search")
@@ -75,13 +76,13 @@ struct SearchView: View {
     private var searchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(isSearchFocused ? Theme.accent : Theme.secondaryText)
+                .foregroundStyle(isSearchFocused ? accent : Theme.secondaryText)
             TextField("Songs, artists, albums", text: $query)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .submitLabel(.search)
                 .focused($isSearchFocused)
-                .tint(Theme.accent)
+                .tint(accent)
                 .accessibilityLabel("Search songs, artists and albums")
             if !query.isEmpty {
                 Button {
@@ -99,7 +100,7 @@ struct SearchView: View {
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
-                .stroke(isSearchFocused ? Theme.accent : Theme.border, lineWidth: Theme.hairline)
+                .stroke(isSearchFocused ? accent : Theme.border, lineWidth: Theme.hairline)
         }
     }
 
@@ -540,6 +541,7 @@ struct SearchView: View {
                         Text(artist.name)
                             .font(Theme.rowTitle)
                             .foregroundStyle(Theme.primaryText)
+                            .lineLimit(1)
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.caption)
@@ -562,6 +564,14 @@ struct SearchView: View {
 
     private func runSearch(force: Bool = false) async {
         filter = .all
+        guard model.isStreamingConfigured else {
+            tracks = []
+            releases = []
+            artists = []
+            errorMessage = nil
+            isSearching = false
+            return
+        }
         let text = trimmedQuery
         guard text.count >= 2 else {
             tracks = []

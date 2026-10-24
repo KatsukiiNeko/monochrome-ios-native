@@ -7,6 +7,9 @@ struct Chip: View {
     let isSelected: Bool
     var action: () -> Void
 
+    @Environment(\.accentColor) private var accent
+    @Environment(\.onAccentColor) private var onAccent
+
     private var shape: RoundedRectangle {
         RoundedRectangle(cornerRadius: Theme.chipRadius, style: .continuous)
     }
@@ -19,8 +22,8 @@ struct Chip: View {
                 .lineLimit(1)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
-                .foregroundStyle(isSelected ? Theme.onAccent : Theme.primaryText)
-                .background(isSelected ? Theme.accent : Theme.surface, in: shape)
+                .foregroundStyle(isSelected ? onAccent : Theme.primaryText)
+                .background(isSelected ? accent : Theme.surface, in: shape)
                 .overlay {
                     if !isSelected {
                         shape.stroke(Theme.border, lineWidth: Theme.hairline)

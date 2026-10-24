@@ -27,11 +27,6 @@ enum Theme {
         light: ThemePalette.light.sunken,
         dark: ThemePalette.dark.sunken
     )
-    /// Low-intensity red wash for a selected control; never a page background.
-    static let accentSurface = adaptive(
-        light: ThemePalette.light.accentSurface,
-        dark: ThemePalette.dark.accentSurface
-    )
     /// Thin rules and card outlines.
     static let border = adaptive(
         light: ThemePalette.light.border,
@@ -56,18 +51,72 @@ enum Theme {
         dark: ThemePalette.dark.tertiaryText
     )
 
-    /// The one meaningful accent: selection, progress and active playback state.
-    static let accent = adaptive(
-        light: ThemePalette.light.accent,
-        dark: ThemePalette.dark.accent
+    /// Default state accent. Views read the selected accent from the environment.
+    static let signalAccent = adaptive(
+        light: AccentPalettes.signal.light,
+        dark: AccentPalettes.signal.dark
     )
-    static let onAccent = Color.white
+    /// The state accent for the selected preference. Artwork accents are
+    /// clamped separately for each appearance so indicators stay visible.
+    static func accentColor(
+        preference: AccentPreference,
+        artwork: ArtworkTintColor?
+    ) -> Color {
+        adaptive(
+            light: resolvedAccent(preference: preference, artwork: artwork, light: true),
+            dark: resolvedAccent(preference: preference, artwork: artwork, light: false)
+        )
+    }
+
+    static func onAccentColor(
+        preference: AccentPreference,
+        artwork: ArtworkTintColor?
+    ) -> Color {
+        adaptive(
+            light: AccentContrast.foreground(
+                for: resolvedAccent(preference: preference, artwork: artwork, light: true)
+            ),
+            dark: AccentContrast.foreground(
+                for: resolvedAccent(preference: preference, artwork: artwork, light: false)
+            )
+        )
+    }
+
+    private static func resolvedAccent(
+        preference: AccentPreference,
+        artwork: ArtworkTintColor?,
+        light: Bool
+    ) -> PaletteColor {
+        if let palette = AccentPalettes.palette(for: preference) {
+            return light ? palette.light : palette.dark
+        }
+        guard preference == .artwork, let artwork else {
+            return light ? AccentPalettes.signal.light : AccentPalettes.signal.dark
+        }
+        let background = light ? ThemePalette.light.surface : ThemePalette.dark.surface
+        let resolved = AccentContrast.clamp(artwork, against: background)
+        return PaletteColor(resolved)
+    }
+
+    /// Accent for the always-dark mini-player card.
+    static func accentOnTint(
+        preference: AccentPreference,
+        artwork: ArtworkTintColor?
+    ) -> Color {
+        if let palette = AccentPalettes.palette(for: preference) {
+            return Color(palette.dark)
+        }
+        guard preference == .artwork, let artwork else {
+            return Color(AccentPalettes.signal.dark)
+        }
+        return Color(AccentContrast.clamp(artwork, against: ThemePalette.dark.surface))
+    }
     static let destructive = adaptive(
         light: ThemePalette.light.destructive,
         dark: ThemePalette.dark.destructive
     )
 
-    /// High-contrast transport surface, independent of the red state accent.
+    /// High-contrast transport surface, independent of the state accent.
     static let primaryAction = adaptive(light: .black, dark: .white)
     static let onPrimaryAction = adaptive(light: .white, dark: .black)
 
@@ -75,7 +124,6 @@ enum Theme {
     static let onTintPrimary = Color.white
     static let onTintSecondary = Color.white.opacity(0.70)
     static let onTintSeparator = Color.white.opacity(0.18)
-    static let onTintAccent = Color(red: 0.98, green: 0.22, blue: 0.24)
 
     // MARK: Spacing
 
@@ -154,9 +202,45 @@ extension AppearanceMode {
     }
 }
 
+private extension PaletteColor {
+    init(_ tint: ArtworkTintColor) {
+        self.init(red: tint.red, green: tint.green, blue: tint.blue)
+    }
+}
+
 extension Color {
     init(_ tint: ArtworkTintColor) {
         self.init(.sRGB, red: tint.red, green: tint.green, blue: tint.blue, opacity: 1)
+    }
+
+    init(_ color: PaletteColor) {
+        self.init(
+            .sRGB,
+            red: color.red,
+            green: color.green,
+            blue: color.blue,
+            opacity: color.alpha
+        )
+    }
+}
+
+private struct AccentColorKey: EnvironmentKey {
+    static let defaultValue = Theme.signalAccent
+}
+
+private struct OnAccentColorKey: EnvironmentKey {
+    static let defaultValue = Color.white
+}
+
+extension EnvironmentValues {
+    var accentColor: Color {
+        get { self[AccentColorKey.self] }
+        set { self[AccentColorKey.self] = newValue }
+    }
+
+    var onAccentColor: Color {
+        get { self[OnAccentColorKey.self] }
+        set { self[OnAccentColorKey.self] = newValue }
     }
 }
 

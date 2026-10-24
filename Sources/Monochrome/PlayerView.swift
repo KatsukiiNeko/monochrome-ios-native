@@ -9,12 +9,34 @@ struct PlayerView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accentColor) private var accent
     @State private var isShowingQueue = false
+    @State private var isShowingAudioSpec = false
+    @State private var isShowingLyrics = false
+    @State private var outputMonitor = AudioOutputMonitor()
     @State private var tint = Color(ArtworkTintColor.neutral)
     @State private var pendingDownloadRemoval: DownloadItem?
 
     private var player: PlayerController { model.player }
+
+    private var audioSpec: AudioSpec {
+        let source: AudioPlaybackSource
+        if player.isCurrentFromDownload {
+            source = .download
+        } else if player.isCurrentFromCache {
+            source = .cache
+        } else if player.currentTrack?.isStreaming == true {
+            source = .stream
+        } else {
+            source = .local
+        }
+        return AudioSpec.from(
+            format: player.format,
+            quality: player.currentTrack?.audioQuality,
+            source: source,
+            output: outputMonitor.output
+        )
+    }
 
     var body: some View {
         ZStack {
@@ -27,6 +49,7 @@ struct PlayerView: View {
                     VStack(spacing: 20) {
                         artwork
                         titleBlock
+                        audioInfoLine
                         if case .failed(let message) = player.state {
                             errorBlock(message)
                         }
@@ -35,8 +58,11 @@ struct PlayerView: View {
                             duration: player.duration,
                             onSeek: { player.seek(to: $0) }
                         )
+                        if player.sleepTimerEnd != nil {
+                            sleepTimerRow
+                        }
                         transportBlock
-                        bottomRow
+                        actionRow
                     }
                     .padding(.horizontal, Theme.screenPadding)
                     .padding(.bottom, 24)
@@ -52,6 +78,18 @@ struct PlayerView: View {
         .sheet(isPresented: $isShowingQueue) {
             QueueView(model: model)
                 .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.background)
+        }
+        .sheet(isPresented: $isShowingAudioSpec) {
+            AudioSpecView(spec: audioSpec, outputMonitor: outputMonitor)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.background)
+        }
+        .sheet(isPresented: $isShowingLyrics) {
+            LyricsView(model: model)
+                .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.background)
         }
@@ -133,7 +171,7 @@ struct PlayerView: View {
 
             HStack(spacing: 7) {
                 Rectangle()
-                    .fill(Theme.accent)
+                    .fill(accent)
                     .frame(width: 4, height: 4)
                     .accessibilityHidden(true)
                 DotMatrixLabel(
@@ -148,6 +186,7 @@ struct PlayerView: View {
             if !player.queue.isEmpty {
                 Menu {
                     Button("Queue", systemImage: "list.bullet") { isShowingQueue = true }
+                    sleepTimerMenu
                     if let track = player.currentTrack, track.source.supportsDownloads {
                         Divider()
                         downloadAction(track)
@@ -220,7 +259,7 @@ struct PlayerView: View {
                 } label: {
                     Image(systemName: model.isFavorite(track) ? "heart.fill" : "heart")
                         .font(.title3)
-                        .foregroundStyle(model.isFavorite(track) ? Theme.accent : Theme.primaryText)
+                        .foregroundStyle(model.isFavorite(track) ? accent : Theme.primaryText)
                         .frame(width: Theme.controlSize, height: Theme.controlSize)
                         .contentShape(Rectangle())
                 }
@@ -248,6 +287,43 @@ struct PlayerView: View {
         .overlay {
             RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
                 .stroke(Theme.border, lineWidth: Theme.hairline)
+        }
+    }
+
+    private var sleepTimerMenu: some View {
+        Menu("Sleep Timer", systemImage: "moon.zzz") {
+            if player.sleepTimerEnd != nil {
+                Button("Turn Off") { player.cancelSleepTimer() }
+                Divider()
+            }
+            ForEach([5, 15, 30, 45, 60], id: \.self) { minutes in
+                Button("\(minutes) minutes") {
+                    player.startSleepTimer(seconds: TimeInterval(minutes) * 60)
+                }
+            }
+        }
+    }
+
+    private var sleepTimerRow: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let remaining = max(0, (player.sleepTimerEnd ?? context.date).timeIntervalSince(context.date))
+            HStack(spacing: 8) {
+                Image(systemName: "moon.zzz")
+                    .font(Theme.caption)
+                    .foregroundStyle(accent)
+                    .accessibilityHidden(true)
+                Text("Sleep timer \(formatDuration(remaining))")
+                    .font(Theme.caption)
+                    .foregroundStyle(Theme.secondaryText)
+                    .monospacedDigit()
+                    .accessibilityLabel("Sleep timer, \(formatDuration(remaining)) remaining")
+                Spacer(minLength: 8)
+                Button("Cancel") { player.cancelSleepTimer() }
+                    .font(Theme.caption)
+                    .foregroundStyle(accent)
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Cancel sleep timer")
+            }
         }
     }
 
@@ -302,12 +378,12 @@ struct PlayerView: View {
         } label: {
             Image(systemName: player.repeatMode.symbolName)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(player.repeatMode == .off ? Theme.secondaryText : Theme.accent)
+                .foregroundStyle(player.repeatMode == .off ? Theme.secondaryText : accent)
                 .frame(width: Theme.controlSize, height: Theme.controlSize)
                 .overlay(alignment: .bottom) {
                     if player.repeatMode != .off {
                         Rectangle()
-                            .fill(Theme.accent)
+                            .fill(accent)
                             .frame(width: 5, height: 2)
                             .offset(y: -6)
                             .accessibilityHidden(true)
@@ -319,81 +395,191 @@ struct PlayerView: View {
         .accessibilityLabel(player.repeatMode.label)
     }
 
-    private var bottomRow: some View {
-        VStack(spacing: 10) {
+    private func lyricsControl(_ track: Track) -> some View {
+        let available = track.lyricsQuery != nil
+        return Button {
+            isShowingLyrics = true
+        } label: {
+            actionIcon("quote.bubble", active: isShowingLyrics)
+        }
+        .buttonStyle(.plain)
+        .disabled(!available)
+        .opacity(available ? 1 : 0.4)
+        .accessibilityLabel("Lyrics")
+        .accessibilityHint(
+            available ? "Opens lyrics for this track" : "Lyrics need a track title and artist"
+        )
+    }
+
+    // MARK: - Audio information
+
+    private var audioInfoLine: some View {
+        let variants = AudioInfoLine.variants(
+            spec: audioSpec,
+            source: audioSpec.source,
+            isDownloaded: player.isCurrentFromDownload
+        )
+        return HStack(spacing: 10) {
+            if let primary = variants.first {
+                Button {
+                    isShowingAudioSpec = true
+                } label: {
+                    // Most detailed first; ViewThatFits picks the first that fits
+                    // on one line instead of truncating or wrapping.
+                    ViewThatFits(in: .horizontal) {
+                        chipRow(variants[min(0, variants.count - 1)])
+                        chipRow(variants[min(1, variants.count - 1)])
+                        chipRow(variants[min(2, variants.count - 1)])
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(primary.map(\.spokenText).joined(separator: ", "))
+                .accessibilityHint("Shows audio details")
+            }
+
+            Spacer(minLength: 8)
+
+            if let queuePosition {
+                DotMatrixLabel(
+                    text: queuePosition,
+                    color: Theme.secondaryText,
+                    dotSize: 1.4
+                )
+                .accessibilityLabel("Track \(queuePosition) in the queue")
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func chipRow(_ chips: [AudioInfoChip]) -> some View {
+        HStack(spacing: 6) {
+            ForEach(Array(chips.enumerated()), id: \.offset) { _, chip in
+                switch chip.kind {
+                case .format, .status:
+                    QualityBadgeLabel(text: chip.text, spokenText: chip.spokenText)
+                case .detail:
+                    TechnicalLabel(text: chip.text)
+                }
+            }
+        }
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    // MARK: - Actions
+
+    private var actionRow: some View {
+        VStack(spacing: 0) {
             Rectangle()
                 .fill(Theme.separator)
                 .frame(height: Theme.hairline)
                 .accessibilityHidden(true)
 
-            HStack(spacing: 12) {
-                if let queuePosition {
-                    DotMatrixLabel(
-                        text: queuePosition,
-                        color: Theme.secondaryText,
-                        dotSize: 1.4
-                    )
-                    .accessibilityLabel("Track \(queuePosition) in the queue")
+            HStack(spacing: 0) {
+                if let track = player.currentTrack {
+                    lyricsControl(track)
                 }
 
                 if !player.queue.isEmpty {
-                    Button {
-                        isShowingQueue = true
-                    } label: {
-                        if dynamicTypeSize.isAccessibilitySize {
-                            Image(systemName: "list.bullet")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(Theme.secondaryText)
-                                .frame(width: Theme.controlSize, height: Theme.controlSize)
-                        } else {
-                            HStack(spacing: 6) {
-                                Image(systemName: "list.bullet")
-                                    .font(.caption.weight(.semibold))
-                                TechnicalLabel(text: "Queue")
-                            }
-                            .foregroundStyle(Theme.secondaryText)
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Open queue")
+                    queueControl
                 }
 
-                if let badge = AudioBadge.text(
-                    format: player.format,
-                    quality: player.currentTrack?.audioQuality
-                ) {
-                    QualityBadgeLabel(
-                        text: badge,
-                        spokenText: AudioBadge.accessibilityLabel(
-                            format: player.format,
-                            quality: player.currentTrack?.audioQuality
-                        )
-                    )
+                if let track = player.currentTrack, track.source.supportsDownloads {
+                    downloadControl(track)
                 }
-
-                if player.isCurrentFromCache {
-                    QualityBadgeLabel(
-                        text: "Cached",
-                        spokenText: "Playing from the local cache"
-                    )
-                }
-
-                if player.isCurrentFromDownload {
-                    QualityBadgeLabel(
-                        text: "Downloaded",
-                        spokenText: "Playing from a permanent download"
-                    )
-                }
-
-                Spacer(minLength: 8)
 
                 #if canImport(AVKit)
                 AirPlayRoutePicker()
-                    .frame(width: Theme.controlSize, height: Theme.controlSize)
+                    .frame(maxWidth: .infinity, minHeight: Theme.controlSize)
+                    .contentShape(Rectangle())
                 #endif
             }
+            .padding(.top, 4)
         }
-        .padding(.top, 4)
+    }
+
+    private func actionIcon(_ name: String, active: Bool = false) -> some View {
+        Image(systemName: name)
+            .font(.body.weight(.semibold))
+            .foregroundStyle(active ? accent : Theme.secondaryText)
+            .frame(maxWidth: .infinity, minHeight: Theme.controlSize)
+            .contentShape(Rectangle())
+    }
+
+    private var queueControl: some View {
+        Button {
+            isShowingQueue = true
+        } label: {
+            actionIcon("list.bullet")
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Queue")
+        .accessibilityValue(queuePosition.map { "Track \($0) in the queue" } ?? "")
+        .accessibilityHint("Opens the queue")
+    }
+
+    private func downloadControl(_ track: Track) -> some View {
+        let state = model.downloadState(for: track)
+        return Button {
+            switch state {
+            case .completed:
+                pendingDownloadRemoval = model.downloads.first {
+                    $0.track.id == track.id && $0.state == .completed
+                }
+            case .failed, .cancelled, .none:
+                model.startDownload(track)
+            case .queued, .downloading:
+                break
+            }
+        } label: {
+            downloadIcon(state)
+        }
+        .buttonStyle(.plain)
+        .disabled(state == .queued || isDownloading(state))
+        .accessibilityLabel(downloadLabel(state))
+        .accessibilityHint(downloadHint(state))
+    }
+
+    @ViewBuilder
+    private func downloadIcon(_ state: DownloadState?) -> some View {
+        switch state {
+        case .queued?, .downloading?:
+            ProgressView()
+                .controlSize(.small)
+                .tint(accent)
+                .frame(maxWidth: .infinity, minHeight: Theme.controlSize)
+        case .completed?:
+            actionIcon("checkmark.circle.fill", active: true)
+        case .failed?:
+            actionIcon("arrow.clockwise")
+        case .cancelled?, .none:
+            actionIcon("arrow.down.circle")
+        }
+    }
+
+    private func isDownloading(_ state: DownloadState?) -> Bool {
+        if case .downloading = state { return true }
+        return false
+    }
+
+    private func downloadLabel(_ state: DownloadState?) -> String {
+        switch state {
+        case .completed?: "Downloaded, remove download"
+        case .queued?, .downloading?: "Downloading"
+        case .failed?: "Retry download"
+        case .cancelled?, .none: "Download"
+        }
+    }
+
+    private func downloadHint(_ state: DownloadState?) -> String {
+        switch state {
+        case .completed?: "Removes the offline copy"
+        case .queued?, .downloading?: "Download in progress"
+        case .failed?: "Starts the download again"
+        case .cancelled?, .none: "Keeps a copy for offline listening"
+        }
     }
 }
 #endif

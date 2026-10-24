@@ -40,13 +40,17 @@ struct ContentView: View {
             .tabItem { Label("Library", systemImage: "music.note.list") }
             .tag(AppTab.library)
         }
-        .tint(Theme.accent)
+        .tint(accentColor)
+        .environment(\.accentColor, accentColor)
+        .environment(\.onAccentColor, onAccentColor)
         .sheet(isPresented: $isShowingPlayer) {
             PlayerView(model: model)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.hidden)
                 .presentationBackground(Theme.background)
                 .preferredColorScheme(model.appearanceMode.colorScheme)
+                .tint(accentColor)
+                .environment(\.accentColor, accentColor)
         }
         .sheet(isPresented: $isShowingSettings) {
             NavigationStack {
@@ -54,6 +58,8 @@ struct ContentView: View {
             }
             .presentationBackground(Theme.background)
             .preferredColorScheme(model.appearanceMode.colorScheme)
+            .tint(accentColor)
+            .environment(\.accentColor, accentColor)
         }
         .alert(
             "Something went wrong",
@@ -71,6 +77,14 @@ struct ContentView: View {
     }
 
     private var isPlayingBarVisible: Bool { model.player.currentTrack != nil }
+
+    private var accentColor: Color {
+        Theme.accentColor(preference: model.accentPreference, artwork: model.artworkAccent)
+    }
+
+    private var onAccentColor: Color {
+        Theme.onAccentColor(preference: model.accentPreference, artwork: model.artworkAccent)
+    }
 
     private var miniPlayer: some View {
         MiniPlayerView(model: model) { isShowingPlayer = true }

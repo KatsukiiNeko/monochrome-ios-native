@@ -100,6 +100,11 @@ final class AVPlayerEngine: PlaybackEngine {
                 playerLog.notice(
                     "item ready seconds=\(duration ?? -1) codec=\(format?.codec ?? "none", privacy: .public) depth=\(format?.bitDepth ?? 0) rate=\(format?.sampleRateHz ?? 0)"
                 )
+                if let format {
+                    playerLog.notice(
+                        "audiospec measured codec=\(format.codec, privacy: .public) sr=\(format.sampleRateHz ?? 0) ch=\(format.channels ?? 0) bitrate=\(format.bitrateKbps ?? 0)"
+                    )
+                }
                 onEvent?(.ready(duration: duration, format: format))
                 return
             case .failed:
@@ -146,15 +151,21 @@ final class AVPlayerEngine: PlaybackEngine {
               let description = descriptions.first
         else { return nil }
         let codec = fourCharacterCode(CMFormatDescriptionGetMediaSubType(description))
+        let estimatedDataRate = (try? await track.load(.estimatedDataRate)) ?? 0
+        let bitrateKbps = estimatedDataRate > 0 ? Int((estimatedDataRate / 1000).rounded()) : nil
         guard let stream = CMAudioFormatDescriptionGetStreamBasicDescription(description)?.pointee else {
-            return AudioFormat(codec: codec)
+            return AudioFormat(codec: codec, bitrateKbps: bitrateKbps, bitrateIsEstimated: true)
         }
         let depth = Int(stream.mBitsPerChannel)
         let rate = Int(stream.mSampleRate)
+        let channels = Int(stream.mChannelsPerFrame)
         return AudioFormat(
             codec: codec,
             bitDepth: depth > 0 ? depth : nil,
-            sampleRateHz: rate > 0 ? rate : nil
+            sampleRateHz: rate > 0 ? rate : nil,
+            channels: channels > 0 ? channels : nil,
+            bitrateKbps: bitrateKbps,
+            bitrateIsEstimated: bitrateKbps == nil ? nil : true
         )
     }
 

@@ -7,6 +7,7 @@ struct QueueView: View {
     let model: AppModel
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accentColor) private var accent
 
     private var player: PlayerController { model.player }
 
@@ -89,7 +90,7 @@ struct QueueView: View {
                     .listStyle(.plain)
                     .listRowSeparatorTint(Theme.separator)
                     .scrollContentBackground(.hidden)
-                    .tint(Theme.accent)
+                    .tint(accent)
                 }
             }
             .background(Theme.background.ignoresSafeArea())

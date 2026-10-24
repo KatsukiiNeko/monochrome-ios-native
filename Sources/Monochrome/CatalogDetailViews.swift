@@ -174,10 +174,13 @@ struct ArtistDetailView: View {
                                         )
                                         .frame(width: 48, height: 48)
                                         VStack(alignment: .leading, spacing: 2) {
-                                            Text(release.title).font(.subheadline)
+                                            Text(release.title)
+                                                .font(.subheadline)
+                                                .lineLimit(1)
                                             Text(release.artist)
                                                 .font(.caption)
                                                 .foregroundStyle(.secondary)
+                                                .lineLimit(1)
                                         }
                                         Spacer()
                                         Image(systemName: "chevron.right")

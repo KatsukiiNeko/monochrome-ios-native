@@ -52,6 +52,7 @@ final class AudioSessionController {
         do {
             try session.setCategory(.playback, mode: .default)
             try session.setActive(true)
+            updateOutputLatency()
             sessionLog.notice(
                 "session ready category=\(session.category.rawValue, privacy: .public) otherAudioPlaying=\(session.isOtherAudioPlaying, privacy: .public)"
             )
@@ -61,6 +62,13 @@ final class AudioSessionController {
                 "session setup failed domain=\(nsError.domain, privacy: .public) code=\(nsError.code) description=\(nsError.localizedDescription, privacy: .public)"
             )
         }
+    }
+
+    /// Route changes replace the hardware latency; lyrics use it to stay in sync.
+    private func updateOutputLatency() {
+        let latency = AVAudioSession.sharedInstance().outputLatency
+        player.setOutputLatency(latency)
+        sessionLog.notice("output latency=\(latency, privacy: .public)")
     }
 
     private func handle(_ event: AudioInterruption) {
@@ -78,6 +86,7 @@ final class AudioSessionController {
     }
 
     private func handle(_ change: RouteChange) {
+        updateOutputLatency()
         // Headphones unplugged: stop playing instead of switching to the speaker.
         if change == .oldDeviceUnavailable, player.isPlaying {
             Task { await player.togglePlayPause() }

@@ -343,19 +343,6 @@ struct AudioCacheTests {
         try? FileManager.default.removeItem(at: directory)
     }
 
-    @Test func clearOnLaunchPreferencePersistsAndDefaultsOff() {
-        let suite = "AudioCacheSettingsTests-\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suite)!
-        defaults.removePersistentDomain(forName: suite)
-        let settings = AudioCacheSettings(defaults: defaults)
-
-        #expect(settings.clearOnLaunch == false)
-        settings.setClearOnLaunch(true)
-        #expect(AudioCacheSettings(defaults: defaults).clearOnLaunch)
-        settings.setClearOnLaunch(false)
-        #expect(AudioCacheSettings(defaults: defaults).clearOnLaunch == false)
-    }
-
     @Test func downloaderFailureLeavesNothingBehind() async throws {
         let directory = temporaryDirectory()
         let downloader = FakeDownloader()
