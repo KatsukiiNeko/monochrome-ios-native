@@ -27,11 +27,25 @@ public struct AudioFormat: Equatable, Sendable, Codable {
     public var codec: String
     public var bitDepth: Int?
     public var sampleRateHz: Int?
+    public var channels: Int?
+    public var bitrateKbps: Int?
+    /// AVFoundation reports an estimated data rate, not a declared average.
+    public var bitrateIsEstimated: Bool?
 
-    public init(codec: String, bitDepth: Int? = nil, sampleRateHz: Int? = nil) {
+    public init(
+        codec: String,
+        bitDepth: Int? = nil,
+        sampleRateHz: Int? = nil,
+        channels: Int? = nil,
+        bitrateKbps: Int? = nil,
+        bitrateIsEstimated: Bool? = nil
+    ) {
         self.codec = codec
         self.bitDepth = bitDepth
         self.sampleRateHz = sampleRateHz
+        self.channels = channels
+        self.bitrateKbps = bitrateKbps
+        self.bitrateIsEstimated = bitrateIsEstimated
     }
 
     /// Lowercase, punctuation-free family name used for matching.
