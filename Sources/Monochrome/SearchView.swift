@@ -541,6 +541,7 @@ struct SearchView: View {
                         Text(artist.name)
                             .font(Theme.rowTitle)
                             .foregroundStyle(Theme.primaryText)
+                            .lineLimit(1)
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.caption)
