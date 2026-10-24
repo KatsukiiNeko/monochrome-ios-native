@@ -13,6 +13,9 @@ public final class PlayerController {
     public private(set) var format: AudioFormat?
     /// Repeat control; `one` restarts the current track at its end.
     public private(set) var repeatMode: RepeatMode = .off
+    /// Measured output-route latency; synced lyrics shift by it so the text
+    /// matches what is heard, not the player clock.
+    public private(set) var outputLatency: TimeInterval = 0
     /// True when the engine is playing a file served from the audio cache.
     public private(set) var isCurrentFromCache = false
     /// True when the engine is playing a permanent download.
@@ -168,6 +171,12 @@ public final class PlayerController {
 
     public func setRepeatMode(_ mode: RepeatMode) {
         repeatMode = mode
+    }
+
+    /// Bluetooth and AirPlay routes buffer audio, so the heard sound lags the
+    /// player clock. Clamped to 0.5 s: a longer route would be unusable for video.
+    public func setOutputLatency(_ seconds: TimeInterval) {
+        outputLatency = min(max(seconds, 0), 0.5)
     }
 
     public func cycleRepeatMode() {

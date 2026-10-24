@@ -44,6 +44,12 @@ public enum LyricsTimeline {
         return nil
     }
 
+    /// Positive manual values move the highlight later; the output route delays
+    /// the heard sound, so its measured latency moves the highlight later too.
+    public static func offset(manual: TimeInterval, outputLatency: TimeInterval) -> TimeInterval {
+        -(manual + max(0, outputLatency))
+    }
+
     public static func isSorted(_ lines: [LyricLine]) -> Bool {
         guard lines.count > 1 else { return true }
         for index in 1..<lines.count where lines[index].time < lines[index - 1].time {

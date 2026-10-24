@@ -117,6 +117,19 @@ chip variants and the build check covers compilation.
 - [ ] At expiry playback pauses in the app and on the Lock Screen/Control Center,
       and reopening Now Playing keeps the position.
 
+## Lyrics
+
+- [ ] Open Lyrics on a synced track: lines follow, scroll and tap-to-seek.
+- [ ] Pair Bluetooth headphones or AirPods, reopen Lyrics and confirm the timer
+      menu shows "Auto delay …" and the highlight sits on the sung line instead
+      of ahead of it.
+- [ ] Switch back to the phone speaker: the auto delay drops to the speaker value
+      within a few seconds and the highlight stays aligned.
+- [ ] Use Earlier/Later ±0.25 s on a provider file that is shifted; the change
+      applies on top of the auto delay and survives reopening the sheet.
+- [ ] Reset timing clears only the manual offset; the auto delay stays visible.
+- [ ] VoiceOver reads the timing value, including the output delay.
+
 ## Playback
 
 - [ ] Search for a track and open the results list.

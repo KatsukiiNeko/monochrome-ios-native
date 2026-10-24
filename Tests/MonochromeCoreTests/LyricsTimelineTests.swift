@@ -102,4 +102,12 @@ struct LyricsTimelineTests {
         ]
         #expect(LyricsTimeline.activeIndex(in: gaps, position: 10) == nil)
     }
+
+    @Test func manualAndOutputLatencyBothMoveTheHighlightLater() {
+        #expect(LyricsTimeline.offset(manual: 0, outputLatency: 0) == 0)
+        #expect(LyricsTimeline.offset(manual: 0.5, outputLatency: 0.2) == -0.7)
+        #expect(abs(LyricsTimeline.offset(manual: -0.25, outputLatency: 0.2) - 0.05) < 1e-9)
+        // A negative latency reading is not a delay.
+        #expect(LyricsTimeline.offset(manual: 0, outputLatency: -0.3) == 0)
+    }
 }

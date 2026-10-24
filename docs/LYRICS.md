@@ -92,6 +92,13 @@ way, without changing the audio. The offset is stored on the device per track;
 Reset timing returns that track to the provider's timing. The offset is local
 only and is never sent to the provider.
 
+The same menu shows an automatic delay measured from the active audio route
+(`AVAudioSession.outputLatency`). Bluetooth and AirPlay buffer audio, so the
+heard sound lags the player clock; adding that measured latency keeps the
+highlight with the vocal instead of ahead of it. It is refreshed on every route
+change, capped at 0.5 s, and never persisted. Manual timing is added on top of
+it, and Reset timing leaves the automatic part in place.
+
 ## Copyright
 
 Lyrics belong to their authors and rights holders. The app displays provider
@@ -122,6 +129,8 @@ release and region. There is no fallback to another source.
   the matcher deliberately rejects uncertain candidates.
 - No translation, transliteration, sharing or editing is included.
 - Timing that the provider gets wrong can only be corrected per track with the
-  manual 0.25 s nudge; there is no automatic alignment.
+  manual 0.25 s nudge; there is no automatic content alignment. Output-route
+  latency is compensated automatically, but that is a device delay, not proof
+  that the provider's timestamps are correct.
 - The sheet cannot be judged visually from the build host; appearance, gestures
   and VoiceOver need a device.

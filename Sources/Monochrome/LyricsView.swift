@@ -238,7 +238,10 @@ struct LyricsView: View {
         LyricsTimeline.activeIndex(
             in: lines,
             position: player.position,
-            offset: -timingDelay
+            offset: LyricsTimeline.offset(
+                manual: timingDelay,
+                outputLatency: player.outputLatency
+            )
         )
     }
 
@@ -250,6 +253,11 @@ struct LyricsView: View {
            case .synced(let lines) = result.content,
            !lines.isEmpty {
             Menu {
+                if player.outputLatency >= 0.03 {
+                    Button("Auto delay \(timingText(player.outputLatency))") {}
+                        .disabled(true)
+                    Divider()
+                }
                 Button("Earlier by 0.25 seconds", systemImage: "minus") {
                     setTimingDelay(timingDelay - Self.timingStep)
                 }
@@ -271,12 +279,23 @@ struct LyricsView: View {
     }
 
     private var timingDescription: String {
-        let value = abs(timingDelay)
-        guard value > 0 else { return "In sync" }
-        let text = value == value.rounded()
-            ? String(Int(value))
-            : String(format: "%g", value)
-        return timingDelay > 0 ? "\(text) seconds later" : "\(text) seconds earlier"
+        guard timingDelay != 0 || player.outputLatency >= 0.03 else { return "In sync" }
+        var parts: [String] = []
+        if timingDelay != 0 {
+            parts.append("\(timingText(timingDelay)) \(timingDelay > 0 ? "later" : "earlier")")
+        }
+        if player.outputLatency >= 0.03 {
+            parts.append("plus \(timingText(player.outputLatency)) output delay")
+        }
+        return parts.joined(separator: ", ")
+    }
+
+    private func timingText(_ value: TimeInterval) -> String {
+        let magnitude = abs(value)
+        let text = magnitude == magnitude.rounded()
+            ? String(Int(magnitude))
+            : String(format: "%g", magnitude)
+        return "\(text) seconds"
     }
 
     private var timingKey: String {
