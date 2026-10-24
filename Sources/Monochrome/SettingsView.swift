@@ -7,8 +7,7 @@ struct SettingsView: View {
     let model: AppModel
 
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.scenePhase) private var scenePhase
-    @State private var isConfirmingClearCache = false
+    @State private var clearedCache = false
     @State private var isConfirmingEndpointReset = false
 
     var body: some View {
@@ -32,19 +31,6 @@ struct SettingsView: View {
                     .fontWeight(.semibold)
                     .foregroundStyle(Theme.primaryText)
             }
-        }
-        .task {
-            await refreshStorage()
-            // Keep the usage row honest while playback fills or evicts cache entries.
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(2))
-                guard !Task.isCancelled else { break }
-                await refreshStorage()
-            }
-        }
-        .onChange(of: scenePhase) { _, phase in
-            guard phase == .active else { return }
-            Task { await refreshStorage() }
         }
         // The sheet has its own presentation environment; apply the authoritative
         // appearance here as well as at the root so an open sheet re-resolves now.
@@ -137,39 +123,23 @@ struct SettingsView: View {
 
     private var cacheSection: some View {
         Section {
-            HStack(spacing: 10) {
-                TechnicalIcon(name: "internaldrive")
-                Text("Cache Usage")
-                    .font(Theme.listRowTitle)
-                    .foregroundStyle(Theme.primaryText)
-                Spacer(minLength: 8)
-                TechnicalLabel(text: byteText(model.cacheSizeBytes), color: Theme.primaryText)
-            }
-            .frame(minHeight: Theme.rowMinHeight)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel("Cache Usage, \(byteText(model.cacheSizeBytes))")
-
             Button(role: .destructive) {
-                isConfirmingClearCache = true
-            } label: {
-                settingsLabel(icon: "trash", title: "Clear Cache", destructive: true)
-            }
-            .confirmationDialog(
-                "Clear the temporary cache?",
-                isPresented: $isConfirmingClearCache,
-                titleVisibility: .visible
-            ) {
-                Button("Clear Cache", role: .destructive) {
-                    Task { await model.clearCache() }
+                Task {
+                    await model.clearCache()
+                    clearedCache = true
+                    try? await Task.sleep(for: .seconds(1.5))
+                    clearedCache = false
                 }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Temporary playback files are removed. Downloads and imported music are not affected.")
+            } label: {
+                settingsLabel(
+                    icon: clearedCache ? "checkmark" : "trash",
+                    title: clearedCache ? "Cleared" : "Clear Cache",
+                    destructive: !clearedCache
+                )
             }
+            .accessibilityLabel(clearedCache ? "Cache cleared" : "Clear Cache")
         } header: {
             TechnicalSectionHeader(title: "Cache")
-        } footer: {
-            Text("Temporary files used for playback. Clearing the cache never removes permanent files.")
         }
     }
 
@@ -224,11 +194,6 @@ struct SettingsView: View {
 
     // MARK: - Actions and values
 
-    private func refreshStorage() async {
-        await model.refreshCacheSize()
-        await model.refreshDownloads()
-    }
-
     private var endpointValue: String {
         guard let host = URL(string: model.streamingHost)?.host, !host.isEmpty else { return "Not set" }
         return host
@@ -236,14 +201,7 @@ struct SettingsView: View {
 
     private var downloadsValue: String {
         let count = model.completedDownloads.count
-        guard count > 0 else { return "None" }
-        let songs = count == 1 ? "1 song" : "\(count) songs"
-        return "\(songs) · \(byteText(model.downloadsBytes))"
-    }
-
-    private func byteText(_ bytes: Int) -> String {
-        guard bytes > 0 else { return "0 bytes" }
-        return ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+        return count == 1 ? "1 song" : "\(count) songs"
     }
 }
 

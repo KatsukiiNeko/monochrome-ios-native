@@ -9,6 +9,7 @@ struct DownloadsView: View {
     @State private var pendingRemoval: DownloadItem?
     @State private var failureMessage: String?
     @State private var hasLoaded = false
+    @State private var isConfirmingDeleteAll = false
 
     private var completed: [DownloadItem] { model.completedDownloads }
     private var active: [DownloadItem] {
@@ -49,6 +50,18 @@ struct DownloadsView: View {
                 ForEach(completed) { item in
                     completedRow(item)
                 }
+                .onDelete { offsets in
+                    let items = offsets.map { completed[$0] }
+                    Task {
+                        for item in items {
+                            if !(await model.removeDownload(item)) {
+                                failureMessage = model.errorMessage ?? "The download could not be removed."
+                                return
+                            }
+                        }
+                        failureMessage = nil
+                    }
+                }
             } header: {
                 if !completed.isEmpty {
                     TechnicalSectionHeader(
@@ -64,6 +77,18 @@ struct DownloadsView: View {
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle("Downloads")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                EditButton()
+                    .disabled(completed.isEmpty)
+            }
+            ToolbarItem(placement: .bottomBar) {
+                Button("Delete All", role: .destructive) {
+                    isConfirmingDeleteAll = true
+                }
+                .disabled(completed.isEmpty)
+            }
+        }
         .overlay {
             if completed.isEmpty, active.isEmpty, model.downloadsMetadataError == nil {
                 if !hasLoaded || model.isRefreshingDownloads {
@@ -108,6 +133,24 @@ struct DownloadsView: View {
             Button("Cancel", role: .cancel) { pendingRemoval = nil }
         } message: {
             Text("The offline copy is deleted. You can download it again later.")
+        }
+        .confirmationDialog(
+            "Delete all downloads?",
+            isPresented: $isConfirmingDeleteAll,
+            titleVisibility: .visible
+        ) {
+            Button("Delete All", role: .destructive) {
+                Task {
+                    if await model.removeAllDownloads() {
+                        failureMessage = nil
+                    } else {
+                        failureMessage = model.errorMessage ?? "The downloads could not be deleted."
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Every permanent offline copy is removed. Cache and imported music are not affected.")
         }
         .preferredColorScheme(model.appearanceMode.colorScheme)
         .tint(Theme.accent)
