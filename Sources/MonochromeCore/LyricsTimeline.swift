@@ -1,0 +1,44 @@
+// LyricsTimeline.swift: active-line lookup for synced lyrics.
+import Foundation
+
+public enum LyricsTimeline {
+    /// A small lead makes a line appear just before its timestamp is reached.
+    public static let defaultLead: TimeInterval = 0.15
+
+    /// Returns the index of the last line at or before `position + offset + lead`.
+    /// Unsorted input is rejected instead of returning a wrong line.
+    public static func activeIndex(
+        in lines: [LyricLine],
+        position: TimeInterval,
+        offset: TimeInterval = 0,
+        lead: TimeInterval = defaultLead
+    ) -> Int? {
+        guard !lines.isEmpty else { return nil }
+        guard isSorted(lines) else { return nil }
+
+        let target = position + offset + lead
+        guard target >= lines[0].time else { return nil }
+
+        var low = 0
+        var high = lines.count - 1
+        var found: Int?
+        while low <= high {
+            let middle = low + (high - low) / 2
+            if lines[middle].time <= target {
+                found = middle
+                low = middle + 1
+            } else {
+                high = middle - 1
+            }
+        }
+        return found
+    }
+
+    public static func isSorted(_ lines: [LyricLine]) -> Bool {
+        guard lines.count > 1 else { return true }
+        for index in 1..<lines.count where lines[index].time < lines[index - 1].time {
+            return false
+        }
+        return true
+    }
+}
