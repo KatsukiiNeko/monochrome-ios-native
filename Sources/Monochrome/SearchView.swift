@@ -41,7 +41,7 @@ struct SearchView: View {
                 }
                 .background(Theme.background)
                 .overlay { stateOverlay }
-                .task(id: query) { await runSearch() }
+                .task(id: "\(query)|\(model.isStreamingConfigured)") { await runSearch() }
             }
             .background(Theme.background.ignoresSafeArea())
             .navigationTitle("Search")
@@ -563,6 +563,14 @@ struct SearchView: View {
 
     private func runSearch(force: Bool = false) async {
         filter = .all
+        guard model.isStreamingConfigured else {
+            tracks = []
+            releases = []
+            artists = []
+            errorMessage = nil
+            isSearching = false
+            return
+        }
         let text = trimmedQuery
         guard text.count >= 2 else {
             tracks = []
