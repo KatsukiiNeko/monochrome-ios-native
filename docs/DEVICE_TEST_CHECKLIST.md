@@ -1,16 +1,19 @@
 # Device test checklist
 
-Build under test: the v0.2.0 release, installed with `xtool dev` on the
-connected iPhone 12 Pro Max and verified by the maintainer.
+Build under test: the current `development` build on a connected iPhone. The
+tagged v0.2.0 release was previously installed with `xtool dev` on an iPhone 12
+Pro Max and verified by the maintainer. The accent-color items below describe
+the current build and have not been device-verified yet.
 Playback and the visual result can only be confirmed by a person, so tick each
-item by hand. The v0.2.0 release was manually verified by the maintainer on an
-iPhone 12 Pro Max; tick the boxes below to record that pass item by item.
+item by hand.
 
 ## Nothing-inspired visual language
 
-- [ ] The chrome is monochrome; artwork is the only source of expressive colour.
-- [ ] The red accent appears only on selection, progress, favorites and active
-      playback state, not on every button or heading.
+- [ ] The chrome and body text stay monochrome; artwork and the selected accent
+      are the only sources of expressive colour.
+- [ ] The selected accent appears only on selection, progress, favorites and
+      active playback state, never on backgrounds, body text, the play button or
+      the logo.
 - [ ] The primary play/pause control is the strongest control on Now Playing.
 - [ ] Section markers, hairline rules and monospaced time/metadata read as
       structure, not decoration.
@@ -34,6 +37,23 @@ iPhone 12 Pro Max; tick the boxes below to record that pass item by item.
       with the selected appearance.
 - [ ] The toolbar logo remains visible in light and dark appearance; it is
       rendered as a template from the existing asset.
+
+## Accent color
+
+- [ ] With Settings open, choose each swatch: the ring and check move at once,
+      and progress, selected chips and rows, toggles and links update in the open
+      sheet without closing it.
+- [ ] Open Now Playing and change the accent from the Settings sheet while it
+      stays presented: the new accent is already applied when it is shown again.
+- [ ] Check every accent, including Monochrome, in light and dark appearance and
+      at the largest Dynamic Type size: state marks stay visible and no
+      background or body text changes colour.
+- [ ] The play button stays black or white and the logo and app icon are
+      unchanged for every accent.
+- [ ] Choose Match Artwork with a track playing, then change tracks: the accent
+      follows the new artwork. With no artwork, it falls back to the Signal
+      accent.
+- [ ] VoiceOver reads "Accent color: <name>, selected" for the chosen swatch.
 
 ## Layout and navigation
 
@@ -153,13 +173,17 @@ iPhone 12 Pro Max; tick the boxes below to record that pass item by item.
 
 ## Permanent downloads
 
-- [ ] Search for a catalog track and choose Download from its menu. Settings →
-      Downloads shows it while downloading and then as a completed offline song.
+- [ ] Search for a catalog track and choose Download from its menu. Settings
+      shows the downloaded-song count; the row opens a list of completed
+      downloads with artwork, title, artist and size.
 - [ ] Play the downloaded track, enable airplane mode, then play it again: it
       starts and Now Playing shows `Downloaded`.
 - [ ] Delete the app's temporary cache: the downloaded song still plays offline.
-- [ ] Remove the download from Library, Search or Settings: the row disappears,
-      the file is gone, and the song streams again when online.
+- [ ] Swipe to delete one download, and remove another from Library or Search:
+      each row disappears, its file is gone, and the song streams again when
+      online.
+- [ ] Use Edit and Delete All: the confirmation appears, and confirming removes
+      every download while cache and imported files remain.
 - [ ] Start three downloads quickly: no more than two transfer at once and the
       third waits rather than failing.
 - [ ] Interrupt a download by force-quitting the app; reopen it: no partial file
@@ -168,33 +192,26 @@ iPhone 12 Pro Max; tick the boxes below to record that pass item by item.
       is offered for it.
 - [ ] Check a downloaded track after relaunching the app: it is still listed and
       still plays offline.
-- [ ] Check the Downloads list and Settings show the same count and byte total.
+- [ ] The Settings Downloads row and the manage screen show the same song count.
 
 ## Cache and loop
 
-- [ ] Play song A for a few seconds, then song B, then A again and B again.
-      Settings shows 2 songs, and both start instantly.
-- [ ] Tap Clear cache: Settings shows 0 songs. Play a song, then open
-      Settings again: it shows 1 song.
-- [ ] Play a catalog track once and wait for it to start; after a few seconds,
-      Settings shows a non-zero cached size.
-- [ ] Keep Settings open while a track finishes downloading: the song count and
-      size update while the sheet stays open.
-- [ ] Open Settings with two cached songs: both are listed under Cached now
-      with title, artist and size.
-- [ ] Tap the trash button on one cached song: only that row disappears, the
-      count drops by one, and the other cached song still starts instantly.
-- [ ] Play the deleted song again: it downloads again and returns to the list.
-- [ ] Play songs 1, 2, 3, 4, 5 in order: Settings shows five cached songs.
-      Play song 6: the cache still shows five, song 1 is gone, and songs 2–6
-      start from cache without re-streaming.
+- [ ] Play song A for a few seconds, then song B, then A again and B again:
+      both start instantly on the later plays.
+- [ ] Tap Clear Cache: the row briefly shows `Cleared`. Settings has no cache
+      meter, song count, byte total, cached-song list, confirmation dialog or
+      cache footer.
+- [ ] Play a catalog track after clearing: it caches again, and Now Playing shows
+      `Cached` beside the badge on the next play.
+- [ ] Play songs 1, 2, 3, 4, 5 in order. Play song 6: the cache still holds five,
+      song 1 is gone, and songs 2–6 start from cache without re-streaming.
 - [ ] With airplane mode on, play song 2 through song 6: all five start.
 - [ ] Clear the temporary cache: permanent downloads and imported files in
       Library still play offline.
-- [ ] Turn on Clear on launch, relaunch the app: the temporary cache is empty
-      and permanent downloads remain.
-- [ ] Turn Clear on launch off, relaunch the app: valid cache entries survive.
-- [ ] Play the same track again: Now Playing shows `Cached` beside the badge.
+- [ ] Relaunch the app with cached songs: valid entries survive. Settings offers
+      no Clear-on-launch or cellular-cache switch.
+- [ ] With cellular data on, play an uncached track: playback works and the
+      cache does not fill.
 - [ ] Turn repeat-one on and let the track end: the next pass starts
       immediately and still shows `Cached`.
 - [ ] Turn on airplane mode, then let that cached track end with repeat-one on:
@@ -203,10 +220,6 @@ iPhone 12 Pro Max; tick the boxes below to record that pass item by item.
       fails with a message and Retry, and the app stays responsive.
 - [ ] Skip a track within 10 seconds: its download stops. Skip after 10 seconds:
       the download finishes and the track is cached.
-- [ ] With Cache over cellular off, playback on cellular still works but the
-      cached size does not grow.
-- [ ] Turn Cache over cellular on, play an uncached track on cellular: the
-      cached size grows.
 
 ## System integration
 

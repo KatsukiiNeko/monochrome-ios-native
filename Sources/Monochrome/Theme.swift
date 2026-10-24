@@ -116,7 +116,7 @@ enum Theme {
         dark: ThemePalette.dark.destructive
     )
 
-    /// High-contrast transport surface, independent of the red state accent.
+    /// High-contrast transport surface, independent of the state accent.
     static let primaryAction = adaptive(light: .black, dark: .white)
     static let onPrimaryAction = adaptive(light: .white, dark: .black)
 

@@ -38,22 +38,22 @@ The app includes Home, Search, and Library tabs; a persistent mini-player; a ful
 | Playback | Play/pause, seeking, next/previous, queue management, and repeat modes. |
 | Library | Local library, favorites, and recently played history persisted on-device. |
 | Permanent downloads | User-chosen songs are saved under Application Support/Downloads and play offline until removed. Downloads are separate from the temporary cache and imported files. |
-| Audio cache | A five-song rolling on-disk LRU buffer. Playing songs 1–5 keeps all five; playing song 6 evicts song 1, so songs 2–6 still start from cache without re-streaming. Cellular caching stays off by default. Cache cleanup never touches downloads or imported files. |
+| Audio cache | A five-song rolling on-disk LRU buffer. Playing songs 1–5 keeps all five; playing song 6 evicts song 1, so songs 2–6 still start from cache without re-streaming. Caching over cellular is disabled, and the cache is never cleared on launch. Cache cleanup never touches downloads or imported files. |
 | Audio metadata | Displays the detected audio format and quality where available. |
 | iOS integration | Background audio, Now Playing metadata with album and artwork, Lock Screen controls, remote commands, interruption handling, and route-change handling. |
-| Preferences | System/Light/Dark appearance, an Enable Endpoint on/off switch, endpoint reset, cache usage and clearing, download management, and project/licensing information. |
+| Preferences | System/Light/Dark appearance, a selectable state accent (Monochrome, Signal, Amber, Mint, Blue, Violet, or the current artwork's colour), an Enable Endpoint on/off switch, endpoint reset, cache clearing, download management, and project/licensing information. |
 | Privacy | No account system, analytics, or tracking SDK. No credentials are embedded in the source. |
 
 Monochrome downloads are available because the upstream web client downloads the same progressive FLAC stream (`js/api.js:3050`, `js/downloads.js:348`). That is capability evidence, not a content licence: the rights caveat below still applies. The YouTube Music companion source has no server configured in this build and never downloads. Lyrics, cloud playlists, account login, and cross-device synchronization are not implemented. See [`docs/SOURCES.md`](docs/SOURCES.md).
 
 ## Verification
 
-The maintainer completed the physical-device test checklist and reports successful results for the 0.2.0 release, including the downloads, five-song cache, settings and Now Playing changes, on an iPhone 12 Pro Max.
+The maintainer completed the physical-device test checklist and reports successful results for the 0.2.0 release, including the downloads, five-song cache, settings and Now Playing changes, on an iPhone 12 Pro Max. The accent-color controls were added after that release and have been checked only by host tests and the iOS compile check.
 
 | Level | Meaning | Status |
 |---|---|---|
 | **L1 — Compile** | Swift sources compile for the target platform. | Passed |
-| **L2 — Unit tests** | Portable core behavior is tested on Linux. | Passed: 212 tests across 26 suites at the last recorded run. |
+| **L2 — Unit tests** | Portable core behavior is tested on Linux. | Passed: 219 tests across 27 suites at the last recorded run. |
 | **L3 — Live service** | Catalog search and stream resolution are checked against the live catalog. | Passed in the recorded live-service checks; the opt-in live test is not run by default. |
 | **L4 — Physical device** | Playback and iOS-specific behavior are checked on a real iPhone. | Passed: the 0.2.0 release was verified on an iPhone 12 Pro Max. |
 

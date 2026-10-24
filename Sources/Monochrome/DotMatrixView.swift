@@ -1,4 +1,4 @@
-// DotMatrixView.swift: the decorative 5x7 glyph renderer and cache slot meter.
+// DotMatrixView.swift: the decorative 5x7 glyph renderer and section headers.
 #if canImport(SwiftUI)
 import MonochromeCore
 import SwiftUI

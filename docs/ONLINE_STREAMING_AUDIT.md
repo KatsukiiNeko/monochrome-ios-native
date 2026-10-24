@@ -85,7 +85,7 @@ The app keeps two separate stores with different roots and lifetimes:
 | store | root | lifetime | used by playback |
 |---|---|---|---|
 | Permanent downloads | `Application Support/Downloads` | until the user removes it; excluded from backup | first, before the cache and network |
-| Temporary cache | `Caches/AudioCache` | five-song rolling LRU; clear-on-launch is opt-in | second, before network |
+| Temporary cache | `Caches/AudioCache` | five-song rolling LRU; cellular caching and clear-on-launch are fixed off | second, before network |
 
 Playing six distinct songs in order leaves songs 2–6 in the cache: song 6
 evicts the least recently used entry (song 1). Cache cleanup never deletes a
