@@ -253,6 +253,12 @@ public enum AudioSpecFormat {
         return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 
+    /// Spoken version of `detail(for:)`, using the expanded sample-rate unit.
+    public static func spokenDetail(for spec: AudioSpec) -> String? {
+        let values = [bitDepth(spec.bitDepth), spokenSampleRate(spec.sampleRateHz)].compactMap { $0 }
+        return values.isEmpty ? nil : values.joined(separator: ", ")
+    }
+
     /// "Lossless → High" only when a fallback actually happened.
     public static func qualityFallback(
         requested: AudioQuality?,
