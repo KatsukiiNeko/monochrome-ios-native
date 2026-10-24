@@ -110,6 +110,23 @@ item by hand.
 - [ ] VoiceOver reads the badge (for example "Lossless, FLAC 16/44.1").
 - [ ] A local imported file shows no badge.
 
+## Audio specification
+
+- [ ] Tap the format badge on Now Playing; the Audio sheet opens at the medium
+      detent and Done dismisses it.
+- [ ] Open the sheet for a streamed track, a cached track and a permanent
+      download; Format, sample rate, bit depth, channels and bitrate match what
+      the app is actually playing, and Source reads Stream, Cache or Download.
+- [ ] Values the app cannot measure are absent; no row shows a guessed number.
+- [ ] Switch the output to Bluetooth or wired headphones while the sheet is
+      open: the Output row changes and shows the hardware sample rate.
+- [ ] Quality shows the requested tier; a fallback is shown only when the app
+      knows the played tier differs.
+- [ ] Provenance labels read measured or reported and stay legible in Light and
+      Dark appearance.
+- [ ] VoiceOver reads each row as a sentence, for example "Sample rate, 44.1
+      kilohertz", and the sheet works at the largest text size.
+
 ## Now-playing bar
 
 - [ ] With a track loaded, the bar is visible on Home, Search and Library,

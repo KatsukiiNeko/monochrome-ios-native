@@ -12,10 +12,31 @@ struct PlayerView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accentColor) private var accent
     @State private var isShowingQueue = false
+    @State private var isShowingAudioSpec = false
+    @State private var outputMonitor = AudioOutputMonitor()
     @State private var tint = Color(ArtworkTintColor.neutral)
     @State private var pendingDownloadRemoval: DownloadItem?
 
     private var player: PlayerController { model.player }
+
+    private var audioSpec: AudioSpec {
+        let source: AudioPlaybackSource
+        if player.isCurrentFromDownload {
+            source = .download
+        } else if player.isCurrentFromCache {
+            source = .cache
+        } else if player.currentTrack?.isStreaming == true {
+            source = .stream
+        } else {
+            source = .local
+        }
+        return AudioSpec.from(
+            format: player.format,
+            quality: player.currentTrack?.audioQuality,
+            source: source,
+            output: outputMonitor.output
+        )
+    }
 
     var body: some View {
         ZStack {
@@ -53,6 +74,12 @@ struct PlayerView: View {
         .sheet(isPresented: $isShowingQueue) {
             QueueView(model: model)
                 .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.background)
+        }
+        .sheet(isPresented: $isShowingAudioSpec) {
+            AudioSpecView(spec: audioSpec, outputMonitor: outputMonitor)
+                .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.background)
         }
@@ -363,13 +390,23 @@ struct PlayerView: View {
                     format: player.format,
                     quality: player.currentTrack?.audioQuality
                 ) {
-                    QualityBadgeLabel(
-                        text: badge,
-                        spokenText: AudioBadge.accessibilityLabel(
-                            format: player.format,
-                            quality: player.currentTrack?.audioQuality
+                    Button {
+                        isShowingAudioSpec = true
+                    } label: {
+                        QualityBadgeLabel(
+                            text: badge,
+                            spokenText: AudioBadge.accessibilityLabel(
+                                format: player.format,
+                                quality: player.currentTrack?.audioQuality
+                            )
                         )
-                    )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Shows audio details")
+                }
+
+                if let detail = AudioSpecFormat.detail(for: audioSpec) {
+                    TechnicalLabel(text: detail)
                 }
 
                 if player.isCurrentFromCache {
