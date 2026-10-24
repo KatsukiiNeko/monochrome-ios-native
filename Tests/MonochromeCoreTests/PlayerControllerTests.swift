@@ -565,4 +565,35 @@ struct PlayerControllerTests {
         #expect(controller.currentTrack?.id == Track.remoteIDPrefix + "2")
         #expect(controller.isCurrentFromCache == false)
     }
+
+    @Test func measuredFormatWinsOverTheCachedCopy() async {
+        let engine = FakeEngine()
+        let resolver = FakeResolver()
+        let cache = FakeCache()
+        await cache.setHit(
+            CachedAudio(
+                url: URL(fileURLWithPath: "/cache/42.flac"),
+                format: AudioFormat(codec: "flac", bitDepth: 16, sampleRateHz: 44_100),
+                duration: 210,
+                byteSize: 1_024
+            )
+        )
+        let controller = PlayerController(engine: engine, resolver: resolver, cache: cache)
+        await controller.play(tracks: [streamTrack("42")], startingAt: 0)
+
+        var lines: [String] = []
+        controller.log = { lines.append($0) }
+        await controller.handle(
+            .ready(
+                duration: 210,
+                format: AudioFormat(codec: "flac", sampleRateHz: 48_000, channels: 2, bitrateKbps: 1_411)
+            )
+        )
+
+        #expect(controller.format?.bitDepth == 16)
+        #expect(controller.format?.sampleRateHz == 48_000)
+        #expect(controller.format?.channels == 2)
+        #expect(controller.format?.bitrateKbps == 1_411)
+        #expect(lines.contains("audiospec mismatch field=sampleRate"))
+    }
 }

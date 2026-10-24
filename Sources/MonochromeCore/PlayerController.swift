@@ -195,11 +195,41 @@ public final class PlayerController {
     // MARK: - Internals
 
     private func handleReady(duration engineDuration: Double?, format engineFormat: AudioFormat?) {
-        if let engineFormat { format = engineFormat }
+        format = mergedFormat(stored: format, measured: engineFormat)
         if let engineDuration, engineDuration > 0 {
             duration = engineDuration
         }
-        startCacheStoreIfReady(format: engineFormat, duration: engineDuration ?? duration)
+        startCacheStoreIfReady(format: format, duration: engineDuration ?? duration)
+    }
+
+    /// Measured fields win over values stored with a cached or downloaded file; a
+    /// disagreement is logged by field name so an unexpected conversion is visible.
+    private func mergedFormat(stored: AudioFormat?, measured: AudioFormat?) -> AudioFormat? {
+        guard var stored else { return measured }
+        guard let measured else { return stored }
+
+        func pick<T: Equatable>(_ old: T?, _ new: T?, _ name: String) -> T? {
+            guard let new else { return old }
+            if let old, old != new {
+                log?("audiospec mismatch field=\(name)")
+            }
+            return new
+        }
+
+        if !measured.codec.isEmpty {
+            if stored.codec != measured.codec, !stored.codec.isEmpty {
+                log?("audiospec mismatch field=codec")
+            }
+            stored.codec = measured.codec
+        }
+        stored.sampleRateHz = pick(stored.sampleRateHz, measured.sampleRateHz, "sampleRate")
+        stored.bitDepth = pick(stored.bitDepth, measured.bitDepth, "bitDepth")
+        stored.channels = pick(stored.channels, measured.channels, "channels")
+        stored.bitrateKbps = pick(stored.bitrateKbps, measured.bitrateKbps, "bitrate")
+        if measured.bitrateKbps != nil {
+            stored.bitrateIsEstimated = measured.bitrateIsEstimated
+        }
+        return stored
     }
 
     private func startCacheStoreIfReady(format: AudioFormat?, duration: Double) {
@@ -299,7 +329,7 @@ public final class PlayerController {
                 try await engine.load(url: downloaded.url, contentType: nil)
                 engine.play()
                 state = .playing
-                format = downloaded.format
+                format = mergedFormat(stored: downloaded.format, measured: format)
                 if let downloadedDuration = downloaded.duration, downloadedDuration > 0 {
                     duration = downloadedDuration
                 }
@@ -321,7 +351,7 @@ public final class PlayerController {
                 try await engine.load(url: cached.url, contentType: nil)
                 engine.play()
                 state = .playing
-                format = cached.format
+                format = mergedFormat(stored: cached.format, measured: format)
                 if let cachedDuration = cached.duration, cachedDuration > 0 {
                     duration = cachedDuration
                 }
