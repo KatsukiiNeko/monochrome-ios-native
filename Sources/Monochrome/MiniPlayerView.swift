@@ -11,6 +11,13 @@ struct MiniPlayerView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var tint = Color(ArtworkTintColor.neutral)
 
+    private var onTintAccent: Color {
+        Theme.accentOnTint(
+            preference: model.accentPreference,
+            artwork: model.artworkAccent
+        )
+    }
+
     private var player: PlayerController { model.player }
 
     private var bar: NowPlayingBar? {
@@ -97,7 +104,7 @@ struct MiniPlayerView: View {
         } label: {
             Image(systemName: model.isFavorite(track) ? "heart.fill" : "heart")
                 .font(.subheadline)
-                .foregroundStyle(model.isFavorite(track) ? Theme.onTintAccent : Theme.onTintPrimary)
+                .foregroundStyle(model.isFavorite(track) ? onTintAccent : Theme.onTintPrimary)
                 .frame(width: Theme.controlSize, height: Theme.controlSize)
                 .contentShape(Rectangle())
         }
@@ -153,7 +160,7 @@ struct MiniPlayerView: View {
             ZStack(alignment: .leading) {
                 Rectangle().fill(Theme.onTintSeparator)
                 Rectangle()
-                    .fill(Theme.onTintAccent)
+                    .fill(onTintAccent)
                     .frame(width: geometry.size.width * fraction)
             }
         }

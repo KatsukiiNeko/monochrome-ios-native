@@ -10,6 +10,7 @@ struct HomeView: View {
     var onOpenSettings: () -> Void
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accentColor) private var accent
 
     private var quickAccess: [Track] {
         QuickAccess.merge(recents: model.recents, favorites: model.favorites)
@@ -57,7 +58,7 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 8) {
                 Rectangle()
-                    .fill(Theme.accent)
+                    .fill(accent)
                     .frame(width: 4, height: 4)
                     .accessibilityHidden(true)
                 DotMatrixLabel(
@@ -123,7 +124,7 @@ struct HomeView: View {
 
                             if model.player.currentTrack?.id == track.id {
                                 Rectangle()
-                                    .fill(Theme.accent)
+                                    .fill(accent)
                                     .frame(width: 5, height: 5)
                                     .accessibilityHidden(true)
                             }

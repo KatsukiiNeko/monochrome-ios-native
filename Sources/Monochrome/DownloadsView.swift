@@ -10,6 +10,7 @@ struct DownloadsView: View {
     @State private var failureMessage: String?
     @State private var hasLoaded = false
     @State private var isConfirmingDeleteAll = false
+    @Environment(\.accentColor) private var accent
 
     private var completed: [DownloadItem] { model.completedDownloads }
     private var active: [DownloadItem] {
@@ -153,7 +154,7 @@ struct DownloadsView: View {
             Text("Every permanent offline copy is removed. Cache and imported music are not affected.")
         }
         .preferredColorScheme(model.appearanceMode.colorScheme)
-        .tint(Theme.accent)
+        .tint(accent)
     }
 
     private func completedRow(_ item: DownloadItem) -> some View {
@@ -197,10 +198,10 @@ struct DownloadsView: View {
             if case .downloading(let progress) = item.state {
                 if let progress {
                     ProgressView(value: progress)
-                        .tint(Theme.accent)
+                        .tint(accent)
                 } else {
                     ProgressView()
-                        .tint(Theme.accent)
+                        .tint(accent)
                 }
             }
             if case .failed(let reason) = item.state {
@@ -212,7 +213,7 @@ struct DownloadsView: View {
                     model.startDownload(item.track)
                 }
                 .font(Theme.technical)
-                .foregroundStyle(Theme.accent)
+                .foregroundStyle(accent)
             }
         }
         .padding(.vertical, 4)

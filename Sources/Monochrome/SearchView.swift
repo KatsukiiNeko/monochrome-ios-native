@@ -16,6 +16,7 @@ struct SearchView: View {
     @State private var selectedRelease: RemoteRelease?
     @State private var selectedArtist: RemoteArtist?
     @State private var pendingDownloadRemoval: DownloadItem?
+    @Environment(\.accentColor) private var accent
     @FocusState private var isSearchFocused: Bool
 
     var body: some View {
@@ -75,13 +76,13 @@ struct SearchView: View {
     private var searchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(isSearchFocused ? Theme.accent : Theme.secondaryText)
+                .foregroundStyle(isSearchFocused ? accent : Theme.secondaryText)
             TextField("Songs, artists, albums", text: $query)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .submitLabel(.search)
                 .focused($isSearchFocused)
-                .tint(Theme.accent)
+                .tint(accent)
                 .accessibilityLabel("Search songs, artists and albums")
             if !query.isEmpty {
                 Button {
@@ -99,7 +100,7 @@ struct SearchView: View {
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)
-                .stroke(isSearchFocused ? Theme.accent : Theme.border, lineWidth: Theme.hairline)
+                .stroke(isSearchFocused ? accent : Theme.border, lineWidth: Theme.hairline)
         }
     }
 

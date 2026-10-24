@@ -6,6 +6,8 @@ import SwiftUI
 struct AboutView: View {
     let model: AppModel
 
+    @Environment(\.accentColor) private var accent
+
     private static let repositoryURL = URL(string: "https://github.com/KatsukiiNeko/monochrome-ios-native")!
     private static let upstreamURL = URL(string: "https://github.com/monochrome-music/monochrome")!
     private static let apacheURL = URL(string: "https://www.apache.org/licenses/LICENSE-2.0")!
@@ -57,7 +59,7 @@ struct AboutView: View {
         .navigationTitle("About")
         .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(model.appearanceMode.colorScheme)
-        .tint(Theme.accent)
+        .tint(accent)
     }
 
     private var versionText: String {
@@ -71,6 +73,8 @@ struct AboutView: View {
 
 private struct LicenseNoticeView: View {
     let model: AppModel
+
+    @Environment(\.accentColor) private var accent
 
     private static let apacheURL = URL(string: "https://www.apache.org/licenses/LICENSE-2.0")!
     private static let upstreamURL = URL(string: "https://github.com/monochrome-music/monochrome")!
@@ -101,7 +105,7 @@ private struct LicenseNoticeView: View {
         .navigationTitle("Attribution")
         .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(model.appearanceMode.colorScheme)
-        .tint(Theme.accent)
+        .tint(accent)
     }
 }
 
@@ -109,6 +113,8 @@ private struct LicenseNoticeView: View {
 
 private struct MusicLicensingView: View {
     let model: AppModel
+
+    @Environment(\.accentColor) private var accent
 
     var body: some View {
         List {
@@ -132,7 +138,7 @@ private struct MusicLicensingView: View {
         .navigationTitle("Music Licensing")
         .navigationBarTitleDisplayMode(.inline)
         .preferredColorScheme(model.appearanceMode.colorScheme)
-        .tint(Theme.accent)
+        .tint(accent)
     }
 }
 #endif

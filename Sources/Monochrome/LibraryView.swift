@@ -13,6 +13,7 @@ struct LibraryView: View {
     @State private var isShowingImporter = false
     @State private var pendingDeletion: Track?
     @State private var pendingDownloadRemoval: DownloadItem?
+    @Environment(\.accentColor) private var accent
 
     private var rows: [Track] {
         LibraryQuery.rows(
@@ -203,7 +204,7 @@ struct LibraryView: View {
             HStack(spacing: 12) {
                 Image(systemName: "heart.fill")
                     .font(.headline)
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(accent)
                     .frame(width: 48, height: 48)
                     .background(Theme.elevated, in: RoundedRectangle(cornerRadius: Theme.tileRadius))
 

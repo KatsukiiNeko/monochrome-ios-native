@@ -93,10 +93,12 @@ struct TechnicalSectionHeader: View {
     let title: String
     var meta: String?
 
+    @Environment(\.accentColor) private var accent
+
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
             Rectangle()
-                .fill(Theme.accent)
+                .fill(accent)
                 .frame(width: Theme.sectionMarker, height: Theme.markerHeight)
                 .accessibilityHidden(true)
 
@@ -111,33 +113,6 @@ struct TechnicalSectionHeader: View {
         .textCase(nil)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
-    }
-}
-
-struct CacheSlotMeter: View {
-    let used: Int
-    let total: Int
-
-    private var boundedUsed: Int { min(max(used, 0), total) }
-
-    var body: some View {
-        HStack(spacing: 6) {
-            ForEach(0..<total, id: \.self) { index in
-                Circle()
-                    .fill(index < boundedUsed ? Theme.accent : Theme.sunken)
-                    .frame(width: 10, height: 10)
-                    .overlay {
-                        Circle()
-                            .stroke(
-                                index < boundedUsed ? Theme.accent : Theme.border,
-                                lineWidth: Theme.hairline
-                            )
-                    }
-            }
-        }
-        .animation(.easeOut(duration: 0.18), value: boundedUsed)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(boundedUsed) of \(total) cache slots used")
     }
 }
 #endif

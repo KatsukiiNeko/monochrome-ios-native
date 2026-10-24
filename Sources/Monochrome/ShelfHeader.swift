@@ -8,10 +8,12 @@ struct ShelfHeader: View {
     var actionTitle: String?
     var action: (() -> Void)?
 
+    @Environment(\.accentColor) private var accent
+
     var body: some View {
         HStack(alignment: .center, spacing: 8) {
             Rectangle()
-                .fill(Theme.accent)
+                .fill(accent)
                 .frame(width: Theme.sectionMarker, height: Theme.markerHeight)
                 .accessibilityHidden(true)
 

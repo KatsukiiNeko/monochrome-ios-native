@@ -23,6 +23,8 @@ final class AppModel {
     private(set) var isMonochromeEnabled: Bool
     private(set) var streamingSettingsError: String?
     private(set) var appearanceMode: AppearanceMode
+    private(set) var accentPreference: AccentPreference
+    private(set) var artworkAccent: ArtworkTintColor?
     private(set) var downloads: [DownloadItem] = []
     private(set) var downloadsMetadataError: String?
     private(set) var isRefreshingDownloads = false
@@ -34,6 +36,7 @@ final class AppModel {
     private let resolver: DefaultTrackResolver
     private let streamingSettings: StreamingSettings
     private let appearanceSettings: AppearanceSettings
+    private let accentSettings: AccentSettings
     private var streamingClient: TracksAPIClient?
     private let mediaDirectory: URL
     private let audioSession: AudioSessionController
@@ -90,6 +93,7 @@ final class AppModel {
         player.log = { message in playerLog.notice("\(message, privacy: .public)") }
         let settings = StreamingSettings()
         let appearanceSettings = AppearanceSettings()
+        let accentSettings = AccentSettings()
         self.service = service
         self.player = player
         self.cache = cache
@@ -97,7 +101,9 @@ final class AppModel {
         self.resolver = resolver
         self.streamingSettings = settings
         self.appearanceSettings = appearanceSettings
+        self.accentSettings = accentSettings
         self.appearanceMode = appearanceSettings.mode
+        self.accentPreference = accentSettings.preference
         self.streamingHost = settings.rawValue
         self.isStreamingConfigured = settings.baseURL != nil
         self.isMonochromeEnabled = settings.isEnabled
@@ -118,7 +124,11 @@ final class AppModel {
         }
         applyStreamingSettings()
         // One source of truth: every track the player actually starts lands in history.
-        player.onTrackStarted = { [weak self] track in self?.record(track) }
+        player.onTrackStarted = { [weak self] track in
+            self?.record(track)
+            guard let self, self.accentPreference == .artwork else { return }
+            Task { await self.refreshArtworkAccent() }
+        }
     }
 
     // MARK: - Appearance
@@ -126,6 +136,27 @@ final class AppModel {
     func setAppearanceMode(_ mode: AppearanceMode) {
         appearanceSettings.setMode(mode)
         appearanceMode = mode
+    }
+
+    func setAccentPreference(_ preference: AccentPreference) {
+        accentSettings.setPreference(preference)
+        accentPreference = preference
+        if preference == .artwork {
+            Task { await refreshArtworkAccent() }
+        } else {
+            artworkAccent = nil
+        }
+    }
+
+    private func refreshArtworkAccent() async {
+        guard accentPreference == .artwork,
+              let track = player.currentTrack,
+              track.artworkURL != nil || track.artworkFileName != nil else {
+            artworkAccent = nil
+            return
+        }
+        let tint = await artworkTint(for: track)
+        artworkAccent = tint == .neutral ? nil : tint
     }
 
     // MARK: - Streaming

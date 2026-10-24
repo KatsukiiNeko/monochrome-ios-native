@@ -10,6 +10,7 @@ struct PlayerView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accentColor) private var accent
     @State private var isShowingQueue = false
     @State private var tint = Color(ArtworkTintColor.neutral)
     @State private var pendingDownloadRemoval: DownloadItem?
@@ -133,7 +134,7 @@ struct PlayerView: View {
 
             HStack(spacing: 7) {
                 Rectangle()
-                    .fill(Theme.accent)
+                    .fill(accent)
                     .frame(width: 4, height: 4)
                     .accessibilityHidden(true)
                 DotMatrixLabel(
@@ -220,7 +221,7 @@ struct PlayerView: View {
                 } label: {
                     Image(systemName: model.isFavorite(track) ? "heart.fill" : "heart")
                         .font(.title3)
-                        .foregroundStyle(model.isFavorite(track) ? Theme.accent : Theme.primaryText)
+                        .foregroundStyle(model.isFavorite(track) ? accent : Theme.primaryText)
                         .frame(width: Theme.controlSize, height: Theme.controlSize)
                         .contentShape(Rectangle())
                 }
@@ -302,12 +303,12 @@ struct PlayerView: View {
         } label: {
             Image(systemName: player.repeatMode.symbolName)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(player.repeatMode == .off ? Theme.secondaryText : Theme.accent)
+                .foregroundStyle(player.repeatMode == .off ? Theme.secondaryText : accent)
                 .frame(width: Theme.controlSize, height: Theme.controlSize)
                 .overlay(alignment: .bottom) {
                     if player.repeatMode != .off {
                         Rectangle()
-                            .fill(Theme.accent)
+                            .fill(accent)
                             .frame(width: 5, height: 2)
                             .offset(y: -6)
                             .accessibilityHidden(true)

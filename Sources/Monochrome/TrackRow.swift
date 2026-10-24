@@ -14,6 +14,8 @@ struct TrackRow: View {
     var subtitle: String?
     var showsKind = false
 
+    @Environment(\.accentColor) private var accent
+
     private var rowSubtitle: String {
         if let subtitle { return subtitle }
         return showsKind ? "Song · \(track.displayArtist)" : track.displayArtist
@@ -33,7 +35,7 @@ struct TrackRow: View {
                     if isCurrent {
                         Image(systemName: "speaker.wave.2.fill")
                             .font(.caption2)
-                            .foregroundStyle(Theme.accent)
+                            .foregroundStyle(accent)
                             .accessibilityLabel("Now playing")
                     }
                     Text(track.title)
@@ -59,7 +61,7 @@ struct TrackRow: View {
             if showsFavorite, isFavorite {
                 Image(systemName: "heart.fill")
                     .font(.caption)
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(accent)
                     .accessibilityLabel("Favorite")
             }
             if showsDuration, let duration = track.durationSeconds {
