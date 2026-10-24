@@ -155,7 +155,7 @@ struct AudioSpecView: View {
     }
 
     private struct Row: Identifiable {
-        let id = UUID()
+        var id: String { label }
         let label: String
         let value: String
         let spokenValue: String

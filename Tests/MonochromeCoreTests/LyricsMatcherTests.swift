@@ -129,6 +129,21 @@ struct LyricsMatcherTests {
         #expect(LyricsMatcher.bestMatch(for: query(), in: [instrumental])?.instrumental == true)
     }
 
+    @Test func aSingleWordTitleDoesNotMatchByContainment() {
+        let query = query(title: "Home", artist: "Synthetic Artist")
+        let wrong = candidate(title: "Coming Home", artist: "Synthetic Artist")
+        #expect(LyricsMatcher.bestMatch(for: query, in: [wrong]) == nil)
+
+        let exact = candidate(title: "Home", artist: "Synthetic Artist")
+        #expect(LyricsMatcher.bestMatch(for: query, in: [exact]) != nil)
+    }
+
+    @Test func aSingleWordArtistDoesNotMatchByContainment() {
+        let query = query(title: "Synthetic Song", artist: "Adele")
+        let wrong = candidate(title: "Synthetic Song", artist: "Adele Blue Adkins")
+        #expect(LyricsMatcher.bestMatch(for: query, in: [wrong]) == nil)
+    }
+
     @Test func aTrackBuildsAQueryOnlyWhenTitleAndArtistExist() {
         let complete = Track(
             id: "stream:42",

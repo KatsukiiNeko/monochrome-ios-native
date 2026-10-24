@@ -48,16 +48,18 @@ public actor LyricsService {
     public var sourceName: String { provider.sourceName }
 
     /// Fresh cache, then the network, then a stale cache when the network fails.
-    public func load(_ query: LyricsQuery) async throws -> LyricsResult {
+    /// `refreshing` skips the fresh entry so Retry can ask the provider again.
+    public func load(_ query: LyricsQuery, refreshing: Bool = false) async throws -> LyricsResult {
         guard query.isQueryable else { throw LyricsLoadError.unavailable }
         let providerName = provider.sourceName
 
-        if let cached = await cache.result(for: query, provider: providerName, now: now()) {
+        if !refreshing,
+           let cached = await cache.result(for: query, provider: providerName, now: now()) {
             log?("lyrics cache hit track=\(query.trackID) state=\(Self.stateLabel(cached))")
             return cached
         }
 
-        log?("lyrics request track=\(query.trackID)")
+        log?("lyrics request track=\(query.trackID) refreshing=\(refreshing)")
         do {
             let result = try await fetchWithRetry(query)
             try Task.checkCancellation()
@@ -79,8 +81,10 @@ public actor LyricsService {
             }
             log?("lyrics error track=\(query.trackID) reason=\(error)")
             switch error {
-            case .offline, .transient:
+            case .offline:
                 throw LyricsLoadError.offline
+            case .transient:
+                throw LyricsLoadError.unavailable
             case .rateLimited(let retryAfter):
                 throw LyricsLoadError.rateLimited(retryAfter: retryAfter)
             default:

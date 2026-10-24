@@ -71,13 +71,13 @@ struct LyricsView: View {
             stateView(
                 title: "Offline",
                 message: "Lyrics are not available offline.",
-                retry: { Task { await load() } }
+                retry: { Task { await load(refreshing: true) } }
             )
         case .failed(let message):
             stateView(
                 title: "Could not load lyrics",
                 message: message,
-                retry: { Task { await load() } }
+                retry: { Task { await load(refreshing: true) } }
             )
         case .content(let result):
             switch result.content {
@@ -169,7 +169,7 @@ struct LyricsView: View {
         stateView(
             title: "No lyrics found",
             message: "This track is not in the lyrics database.",
-            retry: { Task { await load() } }
+            retry: { Task { await load(refreshing: true) } }
         )
     }
 
@@ -261,7 +261,7 @@ struct LyricsView: View {
 
     // MARK: - Loading
 
-    private func load() async {
+    private func load(refreshing: Bool = false) async {
         guard let query, query.isQueryable else {
             state = .missingMetadata
             return
@@ -270,7 +270,7 @@ struct LyricsView: View {
         state = .loading
         follow = true
         do {
-            let result = try await model.lyricsService.load(query)
+            let result = try await model.lyricsService.load(query, refreshing: refreshing)
             guard !Task.isCancelled, player.currentTrack?.id == trackID else { return }
             state = .content(result)
         } catch is CancellationError {

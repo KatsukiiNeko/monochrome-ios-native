@@ -77,6 +77,31 @@ struct LyricsServiceTests {
         try? FileManager.default.removeItem(at: directory)
     }
 
+    @Test func refreshingBypassesTheFreshCache() async throws {
+        let directory = temporaryDirectory()
+        let cache = LyricsCache(directory: directory)
+        await cache.store(found, for: query(), provider: "Fake", now: t0)
+        let refreshed = LyricsResult(
+            content: .synced([LyricLine(time: 1, text: "Refreshed synthetic line")]),
+            source: "Fake"
+        )
+        let recorder = FakeRecorder([.result(refreshed)])
+        let service = LyricsService(
+            provider: FakeLyricsProvider(recorder: recorder),
+            cache: cache,
+            now: { self.t0 },
+            retryDelay: .zero
+        )
+
+        let result = try await service.load(query(), refreshing: true)
+        let cached = try await service.load(query())
+
+        #expect(result == refreshed)
+        #expect(cached == refreshed)
+        #expect(await recorder.calls == 1)
+        try? FileManager.default.removeItem(at: directory)
+    }
+
     @Test func aTransientFailureIsRetriedOnce() async throws {
         let directory = temporaryDirectory()
         let recorder = FakeRecorder([.error(.transient), .result(found)])
@@ -104,7 +129,7 @@ struct LyricsServiceTests {
             retryDelay: .zero
         )
 
-        await #expect(throws: LyricsLoadError.offline) {
+        await #expect(throws: LyricsLoadError.unavailable) {
             _ = try await service.load(self.query())
         }
         #expect(await recorder.calls == 2)

@@ -111,10 +111,15 @@ public enum LyricsMatcher {
     private static func similarity(_ lhs: String, _ rhs: String) -> Double {
         if lhs == rhs { return 1 }
         guard !lhs.isEmpty, !rhs.isEmpty else { return 0 }
-        var score = 0.0
-        if lhs.contains(rhs) || rhs.contains(lhs) { score = 0.8 }
         let lhsTokens = Set(lhs.split(separator: " "))
         let rhsTokens = Set(rhs.split(separator: " "))
+        var score = 0.0
+        // Containment is weak evidence when one side is a single word: "Home"
+        // is not "Coming Home", and "Adele" is not "Adele Blue Adkins".
+        if min(lhsTokens.count, rhsTokens.count) > 1,
+           lhs.contains(rhs) || rhs.contains(lhs) {
+            score = 0.8
+        }
         let union = lhsTokens.union(rhsTokens)
         if !union.isEmpty {
             let jaccard = Double(lhsTokens.intersection(rhsTokens).count) / Double(union.count)
