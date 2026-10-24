@@ -154,6 +154,12 @@ chip variants and the build check covers compilation.
       Tap Follow: the sheet returns to the active line and follow resumes.
 - [ ] With Reduce Motion on, following still moves the list but without an
       animated scroll.
+- [ ] On a track whose file has timed blank lines, the last sung line stays
+      highlighted through the instrumental gap and the next line lights up when
+      it starts.
+- [ ] Open the timer menu: moving the highlight 0.25 s earlier or later updates
+      the lyric immediately, stays set after closing and reopening the sheet,
+      and Reset timing returns it to the provider timing.
 - [ ] Open a track with only plain lyrics, an instrumental track, and a track
       the provider does not know. Each state reads distinctly; not found and
       error states offer Retry.

@@ -80,6 +80,18 @@ Lines are sorted by time, and the active line is found by binary search with a
 small lead. Tapping a line seeks to its timestamp. Manual scrolling pauses
 auto-follow until Follow is tapped.
 
+### Gaps and timing
+
+A timed line with no text marks an instrumental gap. It keeps its space in the
+list but never takes the active highlight, so the last sung line stays lit until
+the next line starts instead of changing when the silence begins.
+
+Some provider files are shifted early or late across the whole song. The timer
+menu in the Lyrics sheet moves the highlight 0.25 s per step, up to 5 s either
+way, without changing the audio. The offset is stored on the device per track;
+Reset timing returns that track to the provider's timing. The offset is local
+only and is never sent to the provider.
+
 ## Copyright
 
 Lyrics belong to their authors and rights holders. The app displays provider
@@ -108,7 +120,8 @@ release and region. There is no fallback to another source.
 - Provider text quality, coverage and timing vary between records.
 - A track whose metadata differs from the provider record may show "not found";
   the matcher deliberately rejects uncertain candidates.
-- No translation, transliteration, sharing, editing or user timing offset is
-  included.
+- No translation, transliteration, sharing or editing is included.
+- Timing that the provider gets wrong can only be corrected per track with the
+  manual 0.25 s nudge; there is no automatic alignment.
 - The sheet cannot be judged visually from the build host; appearance, gestures
   and VoiceOver need a device.

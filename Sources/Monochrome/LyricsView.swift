@@ -11,6 +11,10 @@ struct LyricsView: View {
     @Environment(\.accentColor) private var accent
     @State private var state: LoadState = .loading
     @State private var follow = true
+    @State private var timingDelay: TimeInterval = 0
+
+    private static let timingStep: TimeInterval = 0.25
+    private static let maxTimingDelay: TimeInterval = 5
 
     private var player: PlayerController { model.player }
     private var track: Track? { player.currentTrack }
@@ -27,6 +31,9 @@ struct LyricsView: View {
             .navigationTitle("Lyrics")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    timingControl
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                         .fontWeight(.semibold)
@@ -36,6 +43,7 @@ struct LyricsView: View {
             .tint(accent)
         }
         .task(id: track?.id) {
+            loadTimingDelay()
             await load()
         }
     }
@@ -227,7 +235,67 @@ struct LyricsView: View {
     }
 
     private func activeIndex(in lines: [LyricLine]) -> Int? {
-        LyricsTimeline.activeIndex(in: lines, position: player.position)
+        LyricsTimeline.activeIndex(
+            in: lines,
+            position: player.position,
+            offset: -timingDelay
+        )
+    }
+
+    // MARK: - Timing
+
+    @ViewBuilder
+    private var timingControl: some View {
+        if case .content(let result) = state,
+           case .synced(let lines) = result.content,
+           !lines.isEmpty {
+            Menu {
+                Button("Earlier by 0.25 seconds", systemImage: "minus") {
+                    setTimingDelay(timingDelay - Self.timingStep)
+                }
+                Button("Later by 0.25 seconds", systemImage: "plus") {
+                    setTimingDelay(timingDelay + Self.timingStep)
+                }
+                if timingDelay != 0 {
+                    Divider()
+                    Button("Reset timing", systemImage: "arrow.counterclockwise") {
+                        setTimingDelay(0)
+                    }
+                }
+            } label: {
+                Image(systemName: "timer")
+            }
+            .accessibilityLabel("Lyrics timing")
+            .accessibilityValue(timingDescription)
+        }
+    }
+
+    private var timingDescription: String {
+        let value = abs(timingDelay)
+        guard value > 0 else { return "In sync" }
+        let text = value == value.rounded()
+            ? String(Int(value))
+            : String(format: "%g", value)
+        return timingDelay > 0 ? "\(text) seconds later" : "\(text) seconds earlier"
+    }
+
+    private var timingKey: String {
+        "lyrics.timingDelay.\(track?.id ?? "none")"
+    }
+
+    private func loadTimingDelay() {
+        let stored = UserDefaults.standard.double(forKey: timingKey)
+        timingDelay = min(max(stored, -Self.maxTimingDelay), Self.maxTimingDelay)
+    }
+
+    private func setTimingDelay(_ value: TimeInterval) {
+        let clamped = min(max(value, -Self.maxTimingDelay), Self.maxTimingDelay)
+        timingDelay = clamped
+        if clamped == 0 {
+            UserDefaults.standard.removeObject(forKey: timingKey)
+        } else {
+            UserDefaults.standard.set(clamped, forKey: timingKey)
+        }
     }
 
     private func followButton(_ proxy: ScrollViewProxy, active: Int?) -> some View {
