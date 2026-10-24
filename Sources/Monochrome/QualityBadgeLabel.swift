@@ -15,6 +15,7 @@ struct QualityBadgeLabel: View {
         Text(text.uppercased())
             .font(Theme.micro)
             .tracking(0.4)
+            .lineLimit(1)
             .foregroundStyle(foreground)
             .padding(.horizontal, 5)
             .padding(.vertical, 2)

@@ -54,7 +54,7 @@ The maintainer completed the physical-device test checklist and reports successf
 | Level | Meaning | Status |
 |---|---|---|
 | **L1 — Compile** | Swift sources compile for the target platform. | Passed |
-| **L2 — Unit tests** | Portable core behavior is tested on Linux. | Passed: 294 tests across 34 suites at the last recorded run, including the audio-specification formatters and the lyrics parser, matcher, cache, provider and service. |
+| **L2 — Unit tests** | Portable core behavior is tested on Linux. | Passed: 303 tests across 35 suites at the last recorded run, including the audio-info chip variants, audio-specification formatters and the lyrics parser, matcher, cache, provider and service. |
 | **L3 — Live service** | Catalog search and stream resolution are checked against the live catalog. | Passed in the recorded live-service checks; the opt-in live test is not run by default. Lyrics response shape and English/Vietnamese coverage were checked against LRCLIB from Linux; see [`docs/LYRICS.md`](docs/LYRICS.md). |
 | **L4 — Physical device** | Playback and iOS-specific behavior are checked on a real iPhone. | Passed: the 0.2.0 release was verified on an iPhone 12 Pro Max. |
 

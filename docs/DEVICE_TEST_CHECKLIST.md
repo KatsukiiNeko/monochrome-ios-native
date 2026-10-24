@@ -91,6 +91,21 @@ item by hand.
 - [ ] The queue sheet opens at medium and large detents; jump, reorder and
       remove affect playback order as expected.
 - [ ] Format, Cached and AirPlay appear only when their real state exists.
+- [ ] Open Now Playing: the action icons for Lyrics, Queue, Download and AirPlay
+      sit on one line, share the row evenly and stay 44 pt tall. No label is
+      cut off and the word "Downloaded" does not appear in this row.
+- [ ] The audio info line under the title shows the format badge and the
+      bit-depth/sample-rate summary on one line. Narrow the window or raise the
+      text size: the line drops the summary, then the status, instead of
+      wrapping mid-word or showing an ellipsis.
+- [ ] Change the download state: the row icon moves through not downloaded,
+      downloading (progress ring) and downloaded (accent checkmark). Tapping the
+      downloaded icon asks before removing the offline copy.
+- [ ] Enter a long title and artist, then the largest text size: the action row
+      stays even and the info line stays on one line.
+
+Layout and feel can only be judged by a person; the host tests cover only the
+chip variants and the build check covers compilation.
 
 ## Playback
 
