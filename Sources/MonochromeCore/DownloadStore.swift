@@ -304,6 +304,24 @@ public actor DownloadStore: DownloadedAudioProviding {
         removeRecord(id: id, removeFile: true)
     }
 
+    /// Removes every recorded download and its audio file. Files that are not
+    /// referenced by a record are left alone.
+    public func removeAll() throws {
+        for task in tasks.values { task.cancel() }
+        tasks.removeAll()
+        active.removeAll()
+        let files = records.values.map(\.fileName)
+        let removed = records
+        records.removeAll()
+        guard writeRecords() else {
+            records = removed
+            throw DownloadError.recordWriteFailed
+        }
+        for file in files {
+            try? FileManager.default.removeItem(at: directory.appendingPathComponent(file))
+        }
+    }
+
     // MARK: - Launch recovery
 
     /// Removes partial files, records whose file is gone, and orphan files.

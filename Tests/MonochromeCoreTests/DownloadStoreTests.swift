@@ -218,10 +218,13 @@ struct DownloadStoreTests {
         try await download(store, track)
         let item = try #require(await store.items().first)
         let audio = try #require(await store.downloadedFile(for: track))
+        let unrelated = directory.appendingPathComponent("imported.flac")
+        try Data("keep".utf8).write(to: unrelated)
 
         try await store.remove(id: item.id)
 
         #expect(!FileManager.default.fileExists(atPath: audio.url.path))
+        #expect(FileManager.default.fileExists(atPath: unrelated.path))
         #expect(await store.items().isEmpty)
         try? FileManager.default.removeItem(at: directory)
     }
@@ -286,6 +289,24 @@ struct DownloadStoreTests {
         await #expect(throws: DownloadError.recordsUnavailable) {
             try await download(store, downloadTrack())
         }
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    @Test func removeAllDeletesRecordedAudioOnly() async throws {
+        let directory = temporaryDirectory()
+        let store = makeStore(directory: directory, downloader: DownloadFake())
+        try await download(store, downloadTrack("1"))
+        try await download(store, downloadTrack("2"))
+        let unrelated = directory.appendingPathComponent("imported.flac")
+        try Data("keep".utf8).write(to: unrelated)
+
+        try await store.removeAll()
+
+        #expect(await store.items().isEmpty)
+        #expect(FileManager.default.fileExists(atPath: unrelated.path))
+        let files = Set((try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? [])
+        #expect(files.contains("imported.flac"))
+        #expect(!files.contains { $0.hasSuffix(".flac") && $0 != "imported.flac" })
         try? FileManager.default.removeItem(at: directory)
     }
 

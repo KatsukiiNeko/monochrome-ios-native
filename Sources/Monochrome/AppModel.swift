@@ -23,9 +23,6 @@ final class AppModel {
     private(set) var isMonochromeEnabled: Bool
     private(set) var streamingSettingsError: String?
     private(set) var appearanceMode: AppearanceMode
-    private(set) var cacheSizeBytes = 0
-    private(set) var cacheEntryCount = 0
-    private(set) var cachedTracks: [CachedTrackSummary] = []
     private(set) var downloads: [DownloadItem] = []
     private(set) var downloadsMetadataError: String?
     private(set) var isRefreshingDownloads = false
@@ -37,7 +34,6 @@ final class AppModel {
     private let resolver: DefaultTrackResolver
     private let streamingSettings: StreamingSettings
     private let appearanceSettings: AppearanceSettings
-    private let cacheSettings: AudioCacheSettings
     private var streamingClient: TracksAPIClient?
     private let mediaDirectory: URL
     private let audioSession: AudioSessionController
@@ -58,7 +54,6 @@ final class AppModel {
             metadataReader: AVAssetMetadataReader()
         )
         let resolver = DefaultTrackResolver(localDirectory: media)
-        let cacheSettings = AudioCacheSettings()
         // Temporary cache only. Permanent user files live in Application Support
         // and must never be moved under this directory.
         let cacheDirectory = FileManager.default
@@ -70,12 +65,8 @@ final class AppModel {
         try? excluded.setResourceValues(resourceValues)
         let cache = AudioCache(
             directory: cacheDirectory,
-            downloader: URLSessionFileDownloader(allowsCellular: {
-                UserDefaults.standard.bool(forKey: AudioCacheSettings.storageKey)
-            }),
-            allowsExpensiveNetwork: {
-                UserDefaults.standard.bool(forKey: AudioCacheSettings.storageKey)
-            },
+            downloader: URLSessionFileDownloader(allowsCellular: { false }),
+            allowsExpensiveNetwork: { false },
             log: { message in playerLog.notice("\(message, privacy: .public)") }
         )
         // Permanent downloads live beside the library, not under Caches.
@@ -103,7 +94,6 @@ final class AppModel {
         self.player = player
         self.cache = cache
         self.downloadStore = downloadStore
-        self.cacheSettings = cacheSettings
         self.resolver = resolver
         self.streamingSettings = settings
         self.appearanceSettings = appearanceSettings
@@ -238,11 +228,7 @@ final class AppModel {
     func loadTracks() async {
         // Launch is the safe boundary for interrupted-write and orphan cleanup.
         if !didReconcileCache {
-            if cacheSettings.clearOnLaunch {
-                await cache.clear()
-            } else {
-                await cache.reconcile()
-            }
+            await cache.reconcile()
             didReconcileCache = true
         }
         if !didReconcileDownloads {
@@ -259,7 +245,6 @@ final class AppModel {
         favorites = loadFavorites()
         recents = (try? historyStore.load()) ?? []
         searchRecents = (try? searchHistoryStore.load()) ?? []
-        await refreshCacheSize()
         await refreshDownloads()
     }
 
@@ -328,33 +313,8 @@ final class AppModel {
 
     // MARK: - Cache
 
-    func refreshCacheSize() async {
-        let tracks = await cache.cachedTracks()
-        // Old sidecars have no display metadata; fill it from anything already loaded.
-        var known: [String: Track] = [:]
-        for track in self.tracks + recents + searchRecents + favorites {
-            known[track.id] = track
-        }
-        cachedTracks = tracks.map { summary in
-            guard let track = known[summary.trackID] else { return summary }
-            var enriched = summary
-            if enriched.title == nil { enriched.title = track.title }
-            if enriched.artist == nil { enriched.artist = track.displayArtist }
-            if enriched.artworkURL == nil { enriched.artworkURL = track.artworkURL }
-            return enriched
-        }
-        cacheEntryCount = cachedTracks.count
-        cacheSizeBytes = cachedTracks.reduce(0) { $0 + $1.byteSize }
-    }
-
-    func removeCachedTrack(_ track: CachedTrackSummary) async {
-        await cache.remove(trackID: track.trackID, qualityName: track.quality)
-        await refreshCacheSize()
-    }
-
     func clearCache() async {
         await cache.clear()
-        await refreshCacheSize()
     }
 
     // MARK: - Permanent downloads
@@ -425,6 +385,18 @@ final class AppModel {
     func removeDownload(_ item: DownloadItem) async -> Bool {
         do {
             try await downloadStore.remove(id: item.id)
+            await refreshDownloads()
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    @discardableResult
+    func removeAllDownloads() async -> Bool {
+        do {
+            try await downloadStore.removeAll()
             await refreshDownloads()
             return true
         } catch {
