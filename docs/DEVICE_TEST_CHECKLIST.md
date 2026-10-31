@@ -164,6 +164,63 @@ chip variants and the build check covers compilation.
       Dark appearance.
 - [ ] VoiceOver reads each row as a sentence, for example "Sample rate, 44.1
       kilohertz", and the sheet works at the largest text size.
+- [ ] With the equalizer on, the Audio sheet lists an Equalizer row naming the
+      preset; for HLS or an item without audio it reads "On · unavailable".
+
+## Equalizer
+
+The tap path has only been host-tested and compile-checked. Everything below
+needs a person with headphones, because a curve that is computed correctly can
+still be audible as a click, a gap or no change at all.
+
+- [ ] Open Now Playing and tap the equalizer control: the sheet opens at the
+      large detent and Done dismisses it. The control reads as active only while
+      a curve is shaping the signal.
+- [ ] Enable the equalizer with a flat curve: the audio is unchanged, the
+      control stays inactive, and nothing clicks.
+- [ ] Pick Monochrome presets and Classic presets in turn: each applies without a
+      click or a dropout, and the curve, the peak/preamp sentence and the fader
+      positions agree.
+- [ ] Drag a graphic band: the sound and the curve change as the finger moves,
+      the gain snaps to 0.5 dB, and double-tapping the band returns it to 0 dB.
+- [ ] In parametric mode, add a band, change its type, frequency, gain and Q, and
+      remove it: every change is audible and no change cuts the audio out.
+- [ ] With Auto preamp on, raising a boost does not make playback louder or
+      quieter overall; switching to Manual and lowering the preamp makes it
+      quieter.
+- [ ] Push the curve until the clip light comes on: it appears within about a
+      second, and clears when the level drops or the preamp is lowered.
+- [ ] Dynamic Boost at 6 dB on quiet material: it gets louder, and the loudest
+      passages do not distort. It cannot make loud material louder.
+- [ ] Stereo width at 0% collapses to mono and at 200% widens; no channel swap.
+- [ ] Turn the equalizer off while playing: the audio returns to unmodified and
+      the change does not click or drop out.
+- [ ] Play a track while the equalizer is on, lock the screen, and change tracks
+      from the Lock Screen: playback continues with the curve still applied. The
+      tap is rebuilt per item; the equalizer must survive that.
+- [ ] Skip through five or more tracks with the equalizer on: no clicks, no
+      silence after a track change, and no track plays with the previous track's
+      curve on a different sample rate.
+- [ ] Let one track end and the next start on its own: the same applies.
+- [ ] Repeat with a permanent download and with a cached track, not only a
+      stream.
+- [ ] Play an HLS or other unprocessable item: the sheet shows the unavailable
+      banner, the controls stay readable but the audio is untouched, and no row
+      claims the equalizer is acting.
+- [ ] Import a text file from Files with an AutoEQ profile: the bands replace the
+      curve, the summary reports ignored or clamped lines, and the sound changes.
+- [ ] Export the current curve, then import that file: the curve returns
+      unchanged.
+- [ ] Save the current curve as a preset, relaunch the app, and confirm it is
+      still there and still selected; delete it and confirm the selection falls
+      back to Flat.
+- [ ] Kill the app mid-playback with the equalizer on and relaunch: the saved
+      state is restored and the first track plays with it.
+- [ ] VoiceOver: each fader reads its frequency and gain in decibels, adjusts in
+      0.5 dB steps, and the curve is skipped rather than read as an image.
+- [ ] Layout at the largest Dynamic Type size and on the smallest supported
+      iPhone: the ten faders, the parametric rows, the value labels and the
+      import/export buttons stay on screen or scroll without overlap.
 
 ## Lyrics
 
@@ -337,3 +394,10 @@ Cache decisions are logged under the same subsystem with `cache hit`,
 `cache clear removed=…`, `cache slot released`, and the loop logs
 `loop source=cache` or `loop source=network`. Each line carries the track id or
 cache key, so it can be matched to what was on screen.
+
+The equalizer logs `eq unavailable reason=…` (HLS, no audio track), `eq state
+enabled=true|false filters=… sampleRate=…` on every change, `eq tap prepare
+sr=… ch=… interleaved=… float=…` once per item, and `eq tap frames=…` once a
+second. A curve that appears to do nothing while `frames` stays at zero means
+the tap is not receiving audio; a curve that does nothing on a track that logged
+`eq unavailable` is expected.
