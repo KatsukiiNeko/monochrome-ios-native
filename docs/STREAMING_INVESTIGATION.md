@@ -14,9 +14,9 @@ Search, metadata and downloads work; a downloaded FLAC plays. Only the
 this app's 20-second readiness timeout text, not a separate network diagnosis.
 
 The request-identity hypothesis is the strongest available explanation: the
-catalog API and the downloader send the app's own user agent, while
-`AVPlayer` sent the system CoreMedia identity. The failing request is the only
-one that used a different identity. The fix sets
+catalog API sends the app's own user agent and the downloader uses
+URLSession's default, while `AVPlayer` sent the system CoreMedia identity.
+The failing request is the only one using CoreMedia. The fix sets
 `AVURLAssetHTTPUserAgentKey` to the same truthful user agent the API client
 uses.
 
@@ -118,7 +118,7 @@ committed, because an unverified probe is not product code.
 |---|---|---|---|
 | H1 | The server response is not AVFoundation-compatible (length, ranges, status, body) | **Unverified** | The last contract was range-capable; the host returned nothing to the build host now. No device log. |
 | H2 | Two consumers hit the same URL while the item loads | **Rejected as the cause of the initial failure** | The cache download and the audio-format probe both start only after `.readyToPlay`. A mid-playback collision remains possible but cannot produce an initial `-1008`/timeout. |
-| H3 | User-Agent / request identity | **Strongly supported, not confirmed** | API and download requests send `MonochromeNative/1.0 (iOS; independent client)`; `AVPlayer` sent CoreMedia. The failing path is the only one with a different identity. The interrupted change in the working tree was exactly `AVURLAssetHTTPUserAgentKey`. |
+| H3 | User-Agent / request identity | **Strongly supported, not confirmed** | API requests send `MonochromeNative/1.0 (iOS; independent client)`, download requests use URLSession's default, and `AVPlayer` sent CoreMedia. The failing path is the only one using CoreMedia. The interrupted change in the working tree was exactly `AVURLAssetHTTPUserAgentKey`. |
 | H4 | MIME override mismatch | **Partially addressed, unverified** | `AVURLAssetOverrideMIMETypeKey = audio/flac` is present and is the documented way to declare an extensionless resource. It is the same symptom `a36ccb4` fixed, so a regression or a server change cannot be ruled out. |
 | H5 | Redirects or expiry | **Unverified, unlikely** | The last contract showed no redirect and no signed URL. The host was unreachable, so redirects could not be replayed. |
 | H6 | A recent regression in source routing, cache order, or the audio-spec probe | **No code regression found** | The network path, resolver output and MIME options are unchanged since `a36ccb4`; the later consumers run after readiness. |
@@ -154,9 +154,9 @@ Files changed:
 Why this is the smallest step: the request-identity difference is the only
 observed difference between the working download and the failing playback.
 The change only adds a header identity that the same host already accepts from
-the API and downloader. It does not add a fallback download, a custom resource
-loader, or a new playback engine; those would hide the cause before the device
-logs can show it.
+the API client. It does not add a fallback download, a custom resource loader,
+or a new playback engine; those would hide the cause before the device logs can
+show it.
 
 ## Verification
 

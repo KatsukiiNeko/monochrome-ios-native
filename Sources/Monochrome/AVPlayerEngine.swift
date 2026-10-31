@@ -54,7 +54,7 @@ final class AVPlayerEngine: PlaybackEngine {
         // The catalog host serves FLAC as application/octet-stream without a path
         // extension, which leaves AVFoundation unable to pick a parser on its own.
         var options: [String: Any] = [
-            // Use the same truthful identity as the catalog API and downloader;
+            // Use the same truthful identity as the catalog API client;
             // AVFoundation's default CoreMedia identity differs from it.
             AVURLAssetHTTPUserAgentKey: TracksAPIClient.userAgent,
         ]
