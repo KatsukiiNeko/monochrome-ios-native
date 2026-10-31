@@ -14,7 +14,8 @@ struct LyricsView: View {
     @State private var timingDelay: TimeInterval = 0
 
     private static let timingStep: TimeInterval = 0.25
-    private static let maxTimingDelay: TimeInterval = 5
+
+    private let timingStore = LyricsTimingStore()
 
     private var player: PlayerController { model.player }
     private var track: Track? { player.currentTrack }
@@ -298,23 +299,12 @@ struct LyricsView: View {
         return "\(text) seconds"
     }
 
-    private var timingKey: String {
-        "lyrics.timingDelay.\(track?.id ?? "none")"
-    }
-
     private func loadTimingDelay() {
-        let stored = UserDefaults.standard.double(forKey: timingKey)
-        timingDelay = min(max(stored, -Self.maxTimingDelay), Self.maxTimingDelay)
+        timingDelay = timingStore.delay(for: track?.id)
     }
 
     private func setTimingDelay(_ value: TimeInterval) {
-        let clamped = min(max(value, -Self.maxTimingDelay), Self.maxTimingDelay)
-        timingDelay = clamped
-        if clamped == 0 {
-            UserDefaults.standard.removeObject(forKey: timingKey)
-        } else {
-            UserDefaults.standard.set(clamped, forKey: timingKey)
-        }
+        timingDelay = timingStore.setDelay(value, for: track?.id)
     }
 
     private func followButton(_ proxy: ScrollViewProxy, active: Int?) -> some View {
