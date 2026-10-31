@@ -13,6 +13,7 @@ struct PlayerView: View {
     @State private var isShowingQueue = false
     @State private var isShowingAudioSpec = false
     @State private var isShowingLyrics = false
+    @State private var isShowingEqualizer = false
     @State private var outputMonitor = AudioOutputMonitor()
     @State private var tint = Color(ArtworkTintColor.neutral)
     @State private var pendingDownloadRemoval: DownloadItem?
@@ -82,13 +83,19 @@ struct PlayerView: View {
                 .presentationBackground(Theme.background)
         }
         .sheet(isPresented: $isShowingAudioSpec) {
-            AudioSpecView(spec: audioSpec, outputMonitor: outputMonitor)
+            AudioSpecView(spec: audioSpec, outputMonitor: outputMonitor, equalizer: model.equalizer)
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.background)
         }
         .sheet(isPresented: $isShowingLyrics) {
             LyricsView(model: model)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.background)
+        }
+        .sheet(isPresented: $isShowingEqualizer) {
+            EqualizerView(eq: model.equalizer)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.background)
@@ -482,6 +489,8 @@ struct PlayerView: View {
                     lyricsControl(track)
                 }
 
+                equalizerControl
+
                 if !player.queue.isEmpty {
                     queueControl
                 }
@@ -508,8 +517,20 @@ struct PlayerView: View {
             .contentShape(Rectangle())
     }
 
-    private var queueControl: some View {
-        Button {
+    private var equalizerControl: some View {
+        let isOn = model.equalizer.settings.isEnabled && !model.equalizer.settings.isFlat
+        return Button {
+            isShowingEqualizer = true
+        } label: {
+            actionIcon("slider.vertical.3", active: isOn)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Equalizer")
+        .accessibilityValue(isOn ? model.equalizer.selectedPresetName : "Off")
+        .accessibilityHint("Opens the equalizer")
+    }
+
+    private var queueControl: some View {        Button {
             isShowingQueue = true
         } label: {
             actionIcon("list.bullet")

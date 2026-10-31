@@ -6,6 +6,7 @@ import SwiftUI
 struct AudioSpecView: View {
     let spec: AudioSpec
     let outputMonitor: AudioOutputMonitor
+    var equalizer: EQController?
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accentColor) private var accent
@@ -97,6 +98,23 @@ struct AudioSpecView: View {
             let value = [output.port.label, rate].compactMap { $0 }.joined(separator: " · ")
             rows.append(Row(
                 label: "Output",
+                value: value,
+                spokenValue: value.replacingOccurrences(of: " · ", with: ", "),
+                provenance: nil
+            ))
+        }
+        if let equalizer {
+            let isOn = equalizer.settings.isEnabled && !equalizer.settings.isFlat
+            let value: String
+            if isOn, !equalizer.availability.isAvailable {
+                value = "On · unavailable"
+            } else if isOn {
+                value = "On · \(equalizer.selectedPresetName)"
+            } else {
+                value = "Off"
+            }
+            rows.append(Row(
+                label: "Equalizer",
                 value: value,
                 spokenValue: value.replacingOccurrences(of: " · ", with: ", "),
                 provenance: nil
