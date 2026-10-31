@@ -155,17 +155,6 @@ struct EQBandFader: View {
                         onGain((raw * 2).rounded() / 2)
                     }
             )
-            .accessibilityElement()
-            .accessibilityLabel(frequencyLabel)
-            .accessibilityValue(gainSpoken)
-            .accessibilityAdjustableAction { direction in
-                switch direction {
-                case .increment: onGain(min(gain + 0.5, range))
-                case .decrement: onGain(max(gain - 0.5, -range))
-                @unknown default: break
-                }
-            }
-            .accessibilityHint("Adjusts this band. Double tap and hold, then slide up or down.")
 
             Text(shortFrequency)
                 .font(Theme.micro)
@@ -175,6 +164,19 @@ struct EQBandFader: View {
         }
         .frame(maxWidth: .infinity)
         .onTapGesture(count: 2) { onGain(0) }
+        // One stop per band instead of three, and the same values the sighted
+        // labels show.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(frequencyLabel)
+        .accessibilityValue(gainSpoken)
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: onGain(min(gain + 0.5, range))
+            case .decrement: onGain(max(gain - 0.5, -range))
+            @unknown default: break
+            }
+        }
+        .accessibilityHint("Swipe up or down to adjust this band.")
     }
 
     private var thumbSpace: CGFloat { 2 }

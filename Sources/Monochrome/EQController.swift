@@ -59,6 +59,10 @@ final class EQController {
 
     var selectedPresetName: String { selectedPreset?.name ?? "Custom" }
 
+    /// Stereo width does nothing without a second channel; the row is disabled
+    /// for a mono item rather than pretending to act.
+    var isMono: Bool { player.format?.channels == 1 }
+
     var isPresetModified: Bool { settings.isPresetModified }
 
     var currentFilters: [FilterSpec] { settings.effectiveFilters }

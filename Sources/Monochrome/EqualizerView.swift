@@ -15,6 +15,7 @@ struct EqualizerView: View {
     @State private var newPresetName = ""
     @State private var nameError: String?
     @State private var isImporting = false
+    @State private var importError: String?
     @State private var pendingDeletion: EQPreset?
 
     private var sampleRate: Double { eq.sampleRate() }
@@ -70,16 +71,20 @@ struct EqualizerView: View {
                 allowedContentTypes: [.plainText, .text],
                 allowsMultipleSelection: false
             ) { result in
+                importError = nil
                 switch result {
                 case .success(let urls):
                     guard let url = urls.first else { return }
                     let accessing = url.startAccessingSecurityScopedResource()
                     defer { if accessing { url.stopAccessingSecurityScopedResource() } }
-                    if let text = try? String(contentsOf: url, encoding: .utf8) {
-                        eq.importText(text)
+                    do {
+                        eq.importText(try String(contentsOf: url, encoding: .utf8))
+                    } catch {
+                        importError = "Could not read that file as UTF-8 text."
+                        playerLog.notice("eq import failed: \(error.localizedDescription, privacy: .public)")
                     }
-                case .failure:
-                    break
+                case .failure(let error):
+                    importError = "Could not open that file: \(error.localizedDescription)"
                 }
             }
         }
@@ -414,15 +419,18 @@ struct EqualizerView: View {
                 value: eq.settings.preampDB(sampleRate: sampleRate),
                 range: -24...24,
                 display: String(format: "%+.1f dB", eq.settings.preampDB(sampleRate: sampleRate)),
-                spoken: String(format: "%+.1f decibels", eq.settings.preampDB(sampleRate: sampleRate))
+                spoken: String(
+                    format: "%+.1f decibels%@",
+                    eq.settings.preampDB(sampleRate: sampleRate),
+                    eq.settings.autoPreamp ? ", automatic" : ""
+                )
             ) { value in
+                // Touching the slider takes over from the automatic value.
                 eq.setManualPreamp(value)
             }
-            .disabled(eq.settings.autoPreamp)
-            .opacity(eq.settings.autoPreamp ? 0.6 : 1)
 
             Text(eq.settings.autoPreamp
-                ? "Headroom is set from the loudest point of the curve."
+                ? "Headroom is set from the loudest point of the curve. Moving the slider switches to manual."
                 : "Manual preamp. Watch the clip light: the curve can exceed 0 dBFS.")
                 .font(Theme.caption)
                 .foregroundStyle(Theme.tertiaryText)
@@ -452,8 +460,10 @@ struct EqualizerView: View {
                 "Stereo width",
                 value: eq.settings.stereoWidth,
                 range: 0...2,
-                display: String(format: "%.0f%%", eq.settings.stereoWidth * 100)
+                display: eq.isMono ? "Mono" : String(format: "%.0f%%", eq.settings.stereoWidth * 100)
             ) { eq.setStereoWidth($0) } onReset: { eq.setStereoWidth(1) }
+            .disabled(eq.isMono)
+            .accessibilityHint(eq.isMono ? "Unavailable for a mono track" : "Widens or narrows the stereo image")
 
             effectRow(
                 "Dynamic Boost",
@@ -540,10 +550,19 @@ struct EqualizerView: View {
             }
 
             if let summary = eq.importSummary {
-                Text(summary.summaryText)
+                Text(summary.filters.isEmpty ? "No filters found in that file." : summary.summaryText)
                     .font(Theme.caption)
                     .foregroundStyle(Theme.secondaryText)
-                    .accessibilityLabel("Imported \(summary.summaryText)")
+                    .accessibilityLabel(
+                        summary.filters.isEmpty ? "No filters found in that file" : "Imported \(summary.summaryText)"
+                    )
+            }
+
+            if let importError {
+                Text(importError)
+                    .font(Theme.caption)
+                    .foregroundStyle(Theme.destructive)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Text("Accept two common text forms: ParametricEQ files and Equalizer APO filters (PK, LS, HS).")
