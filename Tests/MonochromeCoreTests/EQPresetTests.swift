@@ -130,6 +130,27 @@ private let catalogCenters: [String: [Double]] = [
     }
 }
 
+@Test func presetMatchingDetectsEveryKindOfEdit() {
+    var settings = EQSettings()
+    let preset = EQPresetCatalog.preset(id: "mono.rock")!
+    settings.apply(preset)
+    #expect(settings.matches(preset))
+
+    settings.filters[0].gainDB += 0.5
+    #expect(!settings.matches(preset))
+
+    settings.apply(preset)
+    settings.bassDB = 2
+    #expect(!settings.matches(preset))
+
+    var classic = EQSettings()
+    let graphic = EQPresetCatalog.preset(id: "classic.rock")!
+    classic.apply(graphic)
+    #expect(classic.matches(graphic))
+    classic.graphicGains[3] = 0
+    #expect(!classic.matches(graphic))
+}
+
 @Test func catalogHasNoDuplicateIDsAndExpectedGroups() {
     let ids = EQPresetCatalog.all.map(\.id)
     #expect(Set(ids).count == ids.count)

@@ -168,4 +168,25 @@ public struct EQSettings: Codable, Equatable, Sendable {
         guard value.isFinite else { return low }
         return min(max(value, low), high)
     }
+
+    /// Whether the current curve still equals the preset it was selected from.
+    /// Effects and preamp are part of the comparison, so moving a slider marks
+    /// the selection as modified.
+    public func matches(_ preset: EQPreset) -> Bool {
+        guard bassDB == 0, clarityDB == 0, stereoWidth == 1, dynamicBoostDB == 0 else {
+            return false
+        }
+        if let gains = preset.graphicGains {
+            guard mode == .graphic, gains.count == graphicGains.count else { return false }
+            return zip(gains, graphicGains).allSatisfy { abs($0 - $1) < 0.001 }
+        }
+        guard mode == .parametric, filters.count == preset.filters.count else { return false }
+        return zip(filters, preset.filters).allSatisfy { left, right in
+            left.kind == right.kind
+                && abs(left.frequency - right.frequency) < 0.001
+                && abs(left.gainDB - right.gainDB) < 0.001
+                && abs(left.q - right.q) < 0.001
+                && left.enabled == right.enabled
+        }
+    }
 }

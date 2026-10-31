@@ -198,6 +198,10 @@ final class AVPlayerEngine: PlaybackEngine {
         applyEqualizer()
     }
 
+    func takeEqualizerPeak() -> Double {
+        eqTapStorage?.takePeak() ?? 0
+    }
+
     /// Publishes the settings as coefficients for the current sample rate and
     /// adds or removes the audio mix. A flat curve leaves the item untouched.
     private func applyEqualizer() {

@@ -25,9 +25,12 @@ public protocol PlaybackEngine: AnyObject {
     func setEqualizer(_ settings: EQSettings)
     /// Whether the current item can carry the equalizer.
     var eqAvailability: EQAvailability { get }
+    /// Largest pre-limiter sample seen since the last call, for the clip light.
+    func takeEqualizerPeak() -> Double
 }
 
 public extension PlaybackEngine {
     func setEqualizer(_ settings: EQSettings) {}
     var eqAvailability: EQAvailability { .available }
+    func takeEqualizerPeak() -> Double { 0 }
 }

@@ -18,6 +18,7 @@ final class AppModel {
     let cache: AudioCache
     let downloadStore: DownloadStore
     let lyricsService: LyricsService
+    let equalizer: EQController
     private(set) var streamingHost: String
     /// The catalog is usable: enabled and pointed at a valid host.
     private(set) var isStreamingConfigured: Bool
@@ -106,6 +107,23 @@ final class AppModel {
         let settings = StreamingSettings()
         let appearanceSettings = AppearanceSettings()
         let accentSettings = AccentSettings()
+        // The equalizer file holds no audio; keep it out of iCloud backups.
+        var equalizerFile = base.appendingPathComponent("equalizer.json")
+        var equalizerValues = URLResourceValues()
+        equalizerValues.isExcludedFromBackup = true
+        try? equalizerFile.setResourceValues(equalizerValues)
+        let equalizerController = EQController(
+            store: EQSettingsStore(
+                fileURL: equalizerFile,
+                log: { message in playerLog.notice("\(message, privacy: .public)") }
+            ),
+            player: player,
+            sampleRate: { [weak player] in
+                let rate = player?.format?.sampleRateHz ?? 0
+                return rate > 0 ? Double(rate) : 48_000
+            },
+            log: { message in playerLog.notice("\(message, privacy: .public)") }
+        )
         self.service = service
         self.player = player
         self.cache = cache
@@ -121,6 +139,7 @@ final class AppModel {
         self.isStreamingConfigured = settings.baseURL != nil
         self.isMonochromeEnabled = settings.isEnabled
         self.mediaDirectory = media
+        self.equalizer = equalizerController
         self.favoritesStore = FavoritesStore(fileURL: base.appendingPathComponent("favorites.json"))
         self.historyStore = HistoryStore(fileURL: base.appendingPathComponent("history.json"))
         self.searchHistoryStore = HistoryStore(
@@ -136,6 +155,7 @@ final class AppModel {
             return track.artworkURL
         }
         applyStreamingSettings()
+        equalizer.activate()
         // One source of truth: every track the player actually starts lands in history.
         player.onTrackStarted = { [weak self] track in
             self?.record(track)

@@ -177,6 +177,11 @@ public final class PlayerController {
 
     public var eqAvailability: EQAvailability { engine.eqAvailability }
 
+    /// Reads and clears the clip light counter.
+    public func takeEqualizerPeak() -> Double {
+        engine.takeEqualizerPeak()
+    }
+
     public func setRepeatMode(_ mode: RepeatMode) {
         repeatMode = mode
     }
