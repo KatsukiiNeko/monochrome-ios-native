@@ -231,6 +231,13 @@ public final class PlayerController {
             await handleEndOfTrack()
         case .failed(let message):
             log?("playback failure message=\(message)")
+            // A load failure is thrown by `load` and handled where it was awaited.
+            // A relayed copy during `.loading` is that same failed item; letting it
+            // through here would replace the staged retry with a visible failure.
+            if case .loading = state {
+                log?("playback failure ignored reason=loading")
+                return
+            }
             // A stream can expire mid-playback; resolve once more before giving up.
             if queue.current?.isStreaming == true, !didRetryCurrentTrack {
                 didRetryCurrentTrack = true
@@ -442,13 +449,21 @@ public final class PlayerController {
                 didRetryCurrentTrack = true
                 // AVFoundation can refuse the extensionless catalog stream even when
                 // the same bytes download fine; stage it and let the retry play locally.
-                await stageInCacheForRetry(track)
-                // The user may have skipped while the download was running.
-                guard queue.current?.id == track.id else {
-                    log?("play retry aborted id=\(track.id) reason=stale")
-                    return
+                switch await stageInCacheForRetry(track) {
+                case true?:
+                    // The user may have skipped while the download was running.
+                    guard queue.current?.id == track.id else {
+                        log?("play retry aborted id=\(track.id) reason=stale")
+                        return
+                    }
+                    await loadCurrent(retrying: true, forLoop: forLoop)
+                case false?:
+                    // The download failed too; the direct URL will not behave better.
+                    state = .failed(error.localizedDescription)
+                    log?("play state=failed id=\(track.id)")
+                case nil:
+                    await loadCurrent(retrying: true, forLoop: forLoop)
                 }
-                await loadCurrent(retrying: true, forLoop: forLoop)
             } else {
                 state = .failed(error.localizedDescription)
                 log?("play state=failed id=\(track.id)")
@@ -456,16 +471,17 @@ public final class PlayerController {
         }
     }
 
-    /// Fetches the stream through the cache downloader so the retry can play a
-    /// local file. A failed download leaves the retry on the network path.
-    private func stageInCacheForRetry(_ track: Track) async {
-        guard let cache else { return }
+    /// Stages the stream through the cache downloader so the retry can play a
+    /// local file. Returns nil when this track cannot be staged, true when a cache
+    /// hit is ready, false when the download itself failed.
+    private func stageInCacheForRetry(_ track: Track) async -> Bool? {
+        guard let cache else { return nil }
         do {
             let url = try await resolver.url(for: track)
             let contentType = await resolver.contentType(for: track)
             guard CacheEligibility.isCacheable(url: url, contentType: contentType) else {
                 log?("play retry skip id=\(track.id) reason=uncacheable")
-                return
+                return nil
             }
             log?("play retry id=\(track.id) via=download \(urlSummary(url))")
             cacheDownloadTrack = track
@@ -478,8 +494,12 @@ public final class PlayerController {
                 duration: track.durationSeconds
             )
             cacheDownloadTrack = nil
+            let staged = await cache.cachedAudio(for: track, quality: track.audioQuality) != nil
+            log?("play retry staged id=\(track.id) ok=\(staged)")
+            return staged
         } catch {
             log?("play retry skip id=\(track.id) error=\(describe(error))")
+            return nil
         }
     }
 

@@ -421,6 +421,23 @@ struct PlayerControllerTests {
         #expect(await cache.storedIDs == [Track.remoteIDPrefix + "42"])
     }
 
+    @Test func failedStreamWithoutACacheDownloadSurfacesTheOriginalError() async {
+        let engine = FakeEngine()
+        engine.loadError = LoadFailure()
+        let cache = FakeCache()
+        let controller = PlayerController(
+            engine: engine,
+            resolver: FakeResolver(),
+            cache: cache
+        )
+
+        await controller.play(tracks: [streamTrack("42")], startingAt: 0)
+
+        #expect(controller.state == .failed("cannot decode audio"))
+        #expect(engine.loadedURLs.count == 1)
+        #expect(await cache.storedIDs == [Track.remoteIDPrefix + "42"])
+    }
+
     @Test func expiredStreamReloadsOnce() async {
         let (controller, engine) = makeController()
         await controller.play(tracks: [streamTrack("42")], startingAt: 0)
