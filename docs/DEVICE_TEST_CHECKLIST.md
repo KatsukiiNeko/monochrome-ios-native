@@ -130,6 +130,17 @@ chip variants and the build check covers compilation.
 - [ ] Reset timing clears only the manual offset; the auto delay stays visible.
 - [ ] VoiceOver reads the timing value, including the output delay.
 
+## Streaming failure regression
+
+- [ ] Search for a song that is **not** downloaded. Tap it: audio starts within a
+      few seconds and the progress advances.
+- [ ] While it plays, open the audio specification sheet: the source is Stream
+      and the measured values are present.
+- [ ] Repeat on Wi-Fi and on cellular.
+- [ ] If it fails, capture the log (see below) and record the first
+      `play start … via=network`, `item.status`, `errorLog status=…` and
+      `accessLog` lines.
+
 ## Playback
 
 - [ ] Search for a track and open the results list.
@@ -326,10 +337,13 @@ Capture the app's log while reproducing, then attach the lines:
 timeout 60 idevicesyslog -u <device-udid> -m monochrome
 ```
 
-The player logs its URL, item status, the AVFoundation error domain/code and
-`AVPlayerItemErrorLog` events under subsystem `com.neko-ngtran.monochrome`,
-categories `player` and `audio-session`. A failed start now shows an error with
-a Retry action instead of staying in the loading state.
+The player logs the host/path (query strings are redacted), item status,
+buffer and time-control state, the AVFoundation error chain and
+`AVPlayerItemErrorLog` / `AVPlayerItemAccessLog` events under subsystem
+`com.neko-ngtran.monochrome`, categories `player` and `audio-session`. A failed
+start shows an error with a Retry action instead of staying in the loading
+state; a timeout also cancels the pending asset load and keeps the original
+error as the underlying cause.
 
 Cache decisions are logged under the same subsystem with `cache hit`,
 `cache miss`, `cache download start`, `cache download finish`,
