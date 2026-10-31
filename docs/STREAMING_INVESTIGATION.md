@@ -23,8 +23,11 @@ uses.
 This pass could not confirm the root cause on a device. The build host could
 not receive any HTTP response from `tracks.monochrome.st`, and the iPhone was
 only briefly visible to `usbmuxd`; no `xtool dev run` was possible. The fix is
-therefore **L1 + L2 verified, L3/L4 unverified**. The permanent diagnostics
-added here make the next device attempt self-explaining.
+therefore **L1 + L2 verified, L3/L4 unverified**. The maintainer then reported
+the same failure on a healthy Wi-Fi connection, so the user agent alone was not
+sufficient; the retry path now stages the track through the cache downloader
+(see “Follow-up” below). The diagnostics added here make the next device attempt
+self-explaining.
 
 ## Actual playback pipeline
 
@@ -118,7 +121,7 @@ committed, because an unverified probe is not product code.
 |---|---|---|---|
 | H1 | The server response is not AVFoundation-compatible (length, ranges, status, body) | **Unverified** | The last contract was range-capable; the host returned nothing to the build host now. No device log. |
 | H2 | Two consumers hit the same URL while the item loads | **Rejected as the cause of the initial failure** | The cache download and the audio-format probe both start only after `.readyToPlay`. A mid-playback collision remains possible but cannot produce an initial `-1008`/timeout. |
-| H3 | User-Agent / request identity | **Strongly supported, not confirmed** | API requests send `MonochromeNative/1.0 (iOS; independent client)`, download requests use URLSession's default, and `AVPlayer` sent CoreMedia. The failing path is the only one using CoreMedia. The interrupted change in the working tree was exactly `AVURLAssetHTTPUserAgentKey`. |
+| H3 | User-Agent / request identity | **Not sufficient; still failed** | The UA change shipped, and the maintainer still saw `the stream did not start` on good Wi-Fi. API requests send `MonochromeNative/1.0 (iOS; independent client)`, downloads use URLSession's default, and `AVPlayer` sent CoreMedia. Identity may still matter server-side, but it is not the whole cause. |
 | H4 | MIME override mismatch | **Partially addressed, unverified** | `AVURLAssetOverrideMIMETypeKey = audio/flac` is present and is the documented way to declare an extensionless resource. It is the same symptom `a36ccb4` fixed, so a regression or a server change cannot be ruled out. |
 | H5 | Redirects or expiry | **Unverified, unlikely** | The last contract showed no redirect and no signed URL. The host was unreachable, so redirects could not be replayed. |
 | H6 | A recent regression in source routing, cache order, or the audio-spec probe | **No code regression found** | The network path, resolver output and MIME options are unchanged since `a36ccb4`; the later consumers run after readiness. |
@@ -150,13 +153,41 @@ Files changed:
     line per attempt, and the failure chain for each path.
   - The timeout no longer hides the underlying failure: the engine logs it, and
     the controller logs the final state.
+  - `stageInCacheForRetry` downloads the stream through `AudioCache` on the
+    single post-failure retry, so the retry plays a local file instead of
+    asking AVPlayer to open the same URL again.
 
 Why this is the smallest step: the request-identity difference is the only
 observed difference between the working download and the failing playback.
 The change only adds a header identity that the same host already accepts from
-the API client. It does not add a fallback download, a custom resource loader,
-or a new playback engine; those would hide the cause before the device logs can
-show it.
+the API client. It does not add a custom resource loader or a new playback
+engine. The cache-staged retry described below was added only after the
+maintainer reported that direct playback still failed.
+
+## Follow-up: direct playback still failed
+
+The maintainer reported `the stream did not start` again on a healthy Wi-Fi
+connection after the user-agent change, so request identity was not sufficient
+on its own, or was not the cause. Direct `AVPlayer` playback of this host is
+therefore treated as unreliable, while the same bytes download and play as a
+local FLAC file.
+
+The single post-failure retry now stages the track through the existing
+`AudioCache` downloader and then replays it from the cache
+(`PlayerController.stageInCacheForRetry`):
+
+- The retry asks the resolver once more, checks `CacheEligibility`, stores the
+  stream with `AudioCache.store`, then calls `loadCurrent` again, which takes
+  the normal cache-hit path and plays the local file.
+- If the download fails, the retry takes the network path once and surfaces the
+  original error; it does not loop and does not double the wait in silence.
+- If the user skips while staging, `cancelCacheDownloadIfSkippedEarly` cancels
+  the download and the stale retry returns without touching the engine.
+- Adds 1 host test: `failedStreamRetriesFromACacheDownload` (310 tests total).
+
+This reuses the path that already works on the device (downloads), so it does
+not depend on an unverified server contract. The cost is start latency: the
+track plays after it has downloaded, because only the retry is staged.
 
 ## Verification
 
@@ -164,13 +195,13 @@ show it.
 |---|---|
 | L0 | Code written |
 | L1 | `./scripts/build.sh` passed for arm64 iOS |
-| L2 | `swift test` passed: 309 tests in 35 suites |
+| L2 | `swift test` passed: 310 tests in 35 suites |
 | L3 | Not reached; `tracks.monochrome.st` returned no HTTP response to the build host |
 | L4 | Not reached; the iPhone disconnected before a deployment |
-| Human | Not reached |
+| Human | Not reached; the maintainer reports the direct path still fails, which is the evidence for the cache-staged retry |
 
-The fix's effect is **unverified**. The host-side tests cannot exercise
-`AVPlayer` asset options.
+The user-agent change is **unverified**; the cache-staged retry is
+**host-tested and device-pending**.
 
 ## Remaining limits and next experiment
 
@@ -180,15 +211,14 @@ The fix's effect is **unverified**. The host-side tests cannot exercise
   `accessLog bytes=…`, and `item not ready after timeout … error=…`. The
   access/error status distinguishes a rejected request (H3/H1) from a parser
   failure (H4).
-- If the log shows a non-2xx status or a missing `Content-Range`, the next
-  rung is download-then-play with the existing downloader and an honest
-  `Preparing` state. That fallback is deliberately not added yet: no evidence
-  shows the server is incapable of serving `AVPlayer` once the identity is
-  correct.
+- If the log shows a non-2xx status or a missing `Content-Range`, the retry
+  already stages the track through the downloader; the remaining question is
+  only why the direct request is rejected.
 - If the log shows a valid 206 and `fLaC` bytes but the item still fails to
   become ready, the problem is in AVFoundation's parsing of the extensionless
-  FLAC resource, not the HTTP contract.
+  FLAC resource, not the HTTP contract. The cache-staged retry bypasses it.
 - The 20-second readiness timeout is unchanged. A slow network can still hit
-  it; the log now shows what the item was doing.
+  it; the log now shows what the item was doing. A failed direct attempt adds
+  that wait before the cache-staged retry starts.
 - The server contract must be re-measured from a network that can reach
   `tracks.monochrome.st` before treating the 2026-10-22 table as current.
