@@ -355,35 +355,44 @@ struct EqualizerView: View {
 
             labelledSlider(
                 "Frequency",
-                value: logFrequency(spec.frequency),
+                value: Binding(
+                    get: { logFrequency(spec.frequency) },
+                    set: { fraction in
+                        eq.updateFilter(id: id) { $0.frequency = expFrequency(fraction) }
+                    }
+                ),
                 range: 0...1,
                 display: frequencyLabel(spec.frequency),
                 spoken: frequencyLabel(spec.frequency)
-            ) { fraction in
-                eq.updateFilter(id: id) { $0.frequency = expFrequency(fraction) }
-            }
+            )
 
             if spec.kind.usesGain {
                 labelledSlider(
                     "Gain",
-                    value: spec.gainDB,
+                    value: Binding(
+                        get: { spec.gainDB },
+                        set: { value in
+                            eq.updateFilter(id: id) { $0.gainDB = (value * 2).rounded() / 2 }
+                        }
+                    ),
                     range: FilterSpec.minGainDB...FilterSpec.maxGainDB,
                     display: String(format: "%+.1f dB", spec.gainDB),
                     spoken: String(format: "%+.1f decibels", spec.gainDB)
-                ) { value in
-                    eq.updateFilter(id: id) { $0.gainDB = (value * 2).rounded() / 2 }
-                }
+                )
             }
 
             labelledSlider(
                 "Q",
-                value: spec.q,
+                value: Binding(
+                    get: { spec.q },
+                    set: { value in
+                        eq.updateFilter(id: id) { $0.q = value }
+                    }
+                ),
                 range: FilterSpec.minQ...FilterSpec.maxQ,
                 display: String(format: "%.2f", spec.q),
                 spoken: String(format: "%.2f", spec.q)
-            ) { value in
-                eq.updateFilter(id: id) { $0.q = value }
-            }
+            )
         }
         .padding(Theme.cardPadding)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
@@ -416,7 +425,13 @@ struct EqualizerView: View {
 
             labelledSlider(
                 "Preamp",
-                value: eq.settings.preampDB(sampleRate: sampleRate),
+                value: Binding(
+                    get: { eq.settings.preampDB(sampleRate: sampleRate) },
+                    set: { value in
+                        // Touching the slider takes over from the automatic value.
+                        eq.setManualPreamp(value)
+                    }
+                ),
                 range: -24...24,
                 display: String(format: "%+.1f dB", eq.settings.preampDB(sampleRate: sampleRate)),
                 spoken: String(
@@ -424,10 +439,7 @@ struct EqualizerView: View {
                     eq.settings.preampDB(sampleRate: sampleRate),
                     eq.settings.autoPreamp ? ", automatic" : ""
                 )
-            ) { value in
-                // Touching the slider takes over from the automatic value.
-                eq.setManualPreamp(value)
-            }
+            )
 
             Text(eq.settings.autoPreamp
                 ? "Headroom is set from the loudest point of the curve. Moving the slider switches to manual."
@@ -444,33 +456,33 @@ struct EqualizerView: View {
 
             effectRow(
                 "Bass",
-                value: eq.settings.bassDB,
+                value: Binding(get: { eq.settings.bassDB }, set: { eq.setBass($0) }),
                 range: 0...8,
                 display: String(format: "%+.1f dB", eq.settings.bassDB)
-            ) { eq.setBass($0) } onReset: { eq.setBass(0) }
+            ) { eq.setBass(0) }
 
             effectRow(
                 "Clarity",
-                value: eq.settings.clarityDB,
+                value: Binding(get: { eq.settings.clarityDB }, set: { eq.setClarity($0) }),
                 range: 0...6,
                 display: String(format: "%+.1f dB", eq.settings.clarityDB)
-            ) { eq.setClarity($0) } onReset: { eq.setClarity(0) }
+            ) { eq.setClarity(0) }
 
             effectRow(
                 "Stereo width",
-                value: eq.settings.stereoWidth,
+                value: Binding(get: { eq.settings.stereoWidth }, set: { eq.setStereoWidth($0) }),
                 range: 0...2,
                 display: eq.isMono ? "Mono" : String(format: "%.0f%%", eq.settings.stereoWidth * 100)
-            ) { eq.setStereoWidth($0) } onReset: { eq.setStereoWidth(1) }
+            ) { eq.setStereoWidth(1) }
             .disabled(eq.isMono)
             .accessibilityHint(eq.isMono ? "Unavailable for a mono track" : "Widens or narrows the stereo image")
 
             effectRow(
                 "Dynamic Boost",
-                value: eq.settings.dynamicBoostDB,
+                value: Binding(get: { eq.settings.dynamicBoostDB }, set: { eq.setDynamicBoost($0) }),
                 range: 0...6,
                 display: String(format: "%+.1f dB", eq.settings.dynamicBoostDB)
-            ) { eq.setDynamicBoost($0) } onReset: { eq.setDynamicBoost(0) }
+            ) { eq.setDynamicBoost(0) }
 
             Text("Dynamic Boost raises the level into a limiter at −1 dBFS. It cannot make quiet material louder than the limiter allows.")
                 .font(Theme.caption)
@@ -481,10 +493,9 @@ struct EqualizerView: View {
 
     private func effectRow(
         _ title: String,
-        value: Double,
+        value: Binding<Double>,
         range: ClosedRange<Double>,
         display: String,
-        onChange: @escaping @Sendable (Double) -> Void,
         onReset: @escaping () -> Void
     ) -> some View {
         HStack(spacing: 12) {
@@ -492,7 +503,7 @@ struct EqualizerView: View {
                 .font(Theme.listRowTitle)
                 .foregroundStyle(Theme.primaryText)
                 .frame(width: 108, alignment: .leading)
-            Slider(value: Binding(get: { value }, set: onChange), in: range)
+            Slider(value: value, in: range)
                 .accessibilityLabel(title)
                 .accessibilityValue(display)
             Text(display)
@@ -505,7 +516,7 @@ struct EqualizerView: View {
             } label: {
                 Image(systemName: "arrow.counterclockwise")
                     .font(Theme.caption)
-                    .foregroundStyle(value == range.lowerBound ? Theme.tertiaryText : Theme.secondaryText)
+                    .foregroundStyle(value.wrappedValue == range.lowerBound ? Theme.tertiaryText : Theme.secondaryText)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Reset \(title)")
@@ -645,11 +656,10 @@ struct EqualizerView: View {
 
     private func labelledSlider(
         _ label: String,
-        value: Double,
+        value: Binding<Double>,
         range: ClosedRange<Double>,
         display: String,
-        spoken: String,
-        onChange: @escaping @Sendable (Double) -> Void
+        spoken: String
     ) -> some View {
         HStack(spacing: 12) {
             Text(label)
@@ -657,7 +667,10 @@ struct EqualizerView: View {
                 .foregroundStyle(Theme.secondaryText)
                 .frame(width: 68, alignment: .leading)
             Slider(
-                value: Binding(get: { min(max(value, range.lowerBound), range.upperBound) }, set: onChange),
+                value: Binding(
+                    get: { min(max(value.wrappedValue, range.lowerBound), range.upperBound) },
+                    set: { value.wrappedValue = $0 }
+                ),
                 in: range
             )
             .accessibilityLabel(label)
