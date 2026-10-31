@@ -29,6 +29,12 @@ final class AVPlayerEngine: PlaybackEngine {
     private var timeControlObservation: NSKeyValueObservation?
     /// Set while `load` waits for the item, so the status observer does not race it.
     private var isWaitingForReadiness = false
+    private var eqTapStorage: EQTapStorage?
+    private var eqTap: MTAudioProcessingTap?
+    private var eqFrameLogTask: Task<Void, Never>?
+    private var loggedEQFormat = false
+    /// Whether the current item can carry the equalizer tap.
+    private(set) var eqAvailability: EQAvailability = .unavailable(.noAudioTrack)
 
     init() {
         // AVPlayer callbacks arrive on the main queue; hand them to the controller there.
@@ -57,7 +63,11 @@ final class AVPlayerEngine: PlaybackEngine {
         }
         let asset = AVURLAsset(url: url, options: options)
 
+        // The tap needs the item's audio track before the item reaches the
+        // player, otherwise the first buffers bypass the chain entirely.
+        let audioTracks = (try? await asset.loadTracks(withMediaType: .audio)) ?? []
         let item = AVPlayerItem(asset: asset)
+        attachEQTap(to: item, audioTracks: audioTracks, url: url, contentType: contentType)
         stopObservingItem()
         endObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main
@@ -140,11 +150,71 @@ final class AVPlayerEngine: PlaybackEngine {
     func stop() {
         player.pause()
         stopObservingItem()
+        eqFrameLogTask?.cancel()
+        eqFrameLogTask = nil
+        eqTap = nil
+        eqTapStorage = nil
         player.replaceCurrentItem(with: nil)
         playerLog.notice("stopped")
     }
 
-    /// The codec and sample format AVFoundation parsed, not what the URL claimed.
+    /// Attaches a pass-through tap when the item can carry one. HLS is rejected
+    /// by `AVPlayerItem.audioMix`, so the availability check happens first.
+    private func attachEQTap(
+        to item: AVPlayerItem,
+        audioTracks: [AVAssetTrack],
+        url: URL,
+        contentType: String?
+    ) {
+        eqFrameLogTask?.cancel()
+        eqFrameLogTask = nil
+        eqTap = nil
+        eqTapStorage = nil
+        loggedEQFormat = false
+        eqAvailability = EQAvailability.resolve(
+            url: url,
+            contentType: contentType,
+            hasAudioTrack: !audioTracks.isEmpty
+        )
+        guard case .available = eqAvailability, let track = audioTracks.first else {
+            if case .unavailable(let reason) = eqAvailability {
+                playerLog.notice("eq unavailable reason=\(reason.rawValue, privacy: .public)")
+            }
+            return
+        }
+        let storage = EQTapStorage()
+        guard let tap = EQTap.make(storage: storage) else { return }
+        let parameters = AVMutableAudioMixInputParameters(track: track)
+        parameters.audioTapProcessor = tap
+        let mix = AVMutableAudioMix()
+        mix.inputParameters = [parameters]
+        item.audioMix = mix
+        eqTapStorage = storage
+        eqTap = tap
+        startEQFrameLog()
+        playerLog.notice("eq tap attached")
+    }
+
+    /// Logs the frame counter from the main actor; the audio thread only
+    /// increments it.
+    private func startEQFrameLog() {
+        eqFrameLogTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard let self, let storage = self.eqTapStorage else { return }
+                let snapshot = storage.snapshot
+                if let format = snapshot.format, !self.loggedEQFormat {
+                    self.loggedEQFormat = true
+                    playerLog.notice(
+                        "eq tap prepare sr=\(format.sampleRate) ch=\(format.channelCount) interleaved=\(format.isInterleaved)"
+                    )
+                }
+                playerLog.notice("eq tap frames=\(snapshot.frames)")
+            }
+        }
+    }
+
+
     private func audioFormat(of asset: AVURLAsset) async -> AudioFormat? {
         guard let track = try? await asset.loadTracks(withMediaType: .audio).first,
               let descriptions = try? await track.load(.formatDescriptions),
