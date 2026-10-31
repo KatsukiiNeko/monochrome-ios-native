@@ -189,6 +189,20 @@ This reuses the path that already works on the device (downloads), so it does
 not depend on an unverified server contract. The cost is start latency: the
 track plays after it has downloaded, because only the retry is staged.
 
+The maintainer tested the retry on the device and saw **“the request timed
+out”**. That is the staged download failing, not AVPlayer: `URLSession` gave up
+before the host answered `GET /track/{id}`. Search on the same phone works, and
+the only requests that work carry `MonochromeNative/1.0 (iOS; independent
+client)`. The downloader was sending URLSession's default CFNetwork identity and
+AVPlayer was sending CoreMedia. The downloader now sets the same app user agent;
+all catalog traffic therefore presents one truthful identity.
+
+If this still times out, the host is refusing the native client at the route
+level, not by identity, and no client-side change can force it. The remaining
+evidence to collect is the access/error log from the item and the download
+error; a browser-identifying header would likely be needed, which is outside
+this project's no-spoofing rule.
+
 ## Verification
 
 | Level | Result |
