@@ -440,11 +440,46 @@ public final class PlayerController {
             log?("play failed id=\(track.id) error=\(describe(error))")
             if !retrying, track.isStreaming, !didRetryCurrentTrack {
                 didRetryCurrentTrack = true
+                // AVFoundation can refuse the extensionless catalog stream even when
+                // the same bytes download fine; stage it and let the retry play locally.
+                await stageInCacheForRetry(track)
+                // The user may have skipped while the download was running.
+                guard queue.current?.id == track.id else {
+                    log?("play retry aborted id=\(track.id) reason=stale")
+                    return
+                }
                 await loadCurrent(retrying: true, forLoop: forLoop)
             } else {
                 state = .failed(error.localizedDescription)
                 log?("play state=failed id=\(track.id)")
             }
+        }
+    }
+
+    /// Fetches the stream through the cache downloader so the retry can play a
+    /// local file. A failed download leaves the retry on the network path.
+    private func stageInCacheForRetry(_ track: Track) async {
+        guard let cache else { return }
+        do {
+            let url = try await resolver.url(for: track)
+            let contentType = await resolver.contentType(for: track)
+            guard CacheEligibility.isCacheable(url: url, contentType: contentType) else {
+                log?("play retry skip id=\(track.id) reason=uncacheable")
+                return
+            }
+            log?("play retry id=\(track.id) via=download \(urlSummary(url))")
+            cacheDownloadTrack = track
+            await cache.store(
+                track,
+                quality: track.audioQuality,
+                url: url,
+                contentType: contentType,
+                format: nil,
+                duration: track.durationSeconds
+            )
+            cacheDownloadTrack = nil
+        } catch {
+            log?("play retry skip id=\(track.id) error=\(describe(error))")
         }
     }
 
