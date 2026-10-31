@@ -63,6 +63,9 @@ private final class ProgressTransfer: NSObject, URLSessionDownloadDelegate, @unc
             let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
             self.session = session
             var request = URLRequest(url: url)
+            // The catalog host accepts the app's own identity; URLSession's default
+            // CFNetwork identity is not the one the API and player use.
+            request.setValue(TracksAPIClient.userAgent, forHTTPHeaderField: "User-Agent")
             request.allowsExpensiveNetworkAccess = allowsExpensiveNetwork
             request.allowsConstrainedNetworkAccess = allowsExpensiveNetwork
             request.timeoutInterval = 60
