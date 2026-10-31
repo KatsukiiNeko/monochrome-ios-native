@@ -20,4 +20,14 @@ public protocol PlaybackEngine: AnyObject {
     func pause()
     func seek(to seconds: Double)
     func stop()
+    /// Applies the equalizer to items this engine can process. Backends that
+    /// cannot process audio ignore it.
+    func setEqualizer(_ settings: EQSettings)
+    /// Whether the current item can carry the equalizer.
+    var eqAvailability: EQAvailability { get }
+}
+
+public extension PlaybackEngine {
+    func setEqualizer(_ settings: EQSettings) {}
+    var eqAvailability: EQAvailability { .available }
 }

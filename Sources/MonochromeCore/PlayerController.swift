@@ -169,6 +169,14 @@ public final class PlayerController {
         await loadCurrent()
     }
 
+    /// Forwards the current equalizer settings to the engine, which applies them
+    /// to the running item when it can.
+    public func setEqualizer(_ settings: EQSettings) {
+        engine.setEqualizer(settings)
+    }
+
+    public var eqAvailability: EQAvailability { engine.eqAvailability }
+
     public func setRepeatMode(_ mode: RepeatMode) {
         repeatMode = mode
     }

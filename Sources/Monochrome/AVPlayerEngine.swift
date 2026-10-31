@@ -33,6 +33,10 @@ final class AVPlayerEngine: PlaybackEngine {
     private var eqTap: MTAudioProcessingTap?
     private var eqFrameLogTask: Task<Void, Never>?
     private var loggedEQFormat = false
+    private var eqSettings = EQSettings()
+    private var eqSampleRate: Double = 48_000
+    private var eqTrack: AVAssetTrack?
+    private var currentItem: AVPlayerItem?
     /// Whether the current item can carry the equalizer tap.
     private(set) var eqAvailability: EQAvailability = .unavailable(.noAudioTrack)
 
@@ -67,7 +71,8 @@ final class AVPlayerEngine: PlaybackEngine {
         // player, otherwise the first buffers bypass the chain entirely.
         let audioTracks = (try? await asset.loadTracks(withMediaType: .audio)) ?? []
         let item = AVPlayerItem(asset: asset)
-        attachEQTap(to: item, audioTracks: audioTracks, url: url, contentType: contentType)
+        currentItem = item
+        prepareEQ(for: item, audioTracks: audioTracks, url: url, contentType: contentType)
         stopObservingItem()
         endObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main
@@ -154,14 +159,17 @@ final class AVPlayerEngine: PlaybackEngine {
         eqFrameLogTask = nil
         eqTap = nil
         eqTapStorage = nil
+        eqTrack = nil
+        currentItem = nil
         player.replaceCurrentItem(with: nil)
         playerLog.notice("stopped")
     }
 
-    /// Attaches a pass-through tap when the item can carry one. HLS is rejected
-    /// by `AVPlayerItem.audioMix`, so the availability check happens first.
-    private func attachEQTap(
-        to item: AVPlayerItem,
+    /// Resolves whether the item can carry the tap, then installs one if the
+    /// equalizer is on. HLS is rejected by `AVPlayerItem.audioMix`, so the check
+    /// happens before anything is attached.
+    private func prepareEQ(
+        for item: AVPlayerItem,
         audioTracks: [AVAssetTrack],
         url: URL,
         contentType: String?
@@ -170,44 +178,86 @@ final class AVPlayerEngine: PlaybackEngine {
         eqFrameLogTask = nil
         eqTap = nil
         eqTapStorage = nil
+        eqTrack = nil
         loggedEQFormat = false
         eqAvailability = EQAvailability.resolve(
             url: url,
             contentType: contentType,
             hasAudioTrack: !audioTracks.isEmpty
         )
-        guard case .available = eqAvailability, let track = audioTracks.first else {
-            if case .unavailable(let reason) = eqAvailability {
-                playerLog.notice("eq unavailable reason=\(reason.rawValue, privacy: .public)")
+        if case .unavailable(let reason) = eqAvailability {
+            playerLog.notice("eq unavailable reason=\(reason.rawValue, privacy: .public)")
+            return
+        }
+        eqTrack = audioTracks.first
+        applyEqualizer()
+    }
+
+    func setEqualizer(_ settings: EQSettings) {
+        eqSettings = settings
+        applyEqualizer()
+    }
+
+    /// Publishes the settings as coefficients for the current sample rate and
+    /// adds or removes the audio mix. A flat curve leaves the item untouched.
+    private func applyEqualizer() {
+        guard let item = currentItem, let track = eqTrack else { return }
+        let snapshot = EQSnapshot.make(settings: eqSettings, sampleRate: eqSampleRate)
+        if snapshot.isBypass {
+            eqTapStorage?.publish(snapshot)
+            if eqFrameLogTask != nil {
+                playerLog.notice("eq state enabled=false")
+            }
+            eqFrameLogTask?.cancel()
+            eqFrameLogTask = nil
+            if item.audioMix != nil {
+                item.audioMix = nil
+                eqTap = nil
+                eqTapStorage = nil
             }
             return
         }
-        let storage = EQTapStorage()
-        guard let tap = EQTap.make(storage: storage) else { return }
-        let parameters = AVMutableAudioMixInputParameters(track: track)
-        parameters.audioTapProcessor = tap
-        let mix = AVMutableAudioMix()
-        mix.inputParameters = [parameters]
-        item.audioMix = mix
-        eqTapStorage = storage
-        eqTap = tap
-        startEQFrameLog()
-        playerLog.notice("eq tap attached")
+        if eqTapStorage == nil {
+            let storage = EQTapStorage()
+            guard let tap = EQTap.make(storage: storage) else {
+                eqAvailability = .unavailable(.tapNotRunning)
+                return
+            }
+            let parameters = AVMutableAudioMixInputParameters(track: track)
+            parameters.audioTapProcessor = tap
+            let mix = AVMutableAudioMix()
+            mix.inputParameters = [parameters]
+            item.audioMix = mix
+            eqTapStorage = storage
+            eqTap = tap
+            startEQFrameLog()
+        }
+        eqTapStorage?.publish(snapshot)
+        playerLog.notice(
+            "eq state enabled=true filters=\(snapshot.coefficients.count) sampleRate=\(self.eqSampleRate)"
+        )
     }
 
     /// Logs the frame counter from the main actor; the audio thread only
-    /// increments it.
+    /// increments it. Also re-publishes the coefficients when the item reports a
+    /// different sample rate than the one they were built for.
     private func startEQFrameLog() {
         eqFrameLogTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
                 guard let self, let storage = self.eqTapStorage else { return }
-                let snapshot = storage.snapshot
+                let snapshot = storage.observation
                 if let format = snapshot.format, !self.loggedEQFormat {
                     self.loggedEQFormat = true
                     playerLog.notice(
-                        "eq tap prepare sr=\(format.sampleRate) ch=\(format.channelCount) interleaved=\(format.isInterleaved)"
+                        "eq tap prepare sr=\(format.sampleRate) ch=\(format.channelCount) interleaved=\(format.isInterleaved) float=\(format.isFloat)"
                     )
+                    if format.sampleRate != self.eqSampleRate {
+                        self.eqSampleRate = format.sampleRate
+                        self.eqTapStorage?.publish(
+                            EQSnapshot.make(settings: self.eqSettings, sampleRate: format.sampleRate)
+                        )
+                    }
                 }
                 playerLog.notice("eq tap frames=\(snapshot.frames)")
             }

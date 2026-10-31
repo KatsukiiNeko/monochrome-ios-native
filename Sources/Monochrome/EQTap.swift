@@ -15,40 +15,132 @@ final class EQTapStorage: @unchecked Sendable {
         var sampleRate: Double
         var channelCount: Int
         var isInterleaved: Bool
+        var isFloat: Bool
     }
 
-    struct Snapshot: Sendable {
-        var frames: Int64 = 0
+    struct Live: Sendable {
         var format: Format?
+        var frames: Int64 = 0
+        var peak: Double = 0
+        var pending: EQSnapshot?
+        var version: Int = 0
+        var appliedVersion: Int = 0
     }
 
-    private let lock = OSAllocatedUnfairLock(initialState: Snapshot())
-
-    var snapshot: Snapshot {
-        lock.withLock { $0 }
+    struct Observation: Sendable {
+        var format: Format?
+        var frames: Int64
+        var peak: Double
+        var hasUnappliedSnapshot: Bool
     }
 
-    /// Called from `prepare`, which is not the real-time thread but must still
-    /// stay allocation-free, so values are copied in place.
-    func notePrepared(sampleRate: Double, channelCount: Int, isInterleaved: Bool) {
+    private let lock = OSAllocatedUnfairLock(initialState: Live())
+    /// Touched only by the tap callbacks: created in `prepare`, used in `process`.
+    private var renderer: EQRenderer?
+    private var appliedSampleRate: Double = 0
+
+    var observation: Observation {
         lock.withLock {
-            $0.format = Format(
-                sampleRate: sampleRate,
-                channelCount: channelCount,
-                isInterleaved: isInterleaved
+            Observation(
+                format: $0.format,
+                frames: $0.frames,
+                peak: $0.peak,
+                hasUnappliedSnapshot: $0.version != $0.appliedVersion
             )
         }
+    }
+
+    /// Main thread: makes a snapshot the next buffer will pick up.
+    func publish(_ snapshot: EQSnapshot) {
+        lock.withLock {
+            $0.pending = snapshot
+            $0.version += 1
+        }
+    }
+
+    /// Main thread: reads and clears the clip light.
+    func takePeak() -> Double {
+        lock.withLock {
+            let peak = $0.peak
+            $0.peak = 0
+            return peak
+        }
+    }
+
+    /// Called from `prepare`, which is not the real-time thread. The renderer
+    /// allocates here, never inside `process`.
+    func prepare(format: Format, rampSamples: Int) {
+        lock.withLock {
+            $0.format = format
+            $0.appliedVersion = 0
+        }
+        appliedSampleRate = format.sampleRate
+        renderer = format.isFloat
+            ? EQRenderer(channelCount: format.channelCount, sampleRate: format.sampleRate)
+            : nil
+        if let renderer, let pending = lock.withLock({ $0.pending }) {
+            renderer.update(pending, rampSamples: rampSamples)
+            lock.withLock { $0.appliedVersion = $0.version }
+        }
+    }
+
+    /// Audio thread. Pulls a pending snapshot without waiting, then renders in
+    /// place. A non-float format leaves the samples untouched.
+    func render(_ bufferList: UnsafeMutablePointer<AudioBufferList>, frames: Int, rampSamples: Int) {
+        guard frames > 0, let renderer else { return }
+
+        if let snapshot = takePendingSnapshot() {
+            renderer.update(snapshot, rampSamples: rampSamples)
+        }
+        let buffers = UnsafeMutableAudioBufferListPointer(bufferList)
+        if buffers.count == 1 {
+            guard let data = buffers[0].mData else { return }
+            renderer.processInterleaved(
+                data.assumingMemoryBound(to: Float.self),
+                frameCount: frames
+            )
+        } else {
+            let channels = min(buffers.count, renderer.channelCount)
+            withUnsafeTemporaryAllocation(of: UnsafeMutablePointer<Float>.self, capacity: channels) { scratch in
+                guard let base = scratch.baseAddress else { return }
+                for index in 0..<channels {
+                    guard let data = buffers[index].mData else { return }
+                    base[index] = data.assumingMemoryBound(to: Float.self)
+                }
+                renderer.processPlanar(base, channels: channels, frameCount: frames)
+            }
+        }
+
+        let peak = renderer.takePeak()
+        lock.withLockIfAvailable {
+            if peak > $0.peak { $0.peak = peak }
+        }
+    }
+
+    private func takePendingSnapshot() -> EQSnapshot? {
+        lock.withLockIfAvailable { live -> EQSnapshot? in
+            guard let pending = live.pending, live.version != live.appliedVersion else { return nil }
+            live.appliedVersion = live.version
+            return pending
+        } ?? nil
     }
 
     func noteProcessed(frames: Int) {
         guard frames > 0 else { return }
         lock.withLockIfAvailable { $0.frames += Int64(frames) }
     }
+
+    deinit {
+        renderer = nil
+    }
 }
 
 /// Creates the tap and owns the C callback table. The storage is retained by
 /// the tap's client info and released in `finalize`.
 enum EQTap {
+    /// Long enough to hide a coefficient swap, short enough to feel immediate.
+    static let rampSamples = 512
+
     static func make(storage: EQTapStorage) -> MTAudioProcessingTap? {
         let clientInfo = Unmanaged.passRetained(storage).toOpaque()
         var callbacks = MTAudioProcessingTapCallbacks(
@@ -99,11 +191,16 @@ private func eqTapPrepare(
     _ processingFormat: UnsafePointer<AudioStreamBasicDescription>
 ) {
     let format = processingFormat.pointee
-    let isInterleaved = (format.mFormatFlags & kAudioFormatFlagIsNonInterleaved) == 0
-    eqTapStorage(tap).notePrepared(
-        sampleRate: format.mSampleRate,
-        channelCount: Int(format.mChannelsPerFrame),
-        isInterleaved: isInterleaved
+    let storage = eqTapStorage(tap)
+    storage.prepare(
+        format: EQTapStorage.Format(
+            sampleRate: format.mSampleRate,
+            channelCount: Int(max(format.mChannelsPerFrame, 1)),
+            isInterleaved: (format.mFormatFlags & kAudioFormatFlagIsNonInterleaved) == 0,
+            isFloat: (format.mFormatFlags & kAudioFormatFlagIsFloat) != 0
+                && format.mBitsPerChannel == 32
+        ),
+        rampSamples: EQTap.rampSamples
     )
 }
 
@@ -126,6 +223,9 @@ private func eqTapProcess(
         numberFramesOut
     )
     guard status == noErr else { return }
-    eqTapStorage(tap).noteProcessed(frames: numberFramesOut.pointee)
+    let storage = eqTapStorage(tap)
+    let frames = Int(numberFramesOut.pointee)
+    storage.noteProcessed(frames: frames)
+    storage.render(bufferListInOut, frames: frames, rampSamples: EQTap.rampSamples)
 }
 #endif
