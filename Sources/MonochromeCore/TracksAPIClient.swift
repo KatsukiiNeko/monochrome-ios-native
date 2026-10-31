@@ -246,6 +246,12 @@ private struct ArtistRefDTO: Decodable {
     var name: String?
 }
 
+/// Prefers the flat name list, falling back to the nested artist objects.
+private func artistNameList(_ names: [String]?, fallback artists: [ArtistRefDTO]?) -> [String] {
+    if let names, !names.isEmpty { return names }
+    return (artists ?? []).compactMap(\.name)
+}
+
 private struct TrackDTO: Decodable {
     var trackID: String?
     var title: String?
@@ -274,7 +280,7 @@ private struct TrackDTO: Decodable {
         guard let trackID, !trackID.isEmpty, let title, !title.isEmpty else { return nil }
         // Unplayable entries would be dead rows in the UI.
         guard playable != false else { return nil }
-        let names = (artistNames?.isEmpty == false ? artistNames! : (artists ?? []).compactMap(\.name))
+        let names = artistNameList(artistNames, fallback: artists)
         return Track(
             id: Track.remoteIDPrefix + trackID,
             title: title,
@@ -321,7 +327,7 @@ private struct ReleaseDTO: Decodable {
 
     var release: RemoteRelease? {
         guard let releaseID, !releaseID.isEmpty, let title, !title.isEmpty else { return nil }
-        let names = (artistNames?.isEmpty == false ? artistNames! : (artists ?? []).compactMap(\.name))
+        let names = artistNameList(artistNames, fallback: artists)
         return RemoteRelease(
             id: releaseID,
             title: title,
