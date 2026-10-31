@@ -6,7 +6,6 @@ import MonochromeCore
 import os
 
 /// One shared logger so device logs can be filtered by subsystem/category.
-let playerLog = Logger(subsystem: "com.neko-ngtran.monochrome", category: "player")
 
 /// AVFoundation's public key for the MIME type of an extensionless resource.
 private let overrideMIMETypeKey = AVURLAssetOverrideMIMETypeKey

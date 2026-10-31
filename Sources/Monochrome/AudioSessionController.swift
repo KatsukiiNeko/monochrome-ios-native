@@ -4,8 +4,6 @@ import AVFoundation
 import MonochromeCore
 import os
 
-private let sessionLog = Logger(subsystem: "com.neko-ngtran.monochrome", category: "audio-session")
-
 @MainActor
 final class AudioSessionController {
     private let player: PlayerController

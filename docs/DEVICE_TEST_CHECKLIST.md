@@ -384,7 +384,7 @@ timeout 60 idevicesyslog -u <device-udid> -m monochrome
 ```
 
 The player logs its URL, item status, the AVFoundation error domain/code and
-`AVPlayerItemErrorLog` events under subsystem `com.neko-ngtran.monochrome`,
+`AVPlayerItemErrorLog` events under subsystem `com.katsukiineko.monochrome`,
 categories `player` and `audio-session`. A failed start now shows an error with
 a Retry action instead of staying in the loading state.
 
