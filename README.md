@@ -22,7 +22,7 @@
 
 A native SwiftUI music player inspired by the [Monochrome web app](https://github.com/monochrome-music/monochrome). It plays audio imported from the iOS Files app and streams FLAC tracks from the public catalog endpoint used by Monochrome.
 
-The app includes Home, Search, and Library tabs; a persistent mini-player; a full Now Playing screen; a queue; a sleep timer; favorites; play history; local audio caching; repeat modes; Lock Screen media controls; an honest audio specification for the current track; and on-demand lyrics.
+The app includes Home, Search, and Library tabs; a persistent mini-player; a full Now Playing screen; a queue; a sleep timer; favorites; play history; local audio caching; repeat modes; Lock Screen media controls; an honest audio specification for the current track; on-demand lyrics; and a parametric equalizer.
 
 **Native app, not a WebView wrapper.** No account is required for the documented public catalog path. The app has no analytics or tracking SDKs and has no third-party Swift package dependencies.
 
@@ -51,12 +51,12 @@ Monochrome downloads are available because the upstream web client downloads the
 
 ## Verification
 
-The maintainer completed the physical-device test checklist and reports successful results for the 0.2.0 release, including the downloads, five-song cache, settings and Now Playing changes, on an iPhone 12 Pro Max. The accent-color controls, the audio specification and lyrics work, and the equalizer were added after that release and have been checked only by host tests and the iOS compile check. The equalizer's audio path in particular has not been heard on hardware: whether it applies to streamed, cached, downloaded and remote-progressive items is unverified.
+The maintainer completed the physical-device test checklist and reports successful results for the 0.2.0 release, including the downloads, five-song cache, settings and Now Playing changes, on an iPhone 12 Pro Max. The accent-color controls, the audio specification, lyrics, and equalizer were added after that release and have been checked by host tests and the iOS compile check. The equalizer's audio path in particular has not been heard on hardware: whether it applies to streamed, cached, downloaded and remote-progressive items is unverified.
 
 | Level | Meaning | Status |
 |---|---|---|
 | **L1 — Compile** | Swift sources compile for the target platform. | Passed |
-| **L2 — Unit tests** | Portable core behavior is tested on Linux. | Passed: 361 tests across 35 suites at the last recorded run, including the equalizer filters, response curves, render chain, presets, persistence, text format and availability rules, plus the audio-info chip variants, audio-specification formatters and the lyrics parser, matcher, cache, provider and service. |
+| **L2 — Unit tests** | Portable core behavior is tested on Linux. | Passed: 367 tests across 37 suites at the last recorded run, including the equalizer filters, response curves, render chain, presets, persistence, text format and availability rules, plus the audio-info chip variants, audio-specification formatters, lyrics parser, matcher, cache, provider, service, timing store, and the core layering guard. |
 | **L3 — Live service** | Catalog search and stream resolution are checked against the live catalog. | Passed in the recorded live-service checks; the opt-in live test is not run by default. Lyrics response shape and English/Vietnamese coverage were checked against LRCLIB from Linux; see [`docs/LYRICS.md`](docs/LYRICS.md). The upstream audio host was serving no data at the time of the equalizer work, so the tap could not be exercised against a real stream. |
 | **L4 — Physical device** | Playback and iOS-specific behavior are checked on a real iPhone. | Passed for the 0.2.0 release on an iPhone 12 Pro Max. Not run for the equalizer: no device was attached during that work. |
 
@@ -76,7 +76,7 @@ The native client uses HTTPS and a truthful `User-Agent`; it does not spoof `Ori
 
 In Settings, **Enable Endpoint** switches the online catalog and streaming on or off while retaining local playback. The catalog endpoint can be pointed at another HTTPS host (for example, your own instance or a supported paid endpoint) and reset to the built-in default without changing appearance, downloads, favorites or history.
 
-“Hi-Fi” in this app is a quality label, not a separate catalogue or provider: the catalog path exposes one lossless tier (FLAC 16-bit / 44.1 kHz). YouTube Music has no authorized integration here; it is a companion-server design with no default URL. Permanent downloads store the same progressive FLAC stream the app plays, and the temporary cache is a separate disposable buffer.
+"Hi-Fi" in this app is a quality label, not a separate catalogue or provider: the catalog path exposes one lossless tier (FLAC 16-bit / 44.1 kHz). YouTube Music has no authorized integration here; it is a companion-server design with no default URL. Permanent downloads store the same progressive FLAC stream the app plays, and the temporary cache is a separate disposable buffer.
 
 ### Content and distribution notice
 
@@ -125,6 +125,19 @@ Device installation is a deliberate, manual operation and is not part of CI. The
 ## CI
 
 GitHub Actions runs `swift test` on pushes and pull requests targeting `main` or `development`. The workflow uses read-only repository permissions and requires no secrets. It validates the portable core; it does not claim to validate the iOS-only runtime layer or physical-device behavior.
+
+## Architecture (brief)
+
+The codebase is split into two layers:
+
+- **MonochromeCore** — portable Swift (`Foundation`, `FoundationNetworking`, `Observation`). Models, stores, API client, cache, downloads, player state machine (`PlayerController`), equalizer DSP (`EQRuntime`, `EQFilters`, `EQChain`), lyrics provider and cache, and the formatted strings used by the UI. Tested on Linux.
+- **Monochrome** — iOS-only SwiftUI and AVFoundation. Views, audio engine (`AVPlayerEngine`), audio session (`AudioSessionController`), Now Playing integration (`NowPlayingController`), equalizer tap (`EQTap`), and the app shell.
+
+Playback order: downloaded file → cache hit → network resolution. The player controller decides; the view only shows what the controller publishes.
+
+Persistence: UserDefaults for settings and per-track lyrics timing; JSON files in Application Support for favorites, history, library index, EQ settings/presets, and download index. Tolerant decoding and schema versions protect upgrades from older releases.
+
+To add a feature: model and logic in `MonochromeCore` with host tests, then a thin SwiftUI binding in `Monochrome`.
 
 ## Repository layout
 
