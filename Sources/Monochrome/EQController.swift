@@ -19,6 +19,9 @@ final class EQController {
     private let player: PlayerController
     private let log: (String) -> Void
     private var clipTask: Task<Void, Never>?
+    /// The clip light holds for a moment so a single over does not make it
+    /// flicker, and so it is not republished several times a second.
+    private var clipHoldUntil: Date?
 
     init(
         store: EQSettingsStore,
@@ -43,8 +46,14 @@ final class EQController {
         startClipMonitor()
     }
 
+    /// Called from the clip poll, so it must not republish an unchanged value:
+    /// every write to an observed property rebuilds the sheet, and rebuilding a
+    /// 37-entry preset menu ten times a second is what made it scroll badly
+    /// during playback.
     func refreshAvailability() {
-        availability = player.eqAvailability
+        let next = player.eqAvailability
+        guard next != availability else { return }
+        availability = next
     }
 
     // MARK: - Groups and selection
@@ -259,7 +268,10 @@ final class EQController {
                 try? await Task.sleep(for: .milliseconds(100))
                 guard let self else { return }
                 let peak = self.player.takeEqualizerPeak()
-                let clipped = peak > 1
+                if peak > 1 {
+                    self.clipHoldUntil = Date().addingTimeInterval(1)
+                }
+                let clipped = (self.clipHoldUntil ?? .distantPast) > Date()
                 if clipped != self.isClipping {
                     self.isClipping = clipped
                 }
