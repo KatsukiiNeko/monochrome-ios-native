@@ -227,6 +227,9 @@ final class AVPlayerEngine: PlaybackEngine {
                 eqAvailability = .unavailable(.tapNotRunning)
                 return
             }
+            // The format log is per attach, not per item: this mix is new even
+            // when the item was already playing.
+            loggedEQFormat = false
             let parameters = AVMutableAudioMixInputParameters(track: track)
             parameters.audioTapProcessor = tap
             let mix = AVMutableAudioMix()
