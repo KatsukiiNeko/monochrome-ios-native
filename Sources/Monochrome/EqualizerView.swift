@@ -484,7 +484,7 @@ struct EqualizerView: View {
         value: Double,
         range: ClosedRange<Double>,
         display: String,
-        onChange: @escaping (Double) -> Void,
+        onChange: @escaping @Sendable (Double) -> Void,
         onReset: @escaping () -> Void
     ) -> some View {
         HStack(spacing: 12) {
@@ -649,7 +649,7 @@ struct EqualizerView: View {
         range: ClosedRange<Double>,
         display: String,
         spoken: String,
-        onChange: @escaping (Double) -> Void
+        onChange: @escaping @Sendable (Double) -> Void
     ) -> some View {
         HStack(spacing: 12) {
             Text(label)
