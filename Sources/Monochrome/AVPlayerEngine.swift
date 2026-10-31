@@ -53,7 +53,11 @@ final class AVPlayerEngine: PlaybackEngine {
         playerLog.notice("load start \(describeURL(url), privacy: .public) type=\(contentType ?? "none", privacy: .public)")
         // The catalog host serves FLAC as application/octet-stream without a path
         // extension, which leaves AVFoundation unable to pick a parser on its own.
-        var options: [String: Any] = [:]
+        var options: [String: Any] = [
+            // Use the same truthful identity as the catalog API and downloader;
+            // AVFoundation's default CoreMedia identity differs from it.
+            AVURLAssetHTTPUserAgentKey: TracksAPIClient.userAgent,
+        ]
         if let contentType {
             options[overrideMIMETypeKey] = contentType
         }
