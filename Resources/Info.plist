@@ -5,9 +5,9 @@
 	<key>CFBundleDisplayName</key>
 	<string>Monochrome</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.3.0</string>
+	<string>0.4.0</string>
 	<key>CFBundleVersion</key>
-	<string>4</string>
+	<string>5</string>
 	<key>MinimumOSVersion</key>
 	<string>17.0</string>
 	<key>UILaunchScreen</key>
