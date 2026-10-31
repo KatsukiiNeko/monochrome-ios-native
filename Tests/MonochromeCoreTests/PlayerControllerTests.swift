@@ -13,16 +13,10 @@ private final class FakeEngine: PlaybackEngine {
     private(set) var seeks: [Double] = []
     private(set) var stopCount = 0
     var loadError: (any Error)?
-    /// Fails this many loads before succeeding, to exercise the retry path.
-    var loadFailuresRemaining = 0
 
     func load(url: URL, contentType: String?) async throws {
         loadedURLs.append(url)
         contentTypes.append(contentType)
-        if loadFailuresRemaining > 0 {
-            loadFailuresRemaining -= 1
-            throw LoadFailure()
-        }
         if let loadError { throw loadError }
     }
 
@@ -61,19 +55,15 @@ private actor FakeResolver: TrackURLResolver {
 /// Serves a canned hit and records what the controller asks to cache.
 private actor FakeCache: AudioCaching {
     private var hit: CachedAudio?
-    private var storedHit: CachedAudio?
-    private var didStore = false
     private(set) var storedIDs: [String] = []
     private(set) var storedURLs: [URL] = []
     private(set) var lookups = 0
 
     func setHit(_ audio: CachedAudio?) { hit = audio }
-    /// Returned only after a store, so a miss can turn into a hit.
-    func setStoredHit(_ audio: CachedAudio?) { storedHit = audio }
 
     func cachedAudio(for track: Track, quality: AudioQuality?) async -> CachedAudio? {
         lookups += 1
-        return didStore ? (storedHit ?? hit) : hit
+        return hit
     }
 
     func store(
@@ -86,7 +76,6 @@ private actor FakeCache: AudioCaching {
     ) async {
         storedIDs.append(track.id)
         storedURLs.append(url)
-        didStore = true
     }
 }
 
@@ -397,45 +386,6 @@ struct PlayerControllerTests {
         #expect(engine.loadedURLs.isEmpty)
         let requests = await resolver.requests()
         #expect(requests.count == 2)
-    }
-
-    @Test func failedStreamRetriesFromACacheDownload() async {
-        let engine = FakeEngine()
-        let cache = FakeCache()
-        let local = URL(fileURLWithPath: "/cache/42.flac")
-        engine.loadFailuresRemaining = 1
-        await cache.setStoredHit(CachedAudio(url: local, duration: 200, byteSize: 1_024))
-        let controller = PlayerController(
-            engine: engine,
-            resolver: FakeResolver(),
-            cache: cache
-        )
-
-        await controller.play(tracks: [streamTrack("42")], startingAt: 0)
-
-        #expect(controller.state == .playing)
-        #expect(controller.isCurrentFromCache)
-        #expect(controller.duration == 200)
-        #expect(engine.loadedURLs.count == 2)
-        #expect(engine.loadedURLs.last == local)
-        #expect(await cache.storedIDs == [Track.remoteIDPrefix + "42"])
-    }
-
-    @Test func failedStreamWithoutACacheDownloadSurfacesTheOriginalError() async {
-        let engine = FakeEngine()
-        engine.loadError = LoadFailure()
-        let cache = FakeCache()
-        let controller = PlayerController(
-            engine: engine,
-            resolver: FakeResolver(),
-            cache: cache
-        )
-
-        await controller.play(tracks: [streamTrack("42")], startingAt: 0)
-
-        #expect(controller.state == .failed("cannot decode audio"))
-        #expect(engine.loadedURLs.count == 1)
-        #expect(await cache.storedIDs == [Track.remoteIDPrefix + "42"])
     }
 
     @Test func expiredStreamReloadsOnce() async {

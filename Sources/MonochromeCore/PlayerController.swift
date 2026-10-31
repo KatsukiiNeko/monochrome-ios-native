@@ -230,14 +230,6 @@ public final class PlayerController {
         case .finished:
             await handleEndOfTrack()
         case .failed(let message):
-            log?("playback failure message=\(message)")
-            // A load failure is thrown by `load` and handled where it was awaited.
-            // A relayed copy during `.loading` is that same failed item; letting it
-            // through here would replace the staged retry with a visible failure.
-            if case .loading = state {
-                log?("playback failure ignored reason=loading")
-                return
-            }
             // A stream can expire mid-playback; resolve once more before giving up.
             if queue.current?.isStreaming == true, !didRetryCurrentTrack {
                 didRetryCurrentTrack = true
@@ -382,7 +374,6 @@ public final class PlayerController {
         if track.isStreaming, let downloads,
            let downloaded = await downloads.downloadedFile(for: track) {
             do {
-                log?("play start id=\(track.id) source=\(track.source.rawValue) via=download \(urlSummary(downloaded.url))")
                 try await engine.load(url: downloaded.url, contentType: nil)
                 engine.play()
                 state = .playing
@@ -398,14 +389,13 @@ public final class PlayerController {
                 onTrackStarted?(track)
                 return
             } catch {
-                log?("download unusable track=\(track.id) error=\(describe(error))")
+                log?("download unusable track=\(track.id)")
             }
         }
 
         if track.isStreaming, let cache,
            let cached = await cache.cachedAudio(for: track, quality: track.audioQuality) {
             do {
-                log?("play start id=\(track.id) source=\(track.source.rawValue) via=cache \(urlSummary(cached.url))")
                 try await engine.load(url: cached.url, contentType: nil)
                 engine.play()
                 state = .playing
@@ -421,7 +411,7 @@ public final class PlayerController {
                 return
             } catch {
                 // A damaged cache entry must not stop playback; resolve the stream instead.
-                log?("cache hit unusable track=\(track.id) error=\(describe(error))")
+                log?("cache hit unusable track=\(track.id)")
             }
         }
         if forLoop { log?("loop source=network reason=cache-miss") }
@@ -429,7 +419,6 @@ public final class PlayerController {
         do {
             let url = try await resolver.url(for: track)
             let contentType = await resolver.contentType(for: track)
-            log?("play start id=\(track.id) source=\(track.source.rawValue) via=network \(urlSummary(url))")
             pendingCache = PendingCache(
                 track: track,
                 quality: track.audioQuality,
@@ -444,82 +433,13 @@ public final class PlayerController {
             onTrackStarted?(track)
         } catch {
             pendingCache = nil
-            log?("play failed id=\(track.id) error=\(describe(error))")
             if !retrying, track.isStreaming, !didRetryCurrentTrack {
                 didRetryCurrentTrack = true
-                // AVFoundation can refuse the extensionless catalog stream even when
-                // the same bytes download fine; stage it and let the retry play locally.
-                switch await stageInCacheForRetry(track) {
-                case true?:
-                    // The user may have skipped while the download was running.
-                    guard queue.current?.id == track.id else {
-                        log?("play retry aborted id=\(track.id) reason=stale")
-                        return
-                    }
-                    await loadCurrent(retrying: true, forLoop: forLoop)
-                case false?:
-                    // The download failed too; the direct URL will not behave better.
-                    state = .failed(error.localizedDescription)
-                    log?("play state=failed id=\(track.id)")
-                case nil:
-                    await loadCurrent(retrying: true, forLoop: forLoop)
-                }
+                await loadCurrent(retrying: true, forLoop: forLoop)
             } else {
                 state = .failed(error.localizedDescription)
-                log?("play state=failed id=\(track.id)")
             }
         }
-    }
-
-    /// Stages the stream through the cache downloader so the retry can play a
-    /// local file. Returns nil when this track cannot be staged, true when a cache
-    /// hit is ready, false when the download itself failed.
-    private func stageInCacheForRetry(_ track: Track) async -> Bool? {
-        guard let cache else { return nil }
-        do {
-            let url = try await resolver.url(for: track)
-            let contentType = await resolver.contentType(for: track)
-            guard CacheEligibility.isCacheable(url: url, contentType: contentType) else {
-                log?("play retry skip id=\(track.id) reason=uncacheable")
-                return nil
-            }
-            log?("play retry id=\(track.id) via=download \(urlSummary(url))")
-            cacheDownloadTrack = track
-            await cache.store(
-                track,
-                quality: track.audioQuality,
-                url: url,
-                contentType: contentType,
-                format: nil,
-                duration: track.durationSeconds
-            )
-            cacheDownloadTrack = nil
-            let staged = await cache.cachedAudio(for: track, quality: track.audioQuality) != nil
-            log?("play retry staged id=\(track.id) ok=\(staged)")
-            return staged
-        } catch {
-            log?("play retry skip id=\(track.id) error=\(describe(error))")
-            return nil
-        }
-    }
-
-    private func urlSummary(_ url: URL) -> String {
-        if url.isFileURL {
-            return "host=local path=\(url.lastPathComponent) hasQuery=false"
-        }
-        return "host=\(url.host ?? "none") path=\(url.path) hasQuery=\(url.query != nil)"
-    }
-
-    private func describe(_ error: any Error) -> String {
-        var parts: [String] = []
-        var current: NSError? = error as NSError
-        var depth = 0
-        while let nsError = current, depth < 5 {
-            parts.append("\(nsError.domain)/\(nsError.code) \(nsError.localizedDescription)")
-            current = nsError.userInfo[NSUnderlyingErrorKey] as? NSError
-            depth += 1
-        }
-        return parts.joined(separator: " <- ")
     }
 }
 
