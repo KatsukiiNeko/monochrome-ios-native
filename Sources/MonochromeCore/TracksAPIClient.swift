@@ -81,7 +81,7 @@ public enum TracksAPIError: LocalizedError, Equatable {
 
 /// Actor because the in-session host health is shared mutable state.
 public actor TracksAPIClient {
-    public static let defaultBaseURL = URL(string: "https://tracks.monochrome.st")!
+    public static let defaultBaseURL = StreamingSettings.defaultBaseURL
     /// Truthful identity: we are not the website and do not claim to be.
     public static let userAgent = "MonochromeNative/1.0 (iOS; independent client)"
 

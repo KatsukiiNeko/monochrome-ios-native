@@ -300,7 +300,7 @@ private struct StreamingEndpointView: View {
     var body: some View {
         List {
             Section {
-                TextField("https://tracks.monochrome.st", text: $host)
+                TextField(StreamingSettings.defaultBaseURL.absoluteString, text: $host)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .keyboardType(.URL)
