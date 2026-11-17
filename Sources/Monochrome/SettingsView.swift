@@ -2,6 +2,7 @@
 #if canImport(SwiftUI)
 import MonochromeCore
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct SettingsView: View {
     let model: AppModel
@@ -60,6 +61,12 @@ struct SettingsView: View {
             .accessibilityLabel("Appearance")
 
             accentChoices
+
+            NavigationLink {
+                ThemePickerView(model: model)
+            } label: {
+                settingsLabel(icon: "paintpalette", title: "Theme", value: model.theme.name)
+            }
         } header: {
             TechnicalSectionHeader(title: "Appearance")
         }
@@ -294,6 +301,143 @@ struct SettingsView: View {
 
     private var hostsValue: String {
         model.userHosts.isEmpty ? "Default only" : "\(model.userHosts.count) extra"
+    }
+}
+
+// MARK: - Theme picker
+
+private struct ThemePickerView: View {
+    let model: AppModel
+
+    @Environment(\.accentColor) private var accent
+    @State private var isImporting = false
+    @State private var exportURL: URL?
+    @State private var message: String?
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(model.themePresets) { preset in
+                    Button {
+                        model.selectTheme(id: preset.id)
+                    } label: {
+                        row(preset)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Theme: \(preset.name)")
+                    .accessibilityAddTraits(model.theme.id == preset.id ? .isSelected : [])
+                }
+            } header: {
+                TechnicalSectionHeader(title: "Presets")
+            } footer: {
+                Text("OLED Black turns the background fully black in dark appearance.")
+            }
+
+            Section {
+                Button("Import Theme…", systemImage: "square.and.arrow.down") {
+                    isImporting = true
+                }
+                .foregroundStyle(Theme.primaryText)
+
+                if let exportURL {
+                    ShareLink(item: exportURL) {
+                        Text("Export Current Theme")
+                            .foregroundStyle(Theme.primaryText)
+                    }
+                }
+            } header: {
+                TechnicalSectionHeader(title: "Files")
+            } footer: {
+                Text(
+                    message
+                        ?? "Themes are JSON files. An imported theme must keep primary text at 4.5:1 or better in both appearances."
+                )
+                .foregroundStyle(message == nil ? Theme.secondaryText : Theme.destructive)
+            }
+        }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .listRowBackground(Theme.surface)
+        .listRowSeparatorTint(Theme.separator)
+        .background(Theme.background.ignoresSafeArea())
+        .navigationTitle("Theme")
+        .navigationBarTitleDisplayMode(.inline)
+        .fileImporter(isPresented: $isImporting, allowedContentTypes: [.json]) { result in
+            switch result {
+            case .success(let url):
+                let scoped = url.startAccessingSecurityScopedResource()
+                defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+                do {
+                    let data = try Data(contentsOf: url)
+                    message = model.importTheme(from: data)
+                    if message == nil { prepareExport() }
+                } catch {
+                    message = error.localizedDescription
+                }
+            case .failure(let error):
+                message = error.localizedDescription
+            }
+        }
+        .onAppear { prepareExport() }
+        .onChange(of: model.theme) { _, _ in prepareExport() }
+        .preferredColorScheme(model.appearanceMode.colorScheme)
+        .tint(accent)
+    }
+
+    private func row(_ preset: ThemeDefinition) -> some View {
+        HStack(spacing: 12) {
+            HStack(spacing: 0) {
+                swatch(preset.light.background.paletteColor, text: preset.light.primaryText.paletteColor)
+                swatch(preset.dark.background.paletteColor, text: preset.dark.primaryText.paletteColor)
+            }
+            .frame(width: 52, height: 26)
+            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .stroke(Theme.border, lineWidth: Theme.hairline)
+            }
+            .accessibilityHidden(true)
+
+            Text(preset.name)
+                .font(Theme.listRowTitle)
+                .foregroundStyle(Theme.primaryText)
+
+            Spacer(minLength: 8)
+
+            if model.theme.id == preset.id {
+                Image(systemName: "checkmark")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(accent)
+            }
+        }
+        .frame(minHeight: Theme.rowMinHeight)
+        .contentShape(Rectangle())
+    }
+
+    private func swatch(_ background: PaletteColor, text: PaletteColor) -> some View {
+        ZStack {
+            Rectangle().fill(Color(background))
+            Circle()
+                .fill(Color(text))
+                .frame(width: 6, height: 6)
+        }
+    }
+
+    /// Writes the current theme beside the app so the share sheet has a real file.
+    private func prepareExport() {
+        guard let data = model.exportCurrentTheme() else {
+            exportURL = nil
+            return
+        }
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("monochrome-theme.json")
+        do {
+            try data.write(to: url, options: .atomic)
+            exportURL = url
+        } catch {
+            exportURL = nil
+            message = "The theme could not be prepared for export."
+        }
     }
 }
 

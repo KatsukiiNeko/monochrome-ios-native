@@ -22,7 +22,7 @@ Status values: **Exists**, **Partial**, **Missing**, **Out of scope**,
 |---|---|---|---|
 | Dark, minimalist interface | Exists | `Theme`, `ThemePalette`, appearance setting | Not applicable |
 | Animated album covers | Missing | No video cover code in the app | Blocked by policy: `functions/api/apple-video-cover.js` forwards an `Authorization` header to `amp-api.music.apple.com` |
-| Custom themes + community store | Partial | Accent palettes (`AccentPreference`), System/Light/Dark; no theme presets or import/export. Store needs a backend | Store out of scope; presets/import/export in scope |
+| Custom themes + community store | Exists (store out of scope) | Presets `ThemePresets` (Monochrome, OLED Black, Paper, Graphite), runtime palette in `Theme.definition`, JSON import/export with 4.5:1 validation in `ThemeCodec`/`ThemeSettings`, Settings → Theme. Accent palette and System/Light/Dark kept. `ThemeDefinitionTests` (15 tests). Community store would need a backend | Store out of scope |
 | Audio visualizer | Missing | No visualizer; equalizer tap exists (`EQTap`) | Blocked by proof: the tap cannot be shown to run for remote progressive items without a device; see D1 note below |
 | Offline-capable app | Exists | Downloads (`DownloadStore`), audio cache, offline local files | PWA is not applicable to a native app |
 | System media controls | Exists | `NowPlayingController`, `AudioSessionController`, `MPRemoteCommandCenter` | Not applicable |

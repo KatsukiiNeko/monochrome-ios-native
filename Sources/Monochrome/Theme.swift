@@ -5,51 +5,51 @@ import SwiftUI
 import UIKit
 
 enum Theme {
+    // MARK: Runtime palette
+
+    /// The palette views read. The root view replaces it when the selected theme
+    /// changes, which re-evaluates every token below on the next render.
+    @MainActor static var definition: ThemeDefinition = ThemePresets.monochrome
+
+    @MainActor private static var lightPalette: Palette { definition.light.palette() }
+    @MainActor private static var darkPalette: Palette { definition.dark.palette() }
+
     // MARK: Colors
 
     /// Near-black in dark appearance, off-white in light appearance.
-    static let background = adaptive(
-        light: ThemePalette.light.background,
-        dark: ThemePalette.dark.background
-    )
+    @MainActor static var background: Color {
+        adaptive(light: lightPalette.background, dark: darkPalette.background)
+    }
     /// Default surface for cards, fields and chips.
-    static let surface = adaptive(
-        light: ThemePalette.light.surface,
-        dark: ThemePalette.dark.surface
-    )
+    @MainActor static var surface: Color {
+        adaptive(light: lightPalette.surface, dark: darkPalette.surface)
+    }
     /// A surface one step above `surface`.
-    static let elevated = adaptive(
-        light: ThemePalette.light.elevated,
-        dark: ThemePalette.dark.elevated
-    )
+    @MainActor static var elevated: Color {
+        adaptive(light: lightPalette.elevated, dark: darkPalette.elevated)
+    }
     /// Recessed control surface, used for fields and selected segments.
-    static let sunken = adaptive(
-        light: ThemePalette.light.sunken,
-        dark: ThemePalette.dark.sunken
-    )
+    @MainActor static var sunken: Color {
+        adaptive(light: lightPalette.sunken, dark: darkPalette.sunken)
+    }
     /// Thin rules and card outlines.
-    static let border = adaptive(
-        light: ThemePalette.light.border,
-        dark: ThemePalette.dark.border
-    )
+    @MainActor static var border: Color {
+        adaptive(light: lightPalette.border, dark: darkPalette.border)
+    }
     /// Quiet separators and idle progress tracks.
-    static let separator = adaptive(
-        light: ThemePalette.light.separator,
-        dark: ThemePalette.dark.separator
-    )
+    @MainActor static var separator: Color {
+        adaptive(light: lightPalette.separator, dark: darkPalette.separator)
+    }
 
-    static let primaryText = adaptive(
-        light: ThemePalette.light.primaryText,
-        dark: ThemePalette.dark.primaryText
-    )
-    static let secondaryText = adaptive(
-        light: ThemePalette.light.secondaryText,
-        dark: ThemePalette.dark.secondaryText
-    )
-    static let tertiaryText = adaptive(
-        light: ThemePalette.light.tertiaryText,
-        dark: ThemePalette.dark.tertiaryText
-    )
+    @MainActor static var primaryText: Color {
+        adaptive(light: lightPalette.primaryText, dark: darkPalette.primaryText)
+    }
+    @MainActor static var secondaryText: Color {
+        adaptive(light: lightPalette.secondaryText, dark: darkPalette.secondaryText)
+    }
+    @MainActor static var tertiaryText: Color {
+        adaptive(light: lightPalette.tertiaryText, dark: darkPalette.tertiaryText)
+    }
 
     /// Default state accent. Views read the selected accent from the environment.
     static let signalAccent = adaptive(
@@ -111,10 +111,9 @@ enum Theme {
         }
         return Color(AccentContrast.clamp(artwork, against: ThemePalette.dark.surface))
     }
-    static let destructive = adaptive(
-        light: ThemePalette.light.destructive,
-        dark: ThemePalette.dark.destructive
-    )
+    @MainActor static var destructive: Color {
+        adaptive(light: lightPalette.destructive, dark: darkPalette.destructive)
+    }
 
     /// High-contrast transport surface, independent of the state accent.
     static let primaryAction = adaptive(light: .black, dark: .white)

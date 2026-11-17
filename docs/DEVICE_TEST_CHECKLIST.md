@@ -146,6 +146,25 @@ chip variants and the build check covers compilation.
 - [ ] VoiceOver: playlist rows read the name and song count; the Add to playlist
       menu names each playlist.
 
+## Themes
+
+- [ ] Settings → Theme: switch between Monochrome, OLED Black, Paper and
+      Graphite. Every screen updates without relaunching, and the choice survives
+      a relaunch.
+- [ ] With Appearance set to System, switch the device between light and dark:
+      each theme shows its light and dark palette.
+- [ ] OLED Black in dark appearance: the Home, Search, Library, Now Playing and
+      Settings backgrounds are fully black while text stays readable.
+- [ ] Export Current Theme and open the file: it is readable JSON with
+      `schemaVersion`, `light` and `dark` tokens.
+- [ ] Import that file from the Files app: it appears as the selected theme and
+      the colours match the exported one.
+- [ ] Import a hand-edited theme whose primary text is faint: an error names the
+      contrast problem, the previous theme stays selected and the app stays
+      usable.
+- [ ] Check the largest Dynamic Type size and VoiceOver: each preset row reads
+      its name and selected state.
+
 ## Catalog hosts
 
 - [ ] Settings → Catalog Hosts: add an HTTPS host and confirm it appears in

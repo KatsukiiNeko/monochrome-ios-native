@@ -76,8 +76,13 @@ struct ContentView: View {
             Text(model.errorMessage ?? "")
         }
         .task {
+            // The theme has to be live before the first render of the tabs.
+            Theme.definition = model.theme
             playlists.load()
             await model.loadTracks()
+        }
+        .onChange(of: model.theme) { _, updated in
+            Theme.definition = updated
         }
         .preferredColorScheme(model.appearanceMode.colorScheme)
     }

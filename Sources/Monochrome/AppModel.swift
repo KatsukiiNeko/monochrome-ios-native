@@ -28,6 +28,8 @@ final class AppModel {
     private(set) var streamingSettingsError: String?
     private(set) var appearanceMode: AppearanceMode
     private(set) var accentPreference: AccentPreference
+    /// The active theme: a preset or an imported definition.
+    private(set) var theme: ThemeDefinition
     private(set) var artworkAccent: ArtworkTintColor?
     private(set) var downloads: [DownloadItem] = []
     private(set) var downloadsMetadataError: String?
@@ -41,6 +43,7 @@ final class AppModel {
     private let streamingSettings: StreamingSettings
     private let appearanceSettings: AppearanceSettings
     private let accentSettings: AccentSettings
+    private let themeSettings: ThemeSettings
     private var streamingClient: TracksAPIClient?
     /// One caching transport for every catalog call, so a recreated client keeps the cache.
     private let catalogHTTP: CachedHTTPClient
@@ -122,6 +125,7 @@ final class AppModel {
         let settings = StreamingSettings()
         let appearanceSettings = AppearanceSettings()
         let accentSettings = AccentSettings()
+        let themeSettings = ThemeSettings()
         // The equalizer file holds no audio; keep it out of iCloud backups.
         var equalizerFile = base.appendingPathComponent("equalizer.json")
         var equalizerValues = URLResourceValues()
@@ -149,8 +153,10 @@ final class AppModel {
         self.streamingSettings = settings
         self.appearanceSettings = appearanceSettings
         self.accentSettings = accentSettings
+        self.themeSettings = themeSettings
         self.appearanceMode = appearanceSettings.mode
         self.accentPreference = accentSettings.preference
+        self.theme = themeSettings.current
         self.streamingHost = settings.rawValue
         self.userHosts = settings.userHosts
         self.isStreamingConfigured = settings.baseURL != nil
@@ -186,6 +192,34 @@ final class AppModel {
     func setAppearanceMode(_ mode: AppearanceMode) {
         appearanceSettings.setMode(mode)
         appearanceMode = mode
+    }
+
+    // MARK: - Themes
+
+    var themePresets: [ThemeDefinition] { ThemePresets.all }
+
+    func selectTheme(id: String) {
+        themeSettings.selectPreset(id: id)
+        theme = themeSettings.current
+    }
+
+    /// Returns a message when the file is rejected, so the caller can show it.
+    func importTheme(from data: Data) -> String? {
+        do {
+            theme = try themeSettings.importTheme(data)
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
+    func exportCurrentTheme() -> Data? {
+        try? themeSettings.exportData(for: theme)
+    }
+
+    func resetTheme() {
+        themeSettings.reset()
+        theme = themeSettings.current
     }
 
     func setAccentPreference(_ preference: AccentPreference) {
