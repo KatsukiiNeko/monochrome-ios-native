@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var model: AppModel
     @State private var playlists: PlaylistModel
     @State private var importer: PlaylistImportModel
+    @State private var recommendations: RecommendationModel
     @State private var tab: AppTab = .home
     @State private var isShowingPlayer = false
     @State private var isShowingSettings = false
@@ -21,6 +22,12 @@ struct ContentView: View {
         _importer = State(initialValue: PlaylistImportModel(
             playlists: playlists,
             search: { try await model.searchTracks($0) }
+        ))
+        // The recommendations use the same catalog and the player's own log.
+        _recommendations = State(initialValue: RecommendationModel(
+            player: model.player,
+            search: { try await model.searchTracks($0) },
+            library: { model.recents + model.favorites }
         ))
     }
 
@@ -60,6 +67,7 @@ struct ContentView: View {
         .environment(\.onAccentColor, onAccentColor)
         .environment(playlists)
         .environment(importer)
+        .environment(recommendations)
         .sheet(isPresented: $isShowingPlayer) {
             PlayerView(model: model)
                 .presentationDetents([.large])
@@ -70,6 +78,7 @@ struct ContentView: View {
                 .environment(\.accentColor, accentColor)
                 .environment(playlists)
                 .environment(importer)
+                .environment(recommendations)
         }
         .sheet(isPresented: $isShowingSettings) {
             NavigationStack {
@@ -79,6 +88,9 @@ struct ContentView: View {
             .preferredColorScheme(model.appearanceMode.colorScheme)
             .tint(accentColor)
             .environment(\.accentColor, accentColor)
+            .environment(playlists)
+            .environment(importer)
+            .environment(recommendations)
         }
         .alert(
             "Something went wrong",
@@ -95,10 +107,23 @@ struct ContentView: View {
             // The theme has to be live before the first render of the tabs.
             Theme.definition = model.theme
             playlists.load()
+            recommendations.bootstrap(favorites: model.favorites, recents: model.recents)
             await model.loadTracks()
         }
         .onChange(of: model.theme) { _, updated in
             Theme.definition = updated
+        }
+        .onChange(of: model.favorites) { _, updated in
+            recommendations.syncSignals(
+                favorites: updated,
+                downloads: model.completedDownloads.map(\.track)
+            )
+        }
+        .onChange(of: model.completedDownloads.map(\.track.id)) { _, _ in
+            recommendations.syncSignals(
+                favorites: model.favorites,
+                downloads: model.completedDownloads.map(\.track)
+            )
         }
         .preferredColorScheme(model.appearanceMode.colorScheme)
     }

@@ -5,7 +5,7 @@ import Foundation
 import Observation
 
 /// Candidate sources for one refresh.
-public typealias RecommendationSearch = @Sendable (String) async throws -> [Track]
+public typealias RecommendationSearch = (String) async throws -> [Track]
 
 @MainActor
 @Observable
@@ -19,14 +19,14 @@ public final class RecommendationEngine {
     /// At most this many searches run at the same time.
     public static let maxConcurrentRequests = 2
 
-    private(set) var events: [PlayEvent] = []
-    private(set) var profile = TasteProfile()
-    private(set) var recommendations: [Recommendation] = []
+    public private(set) var events: [PlayEvent] = []
+    public private(set) var profile = TasteProfile()
+    public private(set) var recommendations: [Recommendation] = []
     /// Library tracks worth hearing again, with no network needed.
-    private(set) var rediscover: [Recommendation] = []
-    private(set) var isRefreshing = false
-    private(set) var lastRefresh: Date?
-    private(set) var lastError: String?
+    public private(set) var rediscover: [Recommendation] = []
+    public private(set) var isRefreshing = false
+    public private(set) var lastRefresh: Date?
+    public private(set) var lastError: String?
     /// Off when the listener turns recommendations down.
     public var isEnabled = true
 

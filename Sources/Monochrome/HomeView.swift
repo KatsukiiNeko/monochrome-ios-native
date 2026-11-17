@@ -11,6 +11,7 @@ struct HomeView: View {
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accentColor) private var accent
+    @Environment(RecommendationModel.self) private var recommendations
 
     private var quickAccess: [Track] {
         QuickAccess.merge(recents: model.recents, favorites: model.favorites)
@@ -29,6 +30,7 @@ struct HomeView: View {
                     if !quickAccess.isEmpty {
                         quickAccessGrid
                     }
+                    RecommendationShelf(model: model)
                     if !model.recents.isEmpty {
                         listenAgainSection
                     }
@@ -50,6 +52,9 @@ struct HomeView: View {
                     Button("Settings", systemImage: "gearshape") { onOpenSettings() }
                         .foregroundStyle(Theme.primaryText)
                 }
+            }
+            .task {
+                await recommendations.refreshIfNeeded()
             }
         }
     }
