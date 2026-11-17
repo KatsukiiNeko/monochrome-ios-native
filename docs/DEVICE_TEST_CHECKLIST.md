@@ -129,6 +129,19 @@ chip variants and the build check covers compilation.
 - [ ] VoiceOver: playlist rows read the name and song count; the Add to playlist
       menu names each playlist.
 
+## Catalog cache
+
+- [ ] Search for a term that returns results, then repeat the same search: the
+      second result set appears immediately.
+- [ ] Wait ten minutes (or relaunch the app) and repeat the same search: the
+      previous results appear immediately while the app refreshes them.
+- [ ] With the previous results cached, turn on airplane mode, force-quit the app
+      and reopen it, then repeat the same search: the saved results still appear.
+- [ ] In airplane mode, search for something new: an error with Retry appears
+      and the app stays responsive.
+- [ ] Stream URLs are never served from the cache: playing a cached-result track
+      in airplane mode fails with Retry rather than playing stale audio.
+
 ## Sleep timer
 
 - [ ] Open Now Playing, use the `•••` menu, choose Sleep Timer → 5 minutes.

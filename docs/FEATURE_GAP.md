@@ -13,7 +13,7 @@ Status values: **Exists**, **Partial**, **Missing**, **Out of scope**,
 |---|---|---|---|
 | Lossless streaming | Exists | `TrackURLResolver`, `TracksAPIClient.streamURL`; progressive FLAC from `track/{id}` | Allowed (same public host the app already uses) |
 | Local files | Exists | `LocalFileService`, `LibraryStore`, `MetadataReader` | Not applicable |
-| API response caching | Missing | No catalog response cache; audio cache only (`AudioCache`) | Not applicable |
+| API response caching | Exists | `CatalogRequestKey`, `CatalogResponseCache`, `CachedHTTPClient` in `Sources/MonochromeCore/CatalogCache/`; wired into `AppModel`'s catalog client. Per-kind TTL (search 10 min, album/artist 6 h), stale-while-revalidate, 50 MB LRU, no stream URLs, errors never stored. `CatalogCacheTests` (12 tests) | Not applicable |
 | Quality tiers above 16-bit/44.1 kHz | Missing | Catalog serves one lossless FLAC per track; no tier parameter in `TracksAPIClient` | No data: upstream's higher tiers use the TIDAL token in `js/HiFi.ts:1208-1269`; the public tracks host has no tier parameter |
 
 ## Interface

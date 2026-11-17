@@ -40,6 +40,8 @@ final class AppModel {
     private let appearanceSettings: AppearanceSettings
     private let accentSettings: AccentSettings
     private var streamingClient: TracksAPIClient?
+    /// One caching transport for every catalog call, so a recreated client keeps the cache.
+    private let catalogHTTP: CachedHTTPClient
     private let mediaDirectory: URL
     private let audioSession: AudioSessionController
     private let nowPlaying: NowPlayingController
@@ -75,6 +77,17 @@ final class AppModel {
             log: { message in playerLog.notice("\(message, privacy: .public)") }
         )
         // Permanent downloads live beside the library, not under Caches.
+        // Catalog responses are cache data, not user data: they live under Caches
+        // and are excluded from backups by the system.
+        let catalogCache = CatalogResponseCache(
+            directory: cacheDirectory.appendingPathComponent("Catalog", isDirectory: true),
+            log: { message in playerLog.notice("\(message, privacy: .public)") }
+        )
+        let catalogHTTP = CachedHTTPClient(
+            upstream: URLSessionHTTPClient(),
+            cache: catalogCache,
+            log: { message in playerLog.notice("\(message, privacy: .public)") }
+        )
         let downloadsDirectory = base.appendingPathComponent("Downloads", isDirectory: true)
         try? FileManager.default.createDirectory(at: downloadsDirectory, withIntermediateDirectories: true)
         var excludedDownloads = downloadsDirectory
@@ -125,6 +138,7 @@ final class AppModel {
             log: { message in playerLog.notice("\(message, privacy: .public)") }
         )
         self.service = service
+        self.catalogHTTP = catalogHTTP
         self.player = player
         self.cache = cache
         self.downloadStore = downloadStore
@@ -199,7 +213,7 @@ final class AppModel {
         let baseURL = streamingSettings.baseURL
         isStreamingConfigured = baseURL != nil
         isMonochromeEnabled = streamingSettings.isEnabled
-        let client = baseURL.map { TracksAPIClient(baseURL: $0) }
+        let client = baseURL.map { TracksAPIClient(baseURL: $0, http: catalogHTTP) }
         streamingClient = client
         Task { await resolver.useStreamingClient(client) }
     }
