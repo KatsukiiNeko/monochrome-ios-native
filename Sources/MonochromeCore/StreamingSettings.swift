@@ -5,6 +5,8 @@ public struct StreamingSettings {
     public static let defaultBaseURL = URL(string: "https://tracks.monochrome.st")!
     public static let storageKey = "streaming.baseURL"
     public static let enabledKey = "streaming.enabled"
+    public static let userHostsKey = "streaming.userHosts"
+    public static let maximumUserHosts = 8
 
     private let defaults: UserDefaults
 
@@ -47,6 +49,59 @@ public struct StreamingSettings {
             reset()
         }
         defaults.set(enabled, forKey: Self.enabledKey)
+    }
+
+    // MARK: - Extra hosts
+
+    /// User-supplied catalog hosts, tried before the default endpoint.
+    public var userHosts: [URL] {
+        (defaults.stringArray(forKey: Self.userHostsKey) ?? [])
+            .compactMap { Self.baseURL(from: $0) }
+    }
+
+    /// User hosts first, then the configured endpoint, then the built-in default.
+    /// Duplicates are dropped so a host never takes two turns.
+    public var allHosts: [URL] {
+        var ordered: [URL] = []
+        var seen: Set<String> = []
+        for url in userHosts + [configuredBaseURL, Self.defaultBaseURL].compactMap({ $0 }) {
+            if seen.insert(url.absoluteString).inserted {
+                ordered.append(url)
+            }
+        }
+        return ordered
+    }
+
+    /// HTTPS only. Returns false for an invalid or already-listed host, or at the cap.
+    @discardableResult
+    public func addUserHost(_ raw: String) -> Bool {
+        guard let url = Self.baseURL(from: raw) else { return false }
+        var hosts = userHosts
+        guard hosts.count < Self.maximumUserHosts,
+              !hosts.contains(where: { $0.absoluteString == url.absoluteString }) else { return false }
+        hosts.append(url)
+        defaults.set(hosts.map(\.absoluteString), forKey: Self.userHostsKey)
+        return true
+    }
+
+    public func removeUserHost(at index: Int) {
+        var hosts = userHosts
+        guard hosts.indices.contains(index) else { return }
+        hosts.remove(at: index)
+        defaults.set(hosts.map(\.absoluteString), forKey: Self.userHostsKey)
+    }
+
+    public func moveUserHost(from source: Int, to destination: Int) {
+        var hosts = userHosts
+        guard hosts.indices.contains(source), (0...hosts.count).contains(destination) else { return }
+        let moved = hosts.remove(at: source)
+        let adjusted = destination > source ? destination - 1 : destination
+        hosts.insert(moved, at: min(adjusted, hosts.count))
+        defaults.set(hosts.map(\.absoluteString), forKey: Self.userHostsKey)
+    }
+
+    public func resetUserHosts() {
+        defaults.removeObject(forKey: Self.userHostsKey)
     }
 
     /// True when the stored host is an override rather than the built-in default.

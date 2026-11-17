@@ -155,6 +155,12 @@ struct SettingsView: View {
                 settingsLabel(icon: "link", title: "Catalog Endpoint", value: endpointValue)
             }
 
+            NavigationLink {
+                CatalogHostsView(model: model)
+            } label: {
+                settingsLabel(icon: "server.rack", title: "Catalog Hosts", value: hostsValue)
+            }
+
             Button(role: .destructive) {
                 if model.hasCustomStreamingEndpoint {
                     isConfirmingEndpointReset = true
@@ -284,6 +290,108 @@ struct SettingsView: View {
     private var downloadsValue: String {
         let count = model.completedDownloads.count
         return count == 1 ? "1 song" : "\(count) songs"
+    }
+
+    private var hostsValue: String {
+        model.userHosts.isEmpty ? "Default only" : "\(model.userHosts.count) extra"
+    }
+}
+
+// MARK: - Extra catalog hosts
+
+/// User-managed failover hosts. The list is ordered: these are tried first, then
+/// the endpoint above and finally the built-in default.
+private struct CatalogHostsView: View {
+    let model: AppModel
+
+    @Environment(\.accentColor) private var accent
+    @State private var host = ""
+    @State private var errorMessage: String?
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(model.userHosts, id: \.absoluteString) { url in
+                    Text(url.host ?? url.absoluteString)
+                        .font(Theme.listRowTitle)
+                        .foregroundStyle(Theme.primaryText)
+                        .lineLimit(1)
+                }
+                .onMove { offsets, destination in
+                    guard let source = offsets.first else { return }
+                    model.moveStreamingHost(from: source, to: destination)
+                }
+                .onDelete { offsets in
+                    for index in offsets.sorted(by: >) {
+                        model.removeStreamingHost(at: index)
+                    }
+                }
+
+                if model.userHosts.isEmpty {
+                    Text("Only the built-in host is used.")
+                        .font(.footnote)
+                        .foregroundStyle(Theme.secondaryText)
+                }
+            } header: {
+                TechnicalSectionHeader(
+                    title: "Additional Hosts",
+                    meta: "\(model.userHosts.count)/\(StreamingSettings.maximumUserHosts)"
+                )
+            } footer: {
+                Text(
+                    errorMessage
+                        ?? "Tried in this order, then the endpoint above. HTTPS only. Swipe a host to remove it and use Edit to reorder."
+                )
+                .foregroundStyle(errorMessage == nil ? Theme.secondaryText : Theme.destructive)
+            }
+
+            Section {
+                TextField("https://example.com", text: $host)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.URL)
+                    .submitLabel(.done)
+                    .onSubmit(add)
+                    .onChange(of: host) { _, _ in errorMessage = nil }
+                    .accessibilityLabel("New catalog host")
+
+                Button("Add Host") { add() }
+                    .foregroundStyle(Theme.primaryText)
+
+                Button(role: .destructive) {
+                    model.resetStreamingHosts()
+                    errorMessage = nil
+                } label: {
+                    Text("Reset Hosts")
+                        .foregroundStyle(Theme.destructive)
+                }
+            } header: {
+                TechnicalSectionHeader(title: "Add")
+            }
+        }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .listRowBackground(Theme.surface)
+        .listRowSeparatorTint(Theme.separator)
+        .background(Theme.background.ignoresSafeArea())
+        .navigationTitle("Catalog Hosts")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if model.userHosts.count > 1 {
+                ToolbarItem(placement: .topBarTrailing) { EditButton() }
+            }
+        }
+        .preferredColorScheme(model.appearanceMode.colorScheme)
+        .tint(accent)
+    }
+
+    private func add() {
+        if model.addStreamingHost(host) {
+            host = ""
+            errorMessage = nil
+        } else {
+            errorMessage = "Enter a new HTTPS address. Hosts are limited to \(StreamingSettings.maximumUserHosts)."
+        }
     }
 }
 

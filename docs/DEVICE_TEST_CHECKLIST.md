@@ -146,6 +146,20 @@ chip variants and the build check covers compilation.
 - [ ] VoiceOver: playlist rows read the name and song count; the Add to playlist
       menu names each playlist.
 
+## Catalog hosts
+
+- [ ] Settings → Catalog Hosts: add an HTTPS host and confirm it appears in
+      the list; adding the same host twice is refused, and an http:// address
+      shows the validation message instead of being saved.
+- [ ] Add two hosts, reorder them with Edit, force-quit and reopen: the order
+      is unchanged.
+- [ ] Swipe a host away and tap Reset Hosts: the list empties and search keeps
+      working through the default endpoint.
+- [ ] With a deliberately unreachable extra host first in the list, search:
+      results still appear (served by the endpoint after the retry) and the app
+      does not hang on the dead host.
+- [ ] Remove the unreachable host: search returns to its usual speed.
+
 ## Catalog cache
 
 - [ ] Search for a term that returns results, then repeat the same search: the

@@ -87,15 +87,25 @@ public actor TracksAPIClient {
 
     public let baseURLs: [URL]
     private let http: any HTTPClient
-    private var unhealthy: Set<String> = []
+    private let now: @Sendable () -> Date
+    private var cooldowns = HostCooldowns()
 
-    public init(baseURLs: [URL], http: any HTTPClient = URLSessionHTTPClient()) {
+    public init(
+        baseURLs: [URL],
+        http: any HTTPClient = URLSessionHTTPClient(),
+        now: @escaping @Sendable () -> Date = { .now }
+    ) {
         self.baseURLs = baseURLs
         self.http = http
+        self.now = now
     }
 
-    public init(baseURL: URL = TracksAPIClient.defaultBaseURL, http: any HTTPClient = URLSessionHTTPClient()) {
-        self.init(baseURLs: [baseURL], http: http)
+    public init(
+        baseURL: URL = TracksAPIClient.defaultBaseURL,
+        http: any HTTPClient = URLSessionHTTPClient(),
+        now: @escaping @Sendable () -> Date = { .now }
+    ) {
+        self.init(baseURLs: [baseURL], http: http, now: now)
     }
 
     // MARK: - Catalog
@@ -140,14 +150,18 @@ public actor TracksAPIClient {
     /// Built at play time and never persisted: stream URLs are not part of a track's saved form.
     public func streamURL(for track: Track) -> URL? {
         guard let streamID = track.streamID, !streamID.isEmpty else { return nil }
-        guard let base = preferredBaseURL else { return nil }
+        guard let base = orderedHosts().first else { return nil }
         return Self.url(path: "track/\(streamID)", on: base)
     }
 
     // MARK: - Transport
 
-    private var preferredBaseURL: URL? {
-        baseURLs.first { !unhealthy.contains($0.absoluteString) } ?? baseURLs.first
+    /// Configured order, with hosts in cooldown moved behind the healthy ones.
+    private func orderedHosts() -> [URL] {
+        let stamp = now()
+        let ready = baseURLs.filter { !cooldowns.isCoolingDown($0, at: stamp) }
+        let cooling = baseURLs.filter { cooldowns.isCoolingDown($0, at: stamp) }
+        return ready + cooling
     }
 
     private static func query(_ text: String, _ limit: Int) -> [URLQueryItem] {
@@ -166,14 +180,18 @@ public actor TracksAPIClient {
         return components.url
     }
 
-    /// Tries healthy hosts first, then the rest, and remembers which hosts just failed.
+    /// At most one cross-host retry per request. Network errors, 5xx and a 429
+    /// with Retry-After rotate; any other 4xx stops at once because it describes
+    /// the request, not the host.
     private func get(path: String, query: [URLQueryItem] = []) async throws -> Data {
-        let healthy = baseURLs.filter { !unhealthy.contains($0.absoluteString) }
-        let failing = baseURLs.filter { unhealthy.contains($0.absoluteString) }
+        let ordered = orderedHosts()
+        var attempts = 0
         var lastFailure = TracksAPIError.invalidPayload
 
-        for base in healthy + failing {
+        for base in ordered {
+            guard attempts < 2 else { break }
             guard let url = Self.url(path: path, query: query, on: base) else { continue }
+            attempts += 1
             var request = URLRequest(url: url)
             request.httpMethod = "GET"
             request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -181,21 +199,31 @@ public actor TracksAPIClient {
 
             do {
                 let (data, response) = try await http.data(for: request)
-                if (200..<300).contains(response.statusCode) {
-                    unhealthy.remove(base.absoluteString)
+                let status = response.statusCode
+                if (200..<300).contains(status) {
+                    cooldowns.reset(base)
                     return data
                 }
-                // A 4xx is about the request, not the host: retrying elsewhere cannot help.
-                if response.statusCode == 429 || response.statusCode >= 500 {
-                    unhealthy.insert(base.absoluteString)
-                    lastFailure = .httpStatus(response.statusCode)
+                if status == 429 {
+                    // Waiting out a rate limit needs a stated delay; without one
+                    // the request fails instead of hammering another host.
+                    guard let retryAfter = HostCooldowns.retryAfter(from: response, at: now()) else {
+                        throw TracksAPIError.httpStatus(429)
+                    }
+                    cooldowns.penalize(base, at: now(), minimum: retryAfter)
+                    lastFailure = .httpStatus(429)
                     continue
                 }
-                throw TracksAPIError.httpStatus(response.statusCode)
+                if status >= 500 {
+                    cooldowns.penalize(base, at: now())
+                    lastFailure = .httpStatus(status)
+                    continue
+                }
+                throw TracksAPIError.httpStatus(status)
             } catch let error as TracksAPIError {
                 throw error
             } catch {
-                unhealthy.insert(base.absoluteString)
+                cooldowns.penalize(base, at: now())
                 lastFailure = .unavailable(error.localizedDescription)
             }
         }

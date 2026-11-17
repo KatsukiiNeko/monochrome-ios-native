@@ -60,7 +60,7 @@ Status values: **Exists**, **Partial**, **Missing**, **Out of scope**,
 | Last.fm / ListenBrainz | Out of scope | — | Needs a third-party login |
 | Unreleased music (ArtistGrid) | Out of scope | — | Unlicensed or leaked recordings |
 | Discord embeds | Out of scope | — | Web-only |
-| Multiple API instances with failover | Partial | `TracksAPIClient.get` rotates hosts but has no cooldown, no `Retry-After` handling and no user host list | Not applicable |
+| Multiple API instances with failover | Exists | `HostCooldowns` (30 s doubling to 10 min), `TracksAPIClient` rotation on transport errors, 5xx and 429-with-Retry-After only, one cross-host retry, no rotation on other 4xx. User host list in `StreamingSettings` (HTTPS, cap 8, reorder, reset) with Settings UI. `FailoverTests` (13 tests) | Not applicable |
 | Podcasts | Missing | No podcast code | Upstream route blocked (PodcastIndex key/secret in `js/podcasts-api.js:7-21`); a token-free Apple Search API + RSS route is allowed but not built in this run |
 | Music videos | Missing | No video playback | Blocked by policy: upstream resolves TIDAL streams through the token in `js/HiFi.ts` |
 | Keyboard shortcuts, command palette | Not applicable | — | Web-only |

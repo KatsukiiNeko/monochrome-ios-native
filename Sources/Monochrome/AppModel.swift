@@ -20,6 +20,8 @@ final class AppModel {
     let lyricsService: LyricsService
     let equalizer: EQController
     private(set) var streamingHost: String
+    /// Extra catalog hosts, tried before the default endpoint.
+    private(set) var userHosts: [URL] = []
     /// The catalog is usable: enabled and pointed at a valid host.
     private(set) var isStreamingConfigured: Bool
     private(set) var isMonochromeEnabled: Bool
@@ -150,6 +152,7 @@ final class AppModel {
         self.appearanceMode = appearanceSettings.mode
         self.accentPreference = accentSettings.preference
         self.streamingHost = settings.rawValue
+        self.userHosts = settings.userHosts
         self.isStreamingConfigured = settings.baseURL != nil
         self.isMonochromeEnabled = settings.isEnabled
         self.mediaDirectory = media
@@ -213,7 +216,10 @@ final class AppModel {
         let baseURL = streamingSettings.baseURL
         isStreamingConfigured = baseURL != nil
         isMonochromeEnabled = streamingSettings.isEnabled
-        let client = baseURL.map { TracksAPIClient(baseURL: $0, http: catalogHTTP) }
+        userHosts = streamingSettings.userHosts
+        // One client over every host in order: the user's first, then the default.
+        let hosts = isMonochromeEnabled ? streamingSettings.allHosts : []
+        let client = hosts.isEmpty ? nil : TracksAPIClient(baseURLs: hosts, http: catalogHTTP)
         streamingClient = client
         Task { await resolver.useStreamingClient(client) }
     }
@@ -245,6 +251,30 @@ final class AppModel {
         applyStreamingSettings()
         streamingSettingsError = nil
         return true
+    }
+
+    // MARK: - Extra catalog hosts
+
+    @discardableResult
+    func addStreamingHost(_ raw: String) -> Bool {
+        guard streamingSettings.addUserHost(raw) else { return false }
+        applyStreamingSettings()
+        return true
+    }
+
+    func removeStreamingHost(at index: Int) {
+        streamingSettings.removeUserHost(at: index)
+        applyStreamingSettings()
+    }
+
+    func moveStreamingHost(from source: Int, to destination: Int) {
+        streamingSettings.moveUserHost(from: source, to: destination)
+        applyStreamingSettings()
+    }
+
+    func resetStreamingHosts() {
+        streamingSettings.resetUserHosts()
+        applyStreamingSettings()
     }
 
     /// Restores only the endpoint. Appearance, cache, downloads and history are untouched.
