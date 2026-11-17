@@ -298,6 +298,31 @@ struct RecommendationEngineTests {
         engine.bootstrapOnce(favorites: favorites, recents: [])
         #expect(engine.eventCount == count)
     }
+
+    @Test("the switch is kept with the log")
+    func enabledPersists() {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("events-\(UUID().uuidString).json")
+        let store = PlayEventStore(fileURL: url)
+        let engine = RecommendationEngine(store: store)
+        engine.setEnabled(false)
+
+        let reloaded = RecommendationEngine(store: store)
+        reloaded.load()
+
+        #expect(reloaded.isEnabled == false)
+    }
+
+    @Test("a log without the switch stays enabled")
+    func legacyContentMigrates() throws {
+        let legacy = "{\"schemaVersion\":1,\"events\":[]}"
+        let content = try JSONDecoder().decode(
+            PlayEventStore.Content.self,
+            from: Data(legacy.utf8)
+        )
+        #expect(content.isEnabled)
+        #expect(content.schemaVersion == PlayEventStore.schemaVersion)
+    }
 }
 
 /// Thread-safe counter for request assertions.

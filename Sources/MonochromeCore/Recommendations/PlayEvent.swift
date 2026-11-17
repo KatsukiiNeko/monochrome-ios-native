@@ -69,13 +69,16 @@ public struct PlayEventStore: Sendable {
     public struct Content: Codable, Equatable, Sendable {
         public var schemaVersion: Int
         public var events: [PlayEvent]
+        /// Off when the listener turns recommendations down.
+        public var isEnabled: Bool
 
-        public init(events: [PlayEvent] = []) {
+        public init(events: [PlayEvent] = [], isEnabled: Bool = true) {
             self.schemaVersion = PlayEventStore.schemaVersion
             self.events = events
+            self.isEnabled = isEnabled
         }
 
-        private enum CodingKeys: String, CodingKey { case schemaVersion, events }
+        private enum CodingKeys: String, CodingKey { case schemaVersion, events, isEnabled }
 
         /// A file written before the version field existed migrates in place.
         public init(from decoder: Decoder) throws {
@@ -83,6 +86,7 @@ public struct PlayEventStore: Sendable {
             schemaVersion = try container.decodeIfPresent(Int.self, forKey: .schemaVersion)
                 ?? PlayEventStore.schemaVersion
             events = try container.decodeIfPresent([PlayEvent].self, forKey: .events) ?? []
+            isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
         }
     }
 
@@ -103,5 +107,16 @@ public struct PlayEventStore: Sendable {
             trimmed.events = Array(trimmed.events.suffix(Self.maxEvents))
         }
         try file.write(trimmed)
+        excludeFromBackups()
+    }
+
+    /// The listening log stays on the device and out of backups.
+    private func excludeFromBackups() {
+        #if canImport(Darwin)
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        var url = file.fileURL
+        try? url.setResourceValues(values)
+        #endif
     }
 }

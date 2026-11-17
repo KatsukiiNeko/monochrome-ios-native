@@ -30,7 +30,7 @@ public final class PlayerController {
     public var onTrackStarted: ((Track) -> Void)?
     /// Called when a track is heard to the end, left early or looped; the app
     /// forwards these to the listening log.
-    public var onPlayEvent: ((PlayEvent) -> Void)?
+    public var onPlayEvent: (@MainActor (PlayEvent) -> Void)?
     /// Technical log sink; the app forwards these to os.Logger.
     public var log: ((String) -> Void)?
 

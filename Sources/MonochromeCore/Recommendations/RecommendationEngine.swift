@@ -60,8 +60,16 @@ public final class RecommendationEngine {
     // MARK: - Events
 
     public func load() {
-        events = store.load().events
+        let content = store.load()
+        events = content.events
+        isEnabled = content.isEnabled
         profile = TasteProfile.build(events: events, now: now())
+    }
+
+    /// Turns the shelf on or off; the choice is kept with the log.
+    public func setEnabled(_ enabled: Bool) {
+        isEnabled = enabled
+        persist()
     }
 
     /// Records a listening event and refreshes the profile.
@@ -140,7 +148,7 @@ public final class RecommendationEngine {
     }
 
     private func persist() {
-        try? store.save(PlayEventStore.Content(events: events))
+        try? store.save(PlayEventStore.Content(events: events, isEnabled: isEnabled))
     }
 
     // MARK: - Candidates
