@@ -74,6 +74,7 @@ struct LibraryView: View {
                             .buttonStyle(.plain)
                             .contextMenu {
                                 AddToPlaylistMenu(track: track)
+                                RecommendationMenu(track: track)
                                 if model.player.currentTrack != nil {
                                     Button("Play next", systemImage: "text.line.first.and.arrowtriangle.forward") {
                                         model.player.playNext(track)

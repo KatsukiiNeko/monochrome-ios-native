@@ -188,6 +188,7 @@ struct DownloadsView: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
+            RecommendationMenu(track: item.track)
             Button {
                 Task {
                     guard let url = await model.downloadedFileURL(for: item) else {

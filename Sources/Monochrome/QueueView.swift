@@ -80,6 +80,7 @@ struct QueueView: View {
                                             player.playNext(entry.track)
                                         }
                                         AddToPlaylistMenu(track: entry.track)
+                                        RecommendationMenu(track: entry.track)
                                     }
                                 }
                                 .onMove { offsets, destination in

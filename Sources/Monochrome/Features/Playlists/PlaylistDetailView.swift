@@ -89,6 +89,7 @@ struct PlaylistDetailView: View {
                     }
                     .contextMenu {
                         AddToPlaylistMenu(track: track)
+                        RecommendationMenu(track: track)
                         Button("Play next", systemImage: "text.line.first.and.arrowtriangle.forward") {
                             model.player.playNext(track)
                         }
