@@ -64,6 +64,7 @@ struct RecommendationShelf: View {
                     .accessibilityHint("Plays this track")
                     .contextMenu {
                         RecommendationMenu(track: item.track)
+                        RadioMenu(track: item.track)
                     }
                 }
             }

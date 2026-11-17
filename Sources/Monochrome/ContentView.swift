@@ -8,6 +8,7 @@ struct ContentView: View {
     @State private var playlists: PlaylistModel
     @State private var importer: PlaylistImportModel
     @State private var recommendations: RecommendationModel
+    @State private var radio: RadioModel
     @State private var tab: AppTab = .home
     @State private var isShowingPlayer = false
     @State private var isShowingSettings = false
@@ -28,6 +29,12 @@ struct ContentView: View {
             player: model.player,
             search: { try await model.searchTracks($0) },
             library: { model.recents + model.favorites }
+        ))
+        // The radio asks the same catalog and avoids the recent plays.
+        _radio = State(initialValue: RadioModel(
+            player: model.player,
+            search: { try await model.searchTracks($0) },
+            recents: { model.recents }
         ))
     }
 
@@ -68,6 +75,7 @@ struct ContentView: View {
         .environment(playlists)
         .environment(importer)
         .environment(recommendations)
+        .environment(radio)
         .sheet(isPresented: $isShowingPlayer) {
             PlayerView(model: model)
                 .presentationDetents([.large])
@@ -79,6 +87,7 @@ struct ContentView: View {
                 .environment(playlists)
                 .environment(importer)
                 .environment(recommendations)
+                .environment(radio)
         }
         .sheet(isPresented: $isShowingSettings) {
             NavigationStack {
@@ -91,6 +100,7 @@ struct ContentView: View {
             .environment(playlists)
             .environment(importer)
             .environment(recommendations)
+            .environment(radio)
         }
         .alert(
             "Something went wrong",
@@ -109,6 +119,9 @@ struct ContentView: View {
             playlists.load()
             recommendations.bootstrap(favorites: model.favorites, recents: model.recents)
             await model.loadTracks()
+        }
+        .onChange(of: model.player.currentTrack?.id) { _, _ in
+            radio.trackChanged()
         }
         .onChange(of: model.theme) { _, updated in
             Theme.definition = updated

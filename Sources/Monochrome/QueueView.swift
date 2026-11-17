@@ -8,6 +8,7 @@ struct QueueView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accentColor) private var accent
+    @Environment(RadioModel.self) private var radio
     @State private var isConfirmingClear = false
 
     private var player: PlayerController { model.player }
@@ -81,6 +82,7 @@ struct QueueView: View {
                                         }
                                         AddToPlaylistMenu(track: entry.track)
                                         RecommendationMenu(track: entry.track)
+                                        RadioMenu(track: entry.track)
                                     }
                                 }
                                 .onMove { offsets, destination in
@@ -92,7 +94,10 @@ struct QueueView: View {
                                 }
                             }
                         } header: {
-                            TechnicalSectionHeader(title: "Next in Queue")
+                            TechnicalSectionHeader(
+                                title: "Next in Queue",
+                                meta: radio.isRunning ? "RADIO" : nil
+                            )
                         }
                     }
                     .listStyle(.plain)
@@ -112,6 +117,11 @@ struct QueueView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
+                        if radio.isRunning {
+                            Button("Stop radio", systemImage: "dot.radiowaves.left.and.right.slash") {
+                                radio.stop()
+                            }
+                        }
                         Button("Clear queue", systemImage: "trash", role: .destructive) {
                             isConfirmingClear = true
                         }

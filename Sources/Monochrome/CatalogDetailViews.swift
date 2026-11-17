@@ -110,6 +110,7 @@ struct ArtistDetailView: View {
     let artist: RemoteArtist
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(RadioModel.self) private var radio
     @State private var detail: RemoteArtistDetail?
     @State private var errorMessage: String?
     @State private var isLoading = false
@@ -134,6 +135,12 @@ struct ArtistDetailView: View {
                             .font(.title3.weight(.semibold))
                     }
                     .padding(.vertical, 4)
+
+                    Button("Start radio", systemImage: "dot.radiowaves.left.and.right") {
+                        radio.start(.artist(artist.name))
+                    }
+                    .font(Theme.technical)
+                    .foregroundStyle(Theme.primaryText)
                 }
 
                 if let detail {

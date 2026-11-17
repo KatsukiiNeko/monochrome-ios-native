@@ -443,6 +443,7 @@ struct SearchView: View {
         Menu {
             AddToPlaylistMenu(track: track)
             RecommendationMenu(track: track)
+                            RadioMenu(track: track)
             if model.player.currentTrack != nil {
                 Button("Play next", systemImage: "text.line.first.and.arrowtriangle.forward") {
                     model.player.playNext(track)
