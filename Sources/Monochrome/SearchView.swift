@@ -443,6 +443,9 @@ struct SearchView: View {
         Menu {
             AddToPlaylistMenu(track: track)
             if model.player.currentTrack != nil {
+                Button("Play next", systemImage: "text.line.first.and.arrowtriangle.forward") {
+                    model.player.playNext(track)
+                }
                 Button("Add to queue", systemImage: "text.badge.plus") {
                     model.player.append([track])
                 }

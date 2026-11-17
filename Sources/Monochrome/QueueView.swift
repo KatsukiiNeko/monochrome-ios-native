@@ -8,6 +8,7 @@ struct QueueView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accentColor) private var accent
+    @State private var isConfirmingClear = false
 
     private var player: PlayerController { model.player }
 
@@ -74,6 +75,12 @@ struct QueueView: View {
                                             Task { await player.removeTrack(at: entry.index) }
                                         }
                                     }
+                                    .contextMenu {
+                                        Button("Play next", systemImage: "text.line.first.and.arrowtriangle.forward") {
+                                            player.playNext(entry.track)
+                                        }
+                                        AddToPlaylistMenu(track: entry.track)
+                                    }
                                 }
                                 .onMove { offsets, destination in
                                     guard let source = offsets.first else { return }
@@ -103,9 +110,32 @@ struct QueueView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button("Clear queue", systemImage: "trash", role: .destructive) {
+                            isConfirmingClear = true
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .foregroundStyle(Theme.primaryText)
+                    }
+                    .accessibilityLabel("Queue actions")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
                         .foregroundStyle(Theme.primaryText)
                 }
+            }
+            .confirmationDialog(
+                "Clear the queue?",
+                isPresented: $isConfirmingClear,
+                titleVisibility: .visible
+            ) {
+                Button("Clear queue", role: .destructive) {
+                    player.clearQueue()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Playback stops and every queued song is removed.")
             }
             .preferredColorScheme(model.appearanceMode.colorScheme)
         }

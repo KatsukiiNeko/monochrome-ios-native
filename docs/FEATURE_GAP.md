@@ -33,7 +33,7 @@ Status values: **Exists**, **Partial**, **Missing**, **Out of scope**,
 |---|---|---|---|
 | Recently played | Exists | `HistoryStore`, `AppModel.recents` | Not applicable |
 | Favorites library | Exists | `FavoritesStore`, Library favorites filter | Not applicable |
-| Queue: shuffle, repeat, reorder, remove | Partial | Repeat (`RepeatMode`), reorder (`Queue.move`), remove, jump. No shuffle, play next, clear | Not applicable |
+| Queue: shuffle, repeat, reorder, remove | Exists | Repeat (`RepeatMode`), reorder (`Queue.move`), remove, jump; shuffle (`QueueShuffle`, `PlayerController.toggleShuffle`), play next (`playNext`), clear (`clearQueue`). UI: shuffle on Now Playing, play next in track menus, clear in the queue sheet. `QueueShuffleTests` + 6 shuffle/play-next/clear tests | Not applicable |
 | Local playlists | Exists | `PlaylistCollection`, `Playlist`, `PlaylistStore` in `Sources/MonochromeCore/Playlists/`; `Sources/Monochrome/Features/Playlists/` for the Library section, detail view and "Add to playlist" menu; `PlaylistTests` (11 tests) | Not applicable |
 | Playlist import from other platforms | Missing | No file import beyond audio files | File import only: no platform URLs (out of scope) |
 | Public playlists | Out of scope | — | Needs accounts and a backend |

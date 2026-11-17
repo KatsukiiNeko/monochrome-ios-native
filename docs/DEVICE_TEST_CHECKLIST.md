@@ -107,6 +107,23 @@ item by hand.
 Layout and feel can only be judged by a person; the host tests cover only the
 chip variants and the build check covers compilation.
 
+## Queue
+
+- [ ] Play an album so several songs are queued, then tap shuffle on Now
+      Playing: the current song keeps playing, the rest play in a different
+      order, and the shuffle mark is visible.
+- [ ] With shuffle on, let the queue run to the end and check that every song
+      played exactly once.
+- [ ] Turn shuffle off: the queue returns to its original order with the current
+      song still selected, and playback does not restart.
+- [ ] Long-press a search result and choose Play next: it plays right after the
+      current song. Choose Add to queue: it goes to the end.
+- [ ] Open the queue sheet, use the ellipsis menu and Clear queue: playback
+      stops, the sheet shows the empty state and Now Playing closes to the mini
+      player.
+- [ ] Reorder and remove songs in the queue sheet; the changes survive opening
+      and closing the sheet.
+
 ## Playlists
 
 - [ ] Library shows a Playlists section. Tap New playlist, name it, and confirm the

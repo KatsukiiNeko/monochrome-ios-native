@@ -193,6 +193,15 @@ struct PlayerView: View {
             if !player.queue.isEmpty {
                 Menu {
                     Button("Queue", systemImage: "list.bullet") { isShowingQueue = true }
+                    Button {
+                        player.toggleShuffle()
+                    } label: {
+                        Label(
+                            player.isShuffled ? "Shuffle Off" : "Shuffle On",
+                            systemImage: "shuffle"
+                        )
+                    }
+                    .accessibilityLabel(player.isShuffled ? "Turn shuffle off" : "Turn shuffle on")
                     if let track = player.currentTrack {
                         AddToPlaylistMenu(track: track)
                     }
@@ -376,10 +385,35 @@ struct PlayerView: View {
             .accessibilityLabel("Next track")
             .frame(maxWidth: .infinity)
 
-            Color.clear
-                .frame(width: Theme.controlSize, height: Theme.controlSize)
-                .frame(maxWidth: .infinity)
+            shuffleControl
         }
+    }
+
+    private var shuffleControl: some View {
+        Button {
+            player.toggleShuffle()
+        } label: {
+            Image(systemName: "shuffle")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(player.isShuffled ? accent : Theme.secondaryText)
+                .frame(width: Theme.controlSize, height: Theme.controlSize)
+                .overlay(alignment: .bottom) {
+                    if player.isShuffled {
+                        Rectangle()
+                            .fill(accent)
+                            .frame(width: 5, height: 2)
+                            .offset(y: -6)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(player.queue.isEmpty)
+        .frame(maxWidth: .infinity)
+        .accessibilityLabel("Shuffle")
+        .accessibilityValue(player.isShuffled ? "On" : "Off")
+        .accessibilityHint("Shuffles the queue and keeps the current song first")
     }
 
     private var repeatControl: some View {

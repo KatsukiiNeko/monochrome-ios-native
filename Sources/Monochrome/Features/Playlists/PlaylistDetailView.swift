@@ -85,6 +85,9 @@ struct PlaylistDetailView: View {
                     }
                     .contextMenu {
                         AddToPlaylistMenu(track: track)
+                        Button("Play next", systemImage: "text.line.first.and.arrowtriangle.forward") {
+                            model.player.playNext(track)
+                        }
                         Button("Add to queue", systemImage: "text.badge.plus") {
                             model.player.append([track])
                         }
@@ -141,6 +144,19 @@ struct PlaylistDetailView: View {
                 .foregroundStyle(Theme.onPrimaryAction)
                 .disabled(playlist.items.isEmpty)
                 .accessibilityHint("Plays this playlist in order")
+
+                Button {
+                    Task {
+                        await model.player.play(tracks: playlist.items, startingAt: 0)
+                        if !model.player.isShuffled { model.player.toggleShuffle() }
+                    }
+                } label: {
+                    Label("Shuffle", systemImage: "shuffle")
+                        .font(Theme.listRowTitle)
+                }
+                .glassControlStyle()
+                .disabled(playlist.items.isEmpty)
+                .accessibilityHint("Plays this playlist in a random order")
 
                 Button {
                     model.player.append(playlist.items)
