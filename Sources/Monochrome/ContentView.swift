@@ -4,11 +4,25 @@ import MonochromeCore
 import SwiftUI
 
 struct ContentView: View {
-    @State private var model = AppModel()
-    @State private var playlists = PlaylistModel()
+    @State private var model: AppModel
+    @State private var playlists: PlaylistModel
+    @State private var importer: PlaylistImportModel
     @State private var tab: AppTab = .home
     @State private var isShowingPlayer = false
     @State private var isShowingSettings = false
+
+    init() {
+        let model = AppModel()
+        let playlists = PlaylistModel()
+        _model = State(initialValue: model)
+        _playlists = State(initialValue: playlists)
+        // The importer asks the catalog through the app model; it keeps no
+        // catalog state of its own.
+        _importer = State(initialValue: PlaylistImportModel(
+            playlists: playlists,
+            search: { try await model.searchTracks($0) }
+        ))
+    }
 
     private enum AppTab: Hashable {
         case home
@@ -45,6 +59,7 @@ struct ContentView: View {
         .environment(\.accentColor, accentColor)
         .environment(\.onAccentColor, onAccentColor)
         .environment(playlists)
+        .environment(importer)
         .sheet(isPresented: $isShowingPlayer) {
             PlayerView(model: model)
                 .presentationDetents([.large])
@@ -54,6 +69,7 @@ struct ContentView: View {
                 .tint(accentColor)
                 .environment(\.accentColor, accentColor)
                 .environment(playlists)
+                .environment(importer)
         }
         .sheet(isPresented: $isShowingSettings) {
             NavigationStack {

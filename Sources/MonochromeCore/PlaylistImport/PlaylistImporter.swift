@@ -4,7 +4,11 @@ import Foundation
 import Observation
 
 /// One entry's settled state, kept so progress is restorable.
-public struct PlaylistImportSettlement: Codable, Equatable, Sendable {
+public struct PlaylistImportSettlement: Codable, Equatable, Sendable, Identifiable {
+    public var id: String {
+        "\(entry.title)|\(entry.artist)"
+    }
+
     public var entry: PlaylistImportEntry
     /// Chosen or auto-accepted track; nil while undecided or rejected.
     public var chosen: Track?
@@ -77,14 +81,14 @@ public final class PlaylistImporter {
     static let searchSpacing: TimeInterval = 0.25
     static let progressMaxBytes = 4 * 1024 * 1024
 
-    private(set) var playlistName = ""
-    private(set) var total = 0
-    private(set) var processed = 0
-    private(set) var isRunning = false
+    public private(set) var playlistName = ""
+    public private(set) var total = 0
+    public private(set) var processed = 0
+    public private(set) var isRunning = false
     /// Entries still awaiting the search loop; drains as it runs.
-    private(set) var pendingEntries: [PlaylistImportEntry] = []
-    private(set) var settlements: [PlaylistImportSettlement] = []
-    private(set) var searchFailures = 0
+    public private(set) var pendingEntries: [PlaylistImportEntry] = []
+    public private(set) var settlements: [PlaylistImportSettlement] = []
+    public private(set) var searchFailures = 0
 
     private var search: PlaylistSearch?
     private var store: JSONFileStore?
@@ -94,6 +98,11 @@ public final class PlaylistImporter {
 
     static func makeStore(_ fileURL: URL) -> JSONFileStore {
         JSONFileStore(fileURL: fileURL, maxBytes: progressMaxBytes, log: nil)
+    }
+
+    /// Saved progress for an unfinished run, if any.
+    public static func storedProgress(at fileURL: URL) -> PlaylistImportProgress? {
+        makeStore(fileURL).read(PlaylistImportProgress.self)
     }
 
     // MARK: - Running

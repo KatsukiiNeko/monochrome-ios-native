@@ -14,6 +14,7 @@ struct PlaylistDetailView: View {
     @State private var isRenaming = false
     @State private var renameText = ""
     @State private var isConfirmingDelete = false
+    @State private var exportURL: IdentifiableURL?
 
     private var playlist: Playlist? { playlists.playlist(id: playlistID) }
 
@@ -33,6 +34,9 @@ struct PlaylistDetailView: View {
         .navigationTitle(playlist?.name ?? "Playlist")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbar }
+        .sheet(item: Binding(get: { exportURL }, set: { exportURL = $0 })) { shared in
+            ActivityShareSheet(items: [shared.url])
+        }
         .alert("Rename playlist", isPresented: $isRenaming) {
             TextField("Name", text: $renameText)
             Button("Save") { playlists.rename(id: playlistID, to: renameText) }
@@ -196,6 +200,15 @@ struct PlaylistDetailView: View {
                 Button("Duplicate", systemImage: "plus.square.on.square") {
                     playlists.duplicate(id: playlistID)
                 }
+                if let playlist, !playlist.items.isEmpty {
+                    Divider()
+                    Button("Export as JSON", systemImage: "curlybraces") {
+                        export(asJSON: true, playlist: playlist)
+                    }
+                    Button("Export as CSV", systemImage: "tablecells") {
+                        export(asJSON: false, playlist: playlist)
+                    }
+                }
                 Divider()
                 Button("Delete", systemImage: "trash", role: .destructive) {
                     isConfirmingDelete = true
@@ -206,6 +219,24 @@ struct PlaylistDetailView: View {
             }
             .accessibilityLabel("Playlist actions")
         }
+    }
+
+    /// Writes the playlist to a file and hands it to the system share sheet.
+    private func export(asJSON: Bool, playlist: Playlist) {
+        let url: URL?
+        if asJSON {
+            url = try? PlaylistExport.writeJSON(name: playlist.name, items: playlist.items)
+        } else {
+            url = try? PlaylistExport.writeCSV(name: playlist.name, items: playlist.items)
+        }
+        if let url {
+            exportURL = IdentifiableURL(url: url)
+        }
+    }
+
+    private struct IdentifiableURL: Identifiable {
+        let id = UUID()
+        let url: URL
     }
 }
 #endif

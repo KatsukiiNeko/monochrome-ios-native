@@ -103,6 +103,15 @@ final class PlaylistModel {
         return result
     }
 
+    /// Adds several tracks in one write; duplicates are skipped.
+    @discardableResult
+    func add(_ tracks: [Track], to playlistID: String) -> Int {
+        var updated = collection
+        let added = updated.add(tracks, to: playlistID, now: .now)
+        guard added > 0 else { return 0 }
+        return commit(updated) ? added : 0
+    }
+
     func removeItem(at index: Int, from playlistID: String) {
         var updated = collection
         guard updated.remove(at: index, from: playlistID, now: .now) != nil else { return }
