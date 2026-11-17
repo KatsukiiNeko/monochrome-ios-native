@@ -550,3 +550,19 @@ the tap is not receiving audio; a curve that does nothing on a track that logged
       shelf leans on the recent listens.
 - [ ] VoiceOver reads the shelf rows with their reason; Dynamic Type at the
       largest size keeps the reason visible.
+
+## Radio
+
+- [ ] Long-press a search or library track → "Start radio": the track plays and
+      the queue fills with tracks of the same artist.
+- [ ] Open the queue sheet: the "Next in Queue" header reads RADIO and the
+      ellipsis menu offers "Stop radio".
+- [ ] Let the queue fall to three remaining tracks: more tracks appear without
+      a gap and playback continues.
+- [ ] After 50 played tracks, none of them comes back in the radio.
+- [ ] Pick a track outside the radio from Search or Library: the radio ends and
+      the queue is the new selection only.
+- [ ] Artist page → "Start radio": tracks of that artist fill the queue.
+- [ ] Play with no network when the queue runs low: playback of the queued
+      tracks continues and the radio fills again once the network is back.
+- [ ] VoiceOver reads the Start radio action and the Stop radio action.
