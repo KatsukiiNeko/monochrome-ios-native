@@ -28,6 +28,9 @@ public final class PlayerController {
 
     /// Called once per successful start; the app uses it to record history.
     public var onTrackStarted: ((Track) -> Void)?
+    /// Called when a track is heard to the end, left early or looped; the app
+    /// forwards these to the listening log.
+    public var onPlayEvent: ((PlayEvent) -> Void)?
     /// Technical log sink; the app forwards these to os.Logger.
     public var log: ((String) -> Void)?
 
@@ -46,6 +49,9 @@ public final class PlayerController {
     private var pendingCache: PendingCache?
     /// When the current item started, used to decide whether skipping should cancel its cache.
     private var playbackStartedAt: Date?
+    /// True when the current track reached its end; a finished track is not
+    /// reported as skipped.
+    private var didFinishCurrentTrack = false
     /// The track whose background download belongs to the current item.
     private var cacheDownloadTrack: Track?
     private var sleepTimerTask: Task<Void, Never>?
@@ -91,6 +97,7 @@ public final class PlayerController {
     // MARK: - Commands
 
     public func play(tracks: [Track], startingAt index: Int) async {
+        reportAbandonedTrack()
         queue.replace(with: tracks, startingAt: index)
         // A replaced queue is a fresh listening session.
         isShuffled = false
@@ -144,6 +151,7 @@ public final class PlayerController {
     }
 
     public func next() async {
+        reportAbandonedTrack()
         if queue.advance() != nil {
             await loadCurrent()
         } else {
@@ -164,12 +172,16 @@ public final class PlayerController {
         if position > 3 {
             engine.seek(to: 0)
             position = 0
-        } else if queue.rewind() != nil {
-            await loadCurrent()
-        } else {
+            return
+        }
+        let abandoned = queue.current
+        guard queue.rewind() != nil else {
             engine.seek(to: 0)
             position = 0
+            return
         }
+        reportAbandonedTrack(abandoned)
+        await loadCurrent()
     }
 
     public func seek(to seconds: Double) {
@@ -180,7 +192,9 @@ public final class PlayerController {
     }
 
     public func jump(to index: Int) async {
+        let abandoned = queue.current
         guard queue.jump(to: index) != nil else { return }
+        reportAbandonedTrack(abandoned)
         await loadCurrent()
     }
 
@@ -192,6 +206,7 @@ public final class PlayerController {
         let removedCurrent = queue.current?.id
         guard let removed = queue.remove(at: index) else { return }
         if removed.id == removedCurrent {
+            reportAbandonedTrack(removed)
             await loadCurrent()
         }
     }
@@ -202,6 +217,7 @@ public final class PlayerController {
 
     /// Stops playback and empties the queue.
     public func clearQueue() {
+        reportAbandonedTrack()
         engine.stop()
         position = 0
         duration = 0
@@ -389,6 +405,8 @@ public final class PlayerController {
             hasTracks: !queue.isEmpty,
             itemIsLocal: currentItemIsLocal
         )
+        didFinishCurrentTrack = true
+        reportCompletedTrack(loop: action == .replayInPlace || action == .reload)
         switch action {
         case .advance:
             await next()
@@ -413,6 +431,40 @@ public final class PlayerController {
         }
     }
 
+    /// Reports the track that was left before its end; a track that reached
+    /// the end was already reported as completed.
+    private func reportAbandonedTrack(_ track: Track? = nil) {
+        guard !didFinishCurrentTrack, let track = track ?? queue.current else { return }
+        guard state == .playing || state == .paused else { return }
+        didFinishCurrentTrack = true
+        onPlayEvent?(PlayEvent(
+            source: track.provider,
+            trackID: track.id,
+            artist: track.artist,
+            album: track.album,
+            startedAt: playbackStartedAt ?? now(),
+            listenedSeconds: position,
+            duration: duration,
+            outcome: .skipped
+        ))
+    }
+
+    /// Reports a track that was heard to the end; a loop counts as a replay.
+    private func reportCompletedTrack(loop: Bool) {
+        guard let track = queue.current else { return }
+        onPlayEvent?(PlayEvent(
+            source: track.provider,
+            trackID: track.id,
+            artist: track.artist,
+            album: track.album,
+            startedAt: playbackStartedAt ?? now(),
+            listenedSeconds: duration > 0 ? duration : position,
+            duration: duration,
+            outcome: .completed,
+            loop: loop
+        ))
+    }
+
     private func loadCurrent(retrying: Bool = false, forLoop: Bool = false) async {
         await cancelCacheDownloadIfSkippedEarly()
         if let cache { await cache.clearProtection() }
@@ -434,6 +486,7 @@ public final class PlayerController {
         format = nil
         position = 0
         duration = track.durationSeconds ?? 0
+        didFinishCurrentTrack = false
         isCurrentFromCache = false
         isCurrentFromDownload = false
         pendingCache = nil

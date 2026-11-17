@@ -424,6 +424,62 @@ struct PlayerControllerTests {
         #expect(started == ["a", "b"])
     }
 
+    // MARK: - Listening events
+
+    @Test func finishedTrackReportsACompletedPlayEvent() async {
+        let (controller, _) = makeController()
+        var events: [PlayEvent] = []
+        controller.onPlayEvent = { events.append($0) }
+
+        await controller.play(tracks: [track("a", duration: 100)], startingAt: 0)
+        await controller.handle(.finished)
+
+        #expect(events.count == 1)
+        #expect(events.first?.outcome == .completed)
+        #expect(events.first?.trackID == "a")
+        #expect(events.first?.duration == 100)
+    }
+
+    @Test func leavingATrackEarlyReportsASkippedPlayEvent() async {
+        let (controller, _) = makeController()
+        var events: [PlayEvent] = []
+        controller.onPlayEvent = { events.append($0) }
+
+        await controller.play(tracks: [track("a", duration: 100), track("b", duration: 100)], startingAt: 0)
+        await controller.handle(.position(12))
+        await controller.next()
+
+        #expect(events.count == 1)
+        #expect(events.first?.outcome == .skipped)
+        #expect(events.first?.listenedSeconds == 12)
+    }
+
+    @Test func advancingAfterTheEndDoesNotReportASkip() async {
+        let (controller, _) = makeController()
+        var events: [PlayEvent] = []
+        controller.onPlayEvent = { events.append($0) }
+
+        await controller.play(tracks: [track("a", duration: 100), track("b", duration: 100)], startingAt: 0)
+        await controller.handle(.finished)
+
+        #expect(events.count == 1)
+        #expect(events.first?.outcome == .completed)
+    }
+
+    @Test func repeatOneReportsALoopedPlayEvent() async {
+        let (controller, _) = makeController()
+        var events: [PlayEvent] = []
+        controller.onPlayEvent = { events.append($0) }
+
+        await controller.play(tracks: [track("a", duration: 100)], startingAt: 0)
+        controller.setRepeatMode(.one)
+        await controller.handle(.finished)
+
+        #expect(events.count == 1)
+        #expect(events.first?.outcome == .completed)
+        #expect(events.first?.loop == true)
+    }
+
     // MARK: - Repeat modes
 
     @Test func repeatOneRestartsALocalTrackWithoutReloading() async {

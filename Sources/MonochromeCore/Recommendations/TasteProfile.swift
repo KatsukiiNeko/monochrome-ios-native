@@ -111,9 +111,11 @@ public struct TasteProfile: Equatable, Sendable {
                 add(value: value, to: &tracks, key: track)
                 profile.playCounts[track, default: 0] += 1
             case .skipped:
-                // Only an early skip says something about the taste.
+                // Only an early skip says something about the taste; without a
+                // known duration only the heard seconds count.
                 let early = event.listenedSeconds < TasteSignal.skipSecondThreshold
-                    || event.listenedFraction < TasteSignal.skipFractionThreshold
+                    || (event.duration > 0
+                        && event.listenedFraction < TasteSignal.skipFractionThreshold)
                 guard early else { continue }
                 add(value: TasteSignal.skip * decay, to: &artists, key: artist)
                 add(value: TasteSignal.skip * decay, to: &tracks, key: track)
