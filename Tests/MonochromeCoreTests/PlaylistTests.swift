@@ -122,6 +122,25 @@ struct PlaylistCollectionTests {
         #expect(c.playlist(id: playlist!.id)?.items.count == 2)
     }
 
+    @Test("total duration sums only known durations")
+    mutating func totalDuration() {
+        var c = collection
+        let playlist = c.create(named: "Length", now: now)
+        #expect(playlist != nil)
+        var first = track("a")
+        first.durationSeconds = 200
+        var second = track("b")
+        second.durationSeconds = nil
+        var third = track("c")
+        third.durationSeconds = 61
+        for song in [first, second, third] {
+            #expect(c.add(song, to: playlist!.id, now: now) == .added)
+        }
+        let total = c.playlist(id: playlist!.id)?.totalDuration
+        #expect(total == 261)
+        #expect(Playlist(name: "Empty", createdAt: now, updatedAt: now).totalDuration == 0)
+    }
+
     @Test("mutating a playlist bumps its updatedAt only")
     mutating func updatedAt() {
         var c = collection

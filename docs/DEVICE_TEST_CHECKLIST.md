@@ -107,6 +107,28 @@ item by hand.
 Layout and feel can only be judged by a person; the host tests cover only the
 chip variants and the build check covers compilation.
 
+## Playlists
+
+- [ ] Library shows a Playlists section. Tap New playlist, name it, and confirm the
+      row appears with its song count.
+- [ ] Open the playlist: the header shows the name and song count, and Play is
+      disabled while it is empty.
+- [ ] From a Library row's long-press menu, add the song to the playlist; the
+      count increases and the playlist detail lists it.
+- [ ] Add the same song again: the menu offers "Add anyway to <name>" instead of
+      silently duplicating.
+- [ ] From Search and from Now Playing's overflow menu, add a song to the same
+      playlist.
+- [ ] Drag to reorder songs with Edit; close and reopen the playlist and the
+      order is unchanged.
+- [ ] Swipe a song to remove it; Play starts from the first song and the queue
+      fills with the rest.
+- [ ] Rename, Duplicate and Delete from the ellipsis menu. Delete asks first and
+      the songs remain in the library.
+- [ ] Force-quit and relaunch: playlists and their order survive.
+- [ ] VoiceOver: playlist rows read the name and song count; the Add to playlist
+      menu names each playlist.
+
 ## Sleep timer
 
 - [ ] Open Now Playing, use the `•••` menu, choose Sleep Timer → 5 minutes.

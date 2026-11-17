@@ -31,12 +31,18 @@ public struct Playlist: Codable, Equatable, Identifiable, Sendable {
 
     /// A playlist is keyed by the track's source and id: the same song twice is
     /// a duplicate unless the user allows it.
-    func contains(_ track: Track) -> Bool {
+    public func contains(_ track: Track) -> Bool {
         items.contains { $0.sourceKey == track.sourceKey }
+    }
+
+    /// Sum of the durations the catalog or file actually states. Tracks without a
+    /// known duration contribute nothing rather than a guessed length.
+    public var totalDuration: Double {
+        items.compactMap(\.durationSeconds).reduce(0, +)
     }
 }
 
 extension Track {
     /// The identity a playlist deduplicates on: source plus id.
-    var sourceKey: String { "\(provider)|\(id)" }
+    public var sourceKey: String { "\(provider)|\(id)" }
 }

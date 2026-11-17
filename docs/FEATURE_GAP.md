@@ -34,7 +34,7 @@ Status values: **Exists**, **Partial**, **Missing**, **Out of scope**,
 | Recently played | Exists | `HistoryStore`, `AppModel.recents` | Not applicable |
 | Favorites library | Exists | `FavoritesStore`, Library favorites filter | Not applicable |
 | Queue: shuffle, repeat, reorder, remove | Partial | Repeat (`RepeatMode`), reorder (`Queue.move`), remove, jump. No shuffle, play next, clear | Not applicable |
-| Local playlists | Missing | No playlist model or store | Not applicable |
+| Local playlists | Exists | `PlaylistCollection`, `Playlist`, `PlaylistStore` in `Sources/MonochromeCore/Playlists/`; `Sources/Monochrome/Features/Playlists/` for the Library section, detail view and "Add to playlist" menu; `PlaylistTests` (11 tests) | Not applicable |
 | Playlist import from other platforms | Missing | No file import beyond audio files | File import only: no platform URLs (out of scope) |
 | Public playlists | Out of scope | — | Needs accounts and a backend |
 | Smart recommendations | Missing | No event log or ranking | Partly: similar/radio data is token-gated (`js/HiFi.ts`); on-device ranking is in scope |

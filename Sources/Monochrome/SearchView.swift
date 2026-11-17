@@ -441,6 +441,7 @@ struct SearchView: View {
 
     private func trackMenu(_ track: Track) -> some View {
         Menu {
+            AddToPlaylistMenu(track: track)
             if model.player.currentTrack != nil {
                 Button("Add to queue", systemImage: "text.badge.plus") {
                     model.player.append([track])

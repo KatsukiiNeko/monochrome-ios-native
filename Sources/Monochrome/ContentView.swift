@@ -5,6 +5,7 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var model = AppModel()
+    @State private var playlists = PlaylistModel()
     @State private var tab: AppTab = .home
     @State private var isShowingPlayer = false
     @State private var isShowingSettings = false
@@ -43,6 +44,7 @@ struct ContentView: View {
         .tint(accentColor)
         .environment(\.accentColor, accentColor)
         .environment(\.onAccentColor, onAccentColor)
+        .environment(playlists)
         .sheet(isPresented: $isShowingPlayer) {
             PlayerView(model: model)
                 .presentationDetents([.large])
@@ -51,6 +53,7 @@ struct ContentView: View {
                 .preferredColorScheme(model.appearanceMode.colorScheme)
                 .tint(accentColor)
                 .environment(\.accentColor, accentColor)
+                .environment(playlists)
         }
         .sheet(isPresented: $isShowingSettings) {
             NavigationStack {
@@ -72,7 +75,10 @@ struct ContentView: View {
         } message: {
             Text(model.errorMessage ?? "")
         }
-        .task { await model.loadTracks() }
+        .task {
+            playlists.load()
+            await model.loadTracks()
+        }
         .preferredColorScheme(model.appearanceMode.colorScheme)
     }
 

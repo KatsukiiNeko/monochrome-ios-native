@@ -13,6 +13,9 @@ struct LibraryView: View {
     @State private var isShowingImporter = false
     @State private var pendingDeletion: Track?
     @State private var pendingDownloadRemoval: DownloadItem?
+    @State private var isNamingPlaylist = false
+    @State private var newPlaylistName = ""
+    @Environment(PlaylistModel.self) private var playlists
     @Environment(\.accentColor) private var accent
 
     private var rows: [Track] {
@@ -34,6 +37,8 @@ struct LibraryView: View {
                     .padding(.bottom, 8)
 
                 List {
+                    PlaylistsSection(model: model) { isNamingPlaylist = true }
+
                     if filter == .downloaded, !model.completedDownloads.isEmpty {
                         NavigationLink {
                             DownloadsView(model: model)
@@ -67,6 +72,9 @@ struct LibraryView: View {
                                 )
                             }
                             .buttonStyle(.plain)
+                            .contextMenu {
+                                AddToPlaylistMenu(track: track)
+                            }
                             .swipeActions(edge: .leading) {
                                 Button(
                                     model.isFavorite(track) ? "Unfavorite" : "Favorite",
@@ -140,6 +148,27 @@ struct LibraryView: View {
                 case .failure(let error):
                     model.report(error)
                 }
+            }
+            .alert("New playlist", isPresented: $isNamingPlaylist) {
+                TextField("Name", text: $newPlaylistName)
+                Button("Create") {
+                    playlists.create(named: newPlaylistName)
+                    newPlaylistName = ""
+                }
+                Button("Cancel", role: .cancel) { newPlaylistName = "" }
+            } message: {
+                Text("The playlist is stored on this device.")
+            }
+            .alert(
+                "Playlists",
+                isPresented: Binding(
+                    get: { playlists.errorMessage != nil },
+                    set: { if !$0 { playlists.clearError() } }
+                )
+            ) {
+                Button("OK", role: .cancel) { playlists.clearError() }
+            } message: {
+                Text(playlists.errorMessage ?? "")
             }
             .confirmationDialog(
                 "Delete “\(pendingDeletion?.title ?? "this track")”?",

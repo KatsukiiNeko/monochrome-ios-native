@@ -193,6 +193,9 @@ struct PlayerView: View {
             if !player.queue.isEmpty {
                 Menu {
                     Button("Queue", systemImage: "list.bullet") { isShowingQueue = true }
+                    if let track = player.currentTrack {
+                        AddToPlaylistMenu(track: track)
+                    }
                     sleepTimerMenu
                     if let track = player.currentTrack, track.source.supportsDownloads {
                         Divider()
