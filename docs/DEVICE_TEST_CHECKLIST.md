@@ -525,3 +525,28 @@ the tap is not receiving audio; a curve that does nothing on a track that logged
       and the saved file re-imports into the same playlist.
 - [ ] VoiceOver reads the import rows, the candidate buttons and the save
       button; Dynamic Type at the largest size does not hide the save button.
+
+## For You shelf and taste profile
+
+- [ ] Fresh install: the Home screen shows "For you — LEARNING" with the line
+      "Play a few tracks and your picks will show up here."
+- [ ] Play about 20 tracks over more than one artist, then reopen the app: the
+      "For you" shelf lists tracks and every row names the reason, for example
+      "Because you play <artist>".
+- [ ] The first ten rows hold at most two tracks per artist; the Rediscover
+      shelf below lists tracks from the own library.
+- [ ] Skip a track after a few seconds, play another one to the end: the next
+      refresh no longer offers the skipped artist.
+- [ ] Tap a track row → "More like this": the shelf changes after the next
+      refresh and the artist of that track appears more often.
+- [ ] Tap a track row → "Not for me": the track and its artist disappear from
+      the shelf after the next refresh.
+- [ ] Settings → Recommendations: switch "Personal Picks" off, the shelf
+      disappears from Home and the feedback actions leave the track menus;
+      switch it on again and the shelf returns.
+- [ ] Settings → Recommendations → "Reset Taste Profile": the log is cleared,
+      the shelf falls back to the learning state and the next plays rebuild it.
+- [ ] Leave the app for a week and come back: older plays count less, so the
+      shelf leans on the recent listens.
+- [ ] VoiceOver reads the shelf rows with their reason; Dynamic Type at the
+      largest size keeps the reason visible.
