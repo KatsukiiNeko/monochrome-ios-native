@@ -625,3 +625,85 @@ struct PlayerControllerTests {
         #expect(controller.sleepTimerEnd == nil)
     }
 }
+
+@MainActor
+@Suite("Queue commands")
+struct QueueCommandTests {
+    private func makeController() -> (PlayerController, FakeEngine) {
+        let engine = FakeEngine()
+        let controller = PlayerController(engine: engine, resolver: FakeResolver())
+        return (controller, engine)
+    }
+
+    private var tracks: [Track] {
+        ["a", "b", "c", "d"].map { Track(id: $0, title: "Track \($0)", fileName: "\($0).m4a") }
+    }
+
+    @Test("play next inserts right after the current track")
+    func playNext() async {
+        let (player, _) = makeController()
+        await player.play(tracks: tracks, startingAt: 0)
+        player.playNext(track("x"))
+        player.playNext(track("y"))
+        #expect(player.queue.tracks.map(\.id) == ["a", "y", "x", "b", "c", "d"])
+        #expect(player.queue.current?.id == "a")
+    }
+
+    @Test("shuffle pins the current track and restores the order when toggled off")
+    func shuffleAndRestore() async {
+        let (player, _) = makeController()
+        await player.play(tracks: tracks, startingAt: 1)
+        #expect(player.queue.current?.id == "b")
+
+        player.toggleShuffle(generator: seededGenerator(seed: 11))
+        #expect(player.isShuffled)
+        #expect(player.queue.current?.id == "b")
+        #expect(player.queue.currentIndex == 1)
+        let shuffledOrder = player.queue.tracks.map(\.id)
+        #expect(Set(shuffledOrder) == Set(["a", "b", "c", "d"]))
+
+        player.toggleShuffle(generator: seededGenerator(seed: 99))
+        #expect(!player.isShuffled)
+        #expect(player.queue.tracks.map(\.id) == ["a", "b", "c", "d"])
+        #expect(player.queue.current?.id == "b")
+        #expect(player.queue.currentIndex == 1)
+    }
+
+    @Test("single track and empty queues are no-ops")
+    func shuffleEdges() async {
+        let (player, _) = makeController()
+        await player.play(tracks: [tracks[0]], startingAt: 0)
+        player.toggleShuffle(generator: { _ in 0 })
+        #expect(player.queue.tracks.map(\.id) == ["a"])
+
+        await player.play(tracks: [], startingAt: 0)
+        player.toggleShuffle(generator: { _ in 0 })
+        #expect(player.queue.isEmpty)
+    }
+
+    @Test("clearing the queue stops playback and resets state")
+    func clearQueue() async {
+        let (player, engine) = makeController()
+        await player.play(tracks: tracks, startingAt: 0)
+        #expect(player.state == .playing)
+
+        player.clearQueue()
+        #expect(player.queue.isEmpty)
+        #expect(player.state == .idle)
+        #expect(player.currentTrack == nil)
+        #expect(player.position == 0)
+        #expect(!player.isShuffled)
+        #expect(engine.stopCount == 1)
+    }
+
+    @Test("playing a new queue resets the shuffle state")
+    func replaceResetsShuffle() async {
+        let (player, _) = makeController()
+        await player.play(tracks: tracks, startingAt: 0)
+        player.toggleShuffle(generator: seededGenerator(seed: 5))
+        #expect(player.isShuffled)
+
+        await player.play(tracks: tracks, startingAt: 0)
+        #expect(!player.isShuffled)
+    }
+}

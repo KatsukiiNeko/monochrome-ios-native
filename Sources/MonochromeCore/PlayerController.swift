@@ -13,6 +13,9 @@ public final class PlayerController {
     public private(set) var format: AudioFormat?
     /// Repeat control; `one` restarts the current track at its end.
     public private(set) var repeatMode: RepeatMode = .off
+    /// True while the queue order is shuffled; toggling off restores the order
+    /// the queue had when shuffle was enabled.
+    public private(set) var isShuffled = false
     /// Measured output-route latency; synced lyrics shift by it so the text
     /// matches what is heard, not the player clock.
     public private(set) var outputLatency: TimeInterval = 0
@@ -46,6 +49,8 @@ public final class PlayerController {
     /// The track whose background download belongs to the current item.
     private var cacheDownloadTrack: Track?
     private var sleepTimerTask: Task<Void, Never>?
+    /// Queue order before shuffle; only valid while `isShuffled` is true.
+    private var unshuffledTracks: [Track] = []
 
     private struct PendingCache {
         var track: Track
@@ -87,7 +92,40 @@ public final class PlayerController {
 
     public func play(tracks: [Track], startingAt index: Int) async {
         queue.replace(with: tracks, startingAt: index)
+        // A replaced queue is a fresh listening session.
+        isShuffled = false
+        unshuffledTracks = []
         await loadCurrent()
+    }
+
+    /// Fisher-Yates over the queue with the current track pinned in place, so
+    /// playback never restarts. Toggling off restores the pre-shuffle order.
+    public func toggleShuffle(generator: (Int) -> Int = { Int.random(in: 0..<$0) }) {
+        guard !queue.isEmpty else { return }
+        if isShuffled {
+            let currentID = queue.current?.id
+            queue.replace(with: unshuffledTracks, startingAt: 0)
+            if let currentID, let index = queue.tracks.firstIndex(where: { $0.id == currentID }) {
+                queue.pin(at: index)
+            }
+            isShuffled = false
+            unshuffledTracks = []
+        } else {
+            unshuffledTracks = queue.tracks
+            let shuffled = QueueShuffle.shuffled(
+                queue.tracks,
+                pinIndex: queue.currentIndex,
+                generator: generator
+            )
+            queue.replace(with: shuffled, startingAt: queue.currentIndex ?? 0)
+            isShuffled = true
+        }
+    }
+
+    /// Plays a track right after the current one; with no current track it starts.
+    public func playNext(_ track: Track) {
+        let index = queue.currentIndex.map { $0 + 1 } ?? 0
+        queue.insert(track, at: index)
     }
 
     public func togglePlayPause() async {
@@ -160,6 +198,22 @@ public final class PlayerController {
 
     public func moveQueue(from source: Int, to destination: Int) {
         queue.move(from: source, to: destination)
+    }
+
+    /// Stops playback and empties the queue.
+    public func clearQueue() {
+        engine.stop()
+        position = 0
+        duration = 0
+        state = .idle
+        queue = Queue()
+        isShuffled = false
+        unshuffledTracks = []
+        isCurrentFromCache = false
+        isCurrentFromDownload = false
+        currentItemIsLocal = false
+        pendingCache = nil
+        cacheDownloadTrack = nil
     }
 
     /// User-initiated retry, including a fresh stream resolution.

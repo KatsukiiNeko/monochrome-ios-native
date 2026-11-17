@@ -124,17 +124,6 @@ public struct PlaylistCollection: Codable, Equatable, Sendable {
         playlists[index].updatedAt = now
     }
 
-    /// Drops entries whose track no longer exists anywhere; called on library reload.
-    public mutating func pruneTracks(matching shouldRemove: (Track) -> Bool, now: Date) {
-        for index in playlists.indices where !playlists[index].items.isEmpty {
-            let filtered = playlists[index].items.filter { !shouldRemove($0) }
-            if filtered.count != playlists[index].items.count {
-                playlists[index].items = filtered
-                playlists[index].updatedAt = now
-            }
-        }
-    }
-
     static func trimmedName(_ raw: String) -> String {
         raw.trimmingCharacters(in: .whitespacesAndNewlines)
     }

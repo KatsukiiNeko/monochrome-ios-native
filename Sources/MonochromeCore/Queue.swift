@@ -41,6 +41,23 @@ public struct Queue: Equatable, Sendable {
         }
     }
 
+    /// Inserts without moving the cursor off the track it names.
+    public mutating func insert(_ track: Track, at index: Int) {
+        let cursorID = current?.id
+        tracks.insert(track, at: min(max(index, 0), tracks.count))
+        if let cursorID {
+            currentIndex = tracks.firstIndex { $0.id == cursorID }
+        } else {
+            currentIndex = tracks.isEmpty ? nil : 0
+        }
+    }
+
+    /// Repositions the cursor without changing playback.
+    public mutating func pin(at index: Int) {
+        guard tracks.indices.contains(index) else { return }
+        currentIndex = index
+    }
+
     /// Removes a track and keeps the cursor on the same logical item where possible.
     @discardableResult
     public mutating func remove(at index: Int) -> Track? {
