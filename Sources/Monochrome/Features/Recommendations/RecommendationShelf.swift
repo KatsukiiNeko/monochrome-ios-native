@@ -62,6 +62,9 @@ struct RecommendationShelf: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityHint("Plays this track")
+                    .contextMenu {
+                        RecommendationMenu(track: item.track)
+                    }
                 }
             }
             if recommendations.isRefreshing {
