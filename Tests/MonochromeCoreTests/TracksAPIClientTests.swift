@@ -184,6 +184,25 @@ struct TracksAPIClientTests {
         #expect(detail.topTracks.count == 2)
         #expect(detail.releases.count == 2)
         #expect(detail.topTracks.first?.streamID == "287206674229092352")
+        #expect(detail.biography == "Synthetic biography text used only by tests. It mentions the band and its synthetic catalogue.")
+        #expect(detail.externalLink?.absoluteString == "https://link.example/synthetic")
+        // Insecure and malformed entries are dropped, valid ones kept.
+        #expect(detail.socialLinks == [URL(string: "https://social.example/synthetic")!])
+    }
+
+    @Test func anArtistWithoutBiographyFieldsDecodesCleanly() async throws {
+        var payload = try JSONSerialization.jsonObject(with: fixture("artist-detail")) as! [String: Any]
+        for key in ["bio", "biography", "externalLink", "socialLinks"] { payload[key] = nil }
+        let data = try JSONSerialization.data(withJSONObject: payload)
+        let client = TracksAPIClient(baseURL: hostA, http: FakeHTTP { request in
+            (data, http(request, 200))
+        })
+
+        let detail = try await client.artist(id: "153542153123926016")
+
+        #expect(detail.biography == nil)
+        #expect(detail.externalLink == nil)
+        #expect(detail.socialLinks.isEmpty)
     }
 
     @Test func streamURLIsBuiltFromStreamID() async {

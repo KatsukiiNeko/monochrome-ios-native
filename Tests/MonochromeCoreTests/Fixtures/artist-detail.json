@@ -52,5 +52,12 @@
       "releaseDate": "2023-04-20T00:00:00.000Z",
       "artwork": "https://tracks.monochrome.st/proxy/mi/165737609279148032-1A01.jpg"
     }
+  ],
+  "bio": "Synthetic biography text used only by tests. It mentions the band and its synthetic catalogue.",
+  "externalLink": "https://link.example/synthetic",
+  "socialLinks": [
+    "https://social.example/synthetic",
+    "http://insecure.example/dropped",
+    "not a url"
   ]
 }

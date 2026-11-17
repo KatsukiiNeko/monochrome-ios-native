@@ -137,6 +137,13 @@ struct ArtistDetailView: View {
                 }
 
                 if let detail {
+                    if let biography = detail.biography {
+                        ArtistBioSection(
+                            biography: biography,
+                            externalLink: detail.externalLink,
+                            socialLinks: detail.socialLinks
+                        )
+                    }
                     if !detail.topTracks.isEmpty {
                         Section {
                             ForEach(detail.topTracks) { track in

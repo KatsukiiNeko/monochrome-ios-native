@@ -55,11 +55,26 @@ public struct RemoteArtistDetail: Equatable, Sendable {
     public var artist: RemoteArtist
     public var topTracks: [Track]
     public var releases: [RemoteRelease]
+    /// Biography text from the catalog; nil when the host has none.
+    public var biography: String?
+    /// HTTPS-only outbound link (e.g. a link-in-bio service) and social pages.
+    public var externalLink: URL?
+    public var socialLinks: [URL]
 
-    public init(artist: RemoteArtist, topTracks: [Track], releases: [RemoteRelease]) {
+    public init(
+        artist: RemoteArtist,
+        topTracks: [Track],
+        releases: [RemoteRelease],
+        biography: String? = nil,
+        externalLink: URL? = nil,
+        socialLinks: [URL] = []
+    ) {
         self.artist = artist
         self.topTracks = topTracks
         self.releases = releases
+        self.biography = biography
+        self.externalLink = externalLink
+        self.socialLinks = socialLinks
     }
 }
 
@@ -142,7 +157,14 @@ public actor TracksAPIClient {
         guard let artist = payload.artist else { throw TracksAPIError.invalidPayload }
         let tracks = (payload.topTracks ?? []).compactMap { $0.track(album: "") }
         let releases = (payload.releases ?? []).compactMap(\.release)
-        return RemoteArtistDetail(artist: artist, topTracks: tracks, releases: releases)
+        return RemoteArtistDetail(
+            artist: artist,
+            topTracks: tracks,
+            releases: releases,
+            biography: payload.biographyText,
+            externalLink: payload.externalLinkURL,
+            socialLinks: payload.socialLinkURLs
+        )
     }
 
     // MARK: - Streams
@@ -372,11 +394,15 @@ private struct ArtistDTO: Decodable {
     var id: String?
     var name: String?
     var avatar: String?
+    var bio: String?
+    var biography: String?
+    var externalLink: String?
+    var socialLinks: [String]?
     var topTracks: [TrackDTO]?
     var releases: [ReleaseDTO]?
 
     private enum CodingKeys: String, CodingKey {
-        case artistID = "artistId", id, name, avatar, topTracks, releases
+        case artistID = "artistId", id, name, avatar, bio, biography, externalLink, socialLinks, topTracks, releases
     }
 
     init(from decoder: Decoder) throws {
@@ -385,6 +411,10 @@ private struct ArtistDTO: Decodable {
         id = try? container.decodeIfPresent(String.self, forKey: .id)
         name = try? container.decodeIfPresent(String.self, forKey: .name)
         avatar = try? container.decodeIfPresent(String.self, forKey: .avatar)
+        bio = try? container.decodeIfPresent(String.self, forKey: .bio)
+        biography = try? container.decodeIfPresent(String.self, forKey: .biography)
+        externalLink = try? container.decodeIfPresent(String.self, forKey: .externalLink)
+        socialLinks = try? container.decodeIfPresent([String].self, forKey: .socialLinks)
         topTracks = try? container.decodeIfPresent([TrackDTO].self, forKey: .topTracks)
         releases = try? container.decodeIfPresent([ReleaseDTO].self, forKey: .releases)
     }
@@ -393,6 +423,27 @@ private struct ArtistDTO: Decodable {
         guard let identifier = artistID ?? id, !identifier.isEmpty,
               let name, !name.isEmpty else { return nil }
         return RemoteArtist(id: identifier, name: name, avatarURL: TracksAPIClient.httpsURL(avatar))
+    }
+
+    /// `bio` and `biography` are aliases on the endpoint; blank counts as none.
+    var biographyText: String? {
+        for candidate in [bio, biography] {
+            if let candidate {
+                let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty { return trimmed }
+            }
+        }
+        return nil
+    }
+
+    var externalLinkURL: URL? {
+        TracksAPIClient.httpsURL(externalLink)
+    }
+
+    /// HTTPS-only, deduplicated, non-blank entries.
+    var socialLinkURLs: [URL] {
+        let seen = Set((socialLinks ?? []).compactMap { TracksAPIClient.httpsURL($0) })
+        return seen.sorted { $0.absoluteString < $1.absoluteString }
     }
 }
 
