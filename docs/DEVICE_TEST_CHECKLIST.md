@@ -508,3 +508,20 @@ the tap is not receiving audio; a curve that does nothing on a track that logged
 - [ ] The outbound link row opens Safari with the artist's link; the row reads
       correctly under VoiceOver.
 - [ ] An artist with no biography shows no About section at all.
+
+## Playlist import and export
+
+- [ ] Library → Playlists → Import playlist: pick a CSV with a header row; the
+      import sheet shows the format, the progress and how many entries matched.
+- [ ] An entry with no close match appears under "Needs review"; tapping a
+      candidate chooses it, "Skip this track" drops it, and the counts update.
+- [ ] Save the import: a new playlist appears in the Library with the matched
+      songs and the name typed in the sheet.
+- [ ] Pause an import with many entries, leave the app, come back and continue:
+      the run resumes without matching the same entries twice.
+- [ ] Import a file with more than 500 entries: the sheet reports the drop and
+      the playlist holds at most 500 songs.
+- [ ] Playlist menu → Export as JSON and Export as CSV: the share sheet opens
+      and the saved file re-imports into the same playlist.
+- [ ] VoiceOver reads the import rows, the candidate buttons and the save
+      button; Dynamic Type at the largest size does not hide the save button.
