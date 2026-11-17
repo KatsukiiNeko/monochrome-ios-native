@@ -8,8 +8,10 @@ struct SettingsView: View {
     let model: AppModel
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(RecommendationModel.self) private var recommendations
     @State private var clearedCache = false
     @State private var isConfirmingEndpointReset = false
+    @State private var isConfirmingTasteReset = false
 
     var body: some View {
         List {
@@ -17,6 +19,7 @@ struct SettingsView: View {
             streamingSection
             cacheSection
             downloadsSection
+            recommendationsSection
             aboutSection
         }
         .listStyle(.insetGrouped)
@@ -241,6 +244,44 @@ struct SettingsView: View {
             }
         } header: {
             TechnicalSectionHeader(title: "Downloads")
+        }
+    }
+
+    // MARK: - Recommendations
+
+    private var recommendationsSection: some View {
+        Section {
+            Toggle(
+                isOn: Binding(
+                    get: { recommendations.isEnabled },
+                    set: { recommendations.setEnabled($0) }
+                )
+            ) {
+                settingsLabel(icon: "sparkles", title: "Personal Picks")
+            }
+            .tint(accent)
+
+            Button(role: .destructive) {
+                isConfirmingTasteReset = true
+            } label: {
+                settingsLabel(
+                    icon: "arrow.counterclockwise",
+                    title: "Reset Taste Profile",
+                    destructive: true
+                )
+            }
+            .confirmationDialog(
+                "Reset the taste profile?",
+                isPresented: $isConfirmingTasteReset,
+                titleVisibility: .visible
+            ) {
+                Button("Reset Taste Profile", role: .destructive) {
+                    recommendations.resetTasteProfile()
+                }
+                Button("Cancel", role: .cancel) {}
+            }
+        } header: {
+            TechnicalSectionHeader(title: "Recommendations")
         }
     }
 
