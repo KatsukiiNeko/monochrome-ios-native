@@ -486,3 +486,16 @@ sr=… ch=… interleaved=… float=…` once per item, and `eq tap frames=…` 
 second. A curve that appears to do nothing while `frames` stays at zero means
 the tap is not receiving audio; a curve that does nothing on a track that logged
 `eq unavailable` is expected.
+
+## Download metadata and export
+
+- [ ] Download a FLAC track; then, on a Mac or PC, confirm the file carries
+      TITLE, ARTIST and ALBUM in its Vorbis comments and a front-cover picture
+      (a tags viewer or `metaflac --list` shows it).
+- [ ] Open the artwork on the Lock Screen or in Files' preview: the embedded
+      cover matches the track, not a previous one.
+- [ ] Downloads row context menu shows "Export to Files"; the share sheet opens
+      and saving to Files produces a playable FLAC with the same tags.
+- [ ] Export an AAC download: the file is shared unchanged and no error appears.
+- [ ] With no network, exporting still works; a download that finished offline
+      has tags but no cover, and playback is unaffected either way.

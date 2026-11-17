@@ -301,7 +301,7 @@ public enum FLACMetadata {
 
 extension Data {
     /// JPEG SOI + marker magic: FF D8 FF.
-    var isJPEGData: Bool {
+    public var isJPEGData: Bool {
         count >= 3 && self[startIndex] == 0xFF && self[startIndex + 1] == 0xD8 && self[startIndex + 2] == 0xFF
     }
 }

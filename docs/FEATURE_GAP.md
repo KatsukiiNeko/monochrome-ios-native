@@ -49,7 +49,7 @@ Status values: **Exists**, **Partial**, **Missing**, **Out of scope**,
 | Synced lyrics | Exists | `LyricsService`, `LRCLIBClient`, `LRCParser`, `LyricsTimeline` | Allowed (existing LRCLIB route) |
 | Karaoke word-level lyrics | Missing | Line-level only | No data: LRCLIB returns line timings (`js/lyrics.js:491-499`); upstream builds TTML from those lines (`js/lyrics.js:570-618`), so there are no real word timings |
 | Genius lyrics | Out of scope | — | Needs a token and scraping; lyric text is copyrighted |
-| Downloads with metadata embedding | Partial | Downloads store the original FLAC (`DownloadStore`); no tag/cover writing or export | Not applicable |
+| Downloads with metadata embedding | Exists | `FLACMetadata` in `Sources/MonochromeCore/FLACMetadata/`: Vorbis comments merged into downloads, front-cover PICTURE (JPEG ≤1 MB), STREAMINFO/SEEKTABLE preserved, audio region verified by SHA-256 after an atomic write; run on every finished FLAC download (`AppModel.embedDownloadMetadata`). Per-track "Export to Files" share sheet in Downloads (`ActivityShareSheet`). Non-FLAC downloads are shared as-is. `FLACMetadataTests` (12 tests) | Not applicable |
 
 ## Integrations
 

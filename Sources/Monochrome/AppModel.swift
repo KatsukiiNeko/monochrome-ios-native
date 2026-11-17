@@ -510,10 +510,55 @@ final class AppModel {
                 format: nil,
                 duration: track.durationSeconds
             )
+            await embedDownloadMetadata(for: track)
         } catch {
             errorMessage = error.localizedDescription
         }
         await refreshDownloads()
+    }
+
+    /// Writes tags and the cover into a finished FLAC download. Failures are
+    /// logged only: the download itself already succeeded.
+    private func embedDownloadMetadata(for track: Track) async {
+        guard let file = await downloadStore.downloadedFile(for: track),
+              FLACMetadata.isFLAC(fileURL: file.url) else { return }
+        let tags = FLACMetadata.Tags(
+            title: track.title,
+            artist: track.artist,
+            album: track.album,
+            albumArtist: track.artist.isEmpty ? nil : track.artist
+        )
+        let artwork = await coverJPEGData(for: track)
+        do {
+            try FLACMetadata.embed(fileURL: file.url, tags: tags, artworkJPEG: artwork)
+        } catch {
+            playerLog.notice("flac embed failed \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Cover bytes for the FLAC PICTURE block: the local artwork file when one
+    /// exists, otherwise the catalog URL. Only JPEGs within the 1 MB cap pass.
+    private func coverJPEGData(for track: Track) async -> Data? {
+        if let local = artworkURL(for: track),
+           let data = try? Data(contentsOf: local), data.isJPEGData,
+           data.count <= FLACMetadata.maxPictureBytes {
+            return data
+        }
+        guard let remote = track.artworkURL else { return nil }
+        var request = URLRequest(url: remote)
+        request.timeoutInterval = 10
+        request.setValue(TracksAPIClient.userAgent, forHTTPHeaderField: "User-Agent")
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse, http.statusCode == 200,
+              data.count <= FLACMetadata.maxPictureBytes,
+              data.isJPEGData else { return nil }
+        return data
+    }
+
+    /// The on-disk location of a completed download, for the export share sheet.
+    func downloadedFileURL(for item: DownloadItem) async -> URL? {
+        guard let file = await downloadStore.downloadedFile(for: item.track) else { return nil }
+        return file.url
     }
 
     func refreshDownloads() async {

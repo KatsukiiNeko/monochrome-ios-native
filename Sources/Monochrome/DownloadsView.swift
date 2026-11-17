@@ -10,6 +10,7 @@ struct DownloadsView: View {
     @State private var failureMessage: String?
     @State private var hasLoaded = false
     @State private var isConfirmingDeleteAll = false
+    @State private var exportURL: IdentifiableURL?
     @Environment(\.accentColor) private var accent
 
     private var completed: [DownloadItem] { model.completedDownloads }
@@ -153,6 +154,12 @@ struct DownloadsView: View {
         } message: {
             Text("Every permanent offline copy is removed. Cache and imported music are not affected.")
         }
+        .sheet(item: Binding(
+            get: { exportURL },
+            set: { exportURL = $0 }
+        )) { shared in
+            ActivityShareSheet(items: [shared.url])
+        }
         .preferredColorScheme(model.appearanceMode.colorScheme)
         .tint(accent)
     }
@@ -180,12 +187,31 @@ struct DownloadsView: View {
             }
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            Button {
+                Task {
+                    guard let url = await model.downloadedFileURL(for: item) else {
+                        failureMessage = "The audio file could not be found."
+                        return
+                    }
+                    exportURL = IdentifiableURL(url: url)
+                }
+            } label: {
+                Label("Export to Files", systemImage: "square.and.arrow.up")
+            }
+            .accessibilityLabel("Export \(item.track.title) to Files")
+        }
         .swipeActions {
             Button("Remove", role: .destructive) {
                 pendingRemoval = item
             }
         }
         .accessibilityHint("Plays this downloaded track")
+    }
+
+    private struct IdentifiableURL: Identifiable {
+        let id = UUID()
+        let url: URL
     }
 
     private func activeRow(_ item: DownloadItem) -> some View {
