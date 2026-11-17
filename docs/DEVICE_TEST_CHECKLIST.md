@@ -499,3 +499,12 @@ the tap is not receiving audio; a curve that does nothing on a track that logged
 - [ ] Export an AAC download: the file is shared unchanged and no error appears.
 - [ ] With no network, exporting still works; a download that finished offline
       has tags but no cover, and playback is unaffected either way.
+
+## Artist biography and links
+
+- [ ] Open an artist page for an artist with a biography: the About section
+      shows the text, collapsed to four lines with Show More / Show Less.
+- [ ] Long biographies expand and collapse without breaking the list layout.
+- [ ] The outbound link row opens Safari with the artist's link; the row reads
+      correctly under VoiceOver.
+- [ ] An artist with no biography shows no About section at all.

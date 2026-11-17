@@ -40,7 +40,7 @@ Status values: **Exists**, **Partial**, **Missing**, **Out of scope**,
 | Smart recommendations | Missing | No event log or ranking | Partly: similar/radio data is token-gated (`js/HiFi.ts`); on-device ranking is in scope |
 | Infinite radio | Missing | No radio queue | Partly: seed from on-device ranking; similar data blocked |
 | Explore (Hot & New, genres) | Missing | No explore entry point | No data: `https://hot.monochrome.tf/` does not resolve from this host; `js/ui.js:3138` is the only source |
-| Artist biography and links | Partial | Artist page shows name, top tracks, releases; ignores `bio`/`biography` fields | Allowed: `GET /artists/{id}` on the existing public host returns `bio`/`biography`, `externalLink`. No token needed |
+| Artist biography and links | Exists | `RemoteArtistDetail.biography/externalLink/socialLinks` decoded from `/artists/{id}` (HTTPS-only links); `ArtistBioSection` on the artist page with collapsible bio and Safari rows. Mapping tests in `TracksAPIClientTests` against a synthetic fixture | Allowed: `GET /artists/{id}` on the existing public host returns `bio`/`biography`, `externalLink`. No token needed |
 
 ## Lyrics and metadata
 
