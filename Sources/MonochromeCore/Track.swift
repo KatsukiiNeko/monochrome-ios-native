@@ -25,6 +25,8 @@ public struct Track: Codable, Equatable, Identifiable, Sendable {
     public var artworkURL: URL?
     /// Quality tier the catalog states for this track, when it states one.
     public var audioQuality: AudioQuality?
+    /// International Standard Recording Code, when the source states one.
+    public var isrc: String?
 
     public init(
         id: String = UUID().uuidString,
@@ -38,7 +40,8 @@ public struct Track: Codable, Equatable, Identifiable, Sendable {
         provider: String = Track.localProvider,
         streamID: String? = nil,
         artworkURL: URL? = nil,
-        audioQuality: AudioQuality? = nil
+        audioQuality: AudioQuality? = nil,
+        isrc: String? = nil
     ) {
         self.id = id
         self.title = title
@@ -52,11 +55,12 @@ public struct Track: Codable, Equatable, Identifiable, Sendable {
         self.streamID = streamID
         self.artworkURL = artworkURL
         self.audioQuality = audioQuality
+        self.isrc = isrc
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, title, artist, album, durationSeconds, fileName, importedAt, artworkFileName
-        case provider, streamID, artworkURL, audioQuality
+        case provider, streamID, artworkURL, audioQuality, isrc
     }
 
     // Tolerant decoding: a hand-edited or older library.json must not fail the app.
@@ -74,6 +78,7 @@ public struct Track: Codable, Equatable, Identifiable, Sendable {
         streamID = try container.decodeIfPresent(String.self, forKey: .streamID)
         artworkURL = (try? container.decodeIfPresent(URL.self, forKey: .artworkURL)) ?? nil
         audioQuality = (try? container.decodeIfPresent(AudioQuality.self, forKey: .audioQuality)) ?? nil
+        isrc = try? container.decodeIfPresent(String.self, forKey: .isrc)
     }
 }
 
