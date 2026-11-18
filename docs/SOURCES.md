@@ -36,6 +36,35 @@ marketing labels: a feature is shown only when the source can really do it.
   capability matrix and the missing server without offering a fake setup
   control.
 
+### Companion contract
+
+The companion server is the only way the app reaches YouTube Music. The app
+speaks this small JSON contract over HTTPS; it sends its truthful `User-Agent`,
+no credentials, cookies or signature parameters, and it never parses HTML.
+The base URL is entered by the user, and until one is configured the source
+stays `Needs setup`.
+
+```
+GET {base}/v1/search?q={query}&limit={count}
+
+200 {"tracks": [
+  {"id": "<opaque>", "title": "<text>", "artist": "<text>",
+   "album": "<text>", "duration": <seconds, number or null>,
+   "artworkUrl": "<https url, optional>"}
+]}
+```
+
+```
+GET {base}/v1/stream/{id}
+
+200 {"url": "<https url>", "contentType": "<mime, optional>",
+     "duration": <seconds, number or null>}
+```
+
+`id` is opaque to the app; it is only used in the stream path. The stream URL
+is progressive audio served by the companion or its upstream; the app does not
+download it for a source without the downloads capability.
+
 ## Rules
 
 - Download eligibility is checked in the core before a transfer starts:
