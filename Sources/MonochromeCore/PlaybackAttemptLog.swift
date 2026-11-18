@@ -8,6 +8,8 @@ public enum PlaybackPhase: String, CaseIterable, Sendable, Equatable {
     case lookup
     /// A stream URL and MIME type were resolved.
     case resolve
+    /// A ranged request confirmed the stream answers before the asset was built.
+    case preflight
     /// An asset/item was handed to the engine.
     case asset
     /// The engine reported the item ready.
@@ -52,8 +54,8 @@ public struct PlaybackAttemptLog: Sendable, Equatable {
         events.append(Event(phase: phase, at: date, detail: detail))
     }
 
-    public mutating func countRequest(_ consumer: String) {
-        requests[consumer, default: 0] += 1
+    public mutating func countRequest(_ consumer: String, count: Int = 1) {
+        requests[consumer, default: 0] += count
     }
 
     /// Milliseconds spent in the last occurrence of a phase: the gap from the
@@ -86,6 +88,10 @@ public struct PlaybackAttemptLog: Sendable, Equatable {
         }
         if events.contains(where: { $0.phase == .resolve }) {
             parts.append("resolve=\(durationMs(of: .resolve) ?? 0)ms")
+        }
+        if let preflight = events.last(where: { $0.phase == .preflight }) {
+            parts.append("preflight=\(durationMs(of: .preflight) ?? 0)ms")
+            if let detail = preflight.detail { parts.append(detail) }
         }
         if events.contains(where: { $0.phase == .asset }) {
             parts.append("asset=\(durationMs(of: .asset) ?? 0)ms")

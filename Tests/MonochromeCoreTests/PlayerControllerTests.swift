@@ -79,6 +79,31 @@ private actor FakeCache: AudioCaching {
     }
 }
 
+/// Resolves to a remote stream, so the preflight path is exercised.
+private struct StreamResolver: TrackURLResolver {
+    func url(for track: Track) async throws -> URL {
+        URL(string: "https://tracks.test/track/\(track.streamID ?? track.id)")!
+    }
+
+    func contentType(for track: Track) async -> String? { "audio/flac" }
+}
+
+private actor FakePreflight: StreamPreflighting {
+    private let result: PreflightResult
+    private(set) var urls: [URL] = []
+
+    init(result: PreflightResult = PreflightResult(isReady: true, requestCount: 1, elapsedMs: 12, lastStatus: 206)) {
+        self.result = result
+    }
+
+    func waitUntilReady(url: URL, isCancelled: @Sendable () -> Bool) async -> PreflightResult {
+        if !isCancelled() { urls.append(url) }
+        return result
+    }
+
+    func requestCount() -> Int { urls.count }
+}
+
 private actor FakeDownloads: DownloadedAudioProviding {
     private var file: DownloadedAudio?
 
@@ -212,6 +237,64 @@ struct PlayerControllerTests {
         #expect(attempts.last?.contains("failed=") == true)
         #expect(attempts.last?.contains("error=") == true)
         #expect(controller.state == .failed("cannot decode audio"))
+    }
+
+    @Test func networkPlayPreflightsTheStreamOnce() async {
+        let engine = FakeEngine()
+        let preflight = FakePreflight()
+        let controller = PlayerController(
+            engine: engine,
+            resolver: StreamResolver(),
+            cache: FakeCache(),
+            downloads: FakeDownloads(),
+            preflight: preflight
+        )
+
+        await controller.play(tracks: [streamTrack("a")], startingAt: 0)
+
+        #expect(controller.state == .playing)
+        #expect(await preflight.requestCount() == 1)
+        #expect(engine.loadedURLs.count == 1)
+    }
+
+    @Test func aCacheHitSkipsThePreflight() async {
+        let engine = FakeEngine()
+        let cache = FakeCache()
+        await cache.setHit(CachedAudio(url: URL(fileURLWithPath: "/cache/a.flac")))
+        let preflight = FakePreflight()
+        let controller = PlayerController(
+            engine: engine,
+            resolver: FakeResolver(),
+            cache: cache,
+            downloads: FakeDownloads(),
+            preflight: preflight
+        )
+
+        await controller.play(tracks: [streamTrack("a")], startingAt: 0)
+
+        #expect(controller.state == .playing)
+        #expect(await preflight.requestCount() == 0)
+    }
+
+    @Test func aColdStreamFailsOnceThenRetriesFresh() async {
+        let engine = FakeEngine()
+        let preflight = FakePreflight(
+            result: PreflightResult(isReady: false, requestCount: 5, elapsedMs: 7_900, lastStatus: 503)
+        )
+        let controller = PlayerController(
+            engine: engine,
+            resolver: StreamResolver(),
+            cache: FakeCache(),
+            downloads: FakeDownloads(),
+            preflight: preflight
+        )
+
+        await controller.play(tracks: [streamTrack("a")], startingAt: 0)
+
+        // One fresh attempt after the first failure, and the engine never saw the URL.
+        #expect(await preflight.requestCount() == 2)
+        #expect(engine.loadedURLs.isEmpty)
+        #expect(controller.state == .failed("The stream did not answer. Check the connection, then retry."))
     }
 
     @Test func playLoadsAndStartsSelectedTrack() async {

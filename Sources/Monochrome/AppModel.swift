@@ -108,7 +108,11 @@ final class AppModel {
             engine: AVPlayerEngine(),
             resolver: resolver,
             cache: cache,
-            downloads: downloadStore
+            downloads: downloadStore,
+            preflight: StreamPreflight(
+                http: URLSessionHTTPClient(timeout: 6),
+                userAgent: TracksAPIClient.userAgent
+            )
         )
         player.log = { message in playbackLog.notice("\(message, privacy: .public)") }
         let lyricsDirectory = cacheDirectory

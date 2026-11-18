@@ -38,6 +38,8 @@ public final class PlayerController {
     private let resolver: any TrackURLResolver
     private let cache: (any AudioCaching)?
     private let downloads: (any DownloadedAudioProviding)?
+    /// Optional cheap check that the stream answers before an asset is built.
+    private let preflight: (any StreamPreflighting)?
     private let now: @Sendable () -> Date
     /// A download may be cancelled only while the track has just started.
     private static let skipCancellationWindow: TimeInterval = 10
@@ -52,6 +54,8 @@ public final class PlayerController {
     /// True when the current track reached its end; a finished track is not
     /// reported as skipped.
     private var didFinishCurrentTrack = false
+    /// Cancels the running preflight when a newer load supersedes it.
+    private var cancellation: AttemptCancellation?
     /// The track whose background download belongs to the current item.
     private var cacheDownloadTrack: Track?
     private var sleepTimerTask: Task<Void, Never>?
@@ -73,12 +77,14 @@ public final class PlayerController {
         resolver: any TrackURLResolver,
         cache: (any AudioCaching)? = nil,
         downloads: (any DownloadedAudioProviding)? = nil,
+        preflight: (any StreamPreflighting)? = nil,
         now: @escaping @Sendable () -> Date = { .now }
     ) {
         self.engine = engine
         self.resolver = resolver
         self.cache = cache
         self.downloads = downloads
+        self.preflight = preflight
         self.now = now
         engine.onEvent = { [weak self] event in
             guard let self else { return }
@@ -325,6 +331,11 @@ public final class PlayerController {
 
     // MARK: - Internals
 
+    private static func preflightDetail(_ result: PreflightResult) -> String {
+        let status = result.lastStatus.map(String.init) ?? "none"
+        return "status=\(status) requests=\(result.requestCount) ready=\(result.isReady)"
+    }
+
     private func handleReady(duration engineDuration: Double?, format engineFormat: AudioFormat?) {
         format = mergedFormat(stored: format, measured: engineFormat)
         if let engineDuration, engineDuration > 0 {
@@ -481,6 +492,9 @@ public final class PlayerController {
             return
         }
         if !retrying { didRetryCurrentTrack = false }
+        cancellation?.cancel()
+        let attemptCancellation = AttemptCancellation()
+        cancellation = attemptCancellation
 
         state = .loading
         format = nil
@@ -559,6 +573,22 @@ public final class PlayerController {
                 url: url,
                 contentType: contentType
             )
+            if let preflight, !url.isFileURL {
+                let result = await preflight.waitUntilReady(
+                    url: url,
+                    isCancelled: { attemptCancellation.isCancelled }
+                )
+                attempt.countRequest("preflight", count: result.requestCount)
+                attempt.mark(.preflight, at: now(), detail: Self.preflightDetail(result))
+                guard result.isReady else {
+                    throw StreamStartError.notReady(lastStatus: result.lastStatus)
+                }
+                // A skip during the preflight supersedes this load.
+                guard !attemptCancellation.isCancelled, queue.current?.id == track.id else {
+                    log?("play aborted reason=superseded")
+                    return
+                }
+            }
             attempt.countRequest("item")
             attempt.mark(.asset, at: now(), detail: "network")
             try await engine.load(url: url, contentType: contentType)
