@@ -12,7 +12,7 @@ private final class QuietEngine: PlaybackEngine {
     var onEvent: ((PlaybackEvent) -> Void)?
     private(set) var loadedURLs: [URL] = []
 
-    func load(url: URL, contentType: String?) async throws {
+    func load(url: URL, contentType: String?, headers: [String: String]) async throws {
         loadedURLs.append(url)
     }
 
@@ -23,8 +23,8 @@ private final class QuietEngine: PlaybackEngine {
 }
 
 private struct FixedResolver: TrackURLResolver {
-    func url(for track: Track) async throws -> URL {
-        URL(string: "https://tracks.example/track/\(track.streamID ?? "x")")!
+    func playbackSource(for track: Track) async throws -> PlaybackSource {
+        .remoteStream(url: URL(string: "https://tracks.example/track/\(track.streamID ?? "x")")!, headers: [:], providerID: track.provider, quality: track.audioQuality, contentType: nil)
     }
 
     func contentType(for track: Track) async -> String? { "audio/flac" }

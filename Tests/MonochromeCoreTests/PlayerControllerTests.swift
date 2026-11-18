@@ -14,7 +14,7 @@ private final class FakeEngine: PlaybackEngine {
     private(set) var stopCount = 0
     var loadError: (any Error)?
 
-    func load(url: URL, contentType: String?) async throws {
+    func load(url: URL, contentType: String?, headers: [String: String]) async throws {
         loadedURLs.append(url)
         contentTypes.append(contentType)
         if let loadError { throw loadError }
@@ -39,14 +39,17 @@ private actor FakeResolver: TrackURLResolver {
         self.failuresRemaining = failures
     }
 
-    func url(for track: Track) async throws -> URL {
+    func playbackSource(for track: Track) async throws -> PlaybackSource {
         requestedIDs.append(track.id)
         if failuresRemaining > 0 {
             failuresRemaining -= 1
             throw LoadFailure()
         }
         let name = track.fileName.isEmpty ? track.id : track.fileName
-        return URL(fileURLWithPath: "/library/\(name)")
+        let url = URL(fileURLWithPath: "/library/\(name)")
+        return track.isStreaming
+            ? .remoteStream(url: url, headers: [:], providerID: track.provider, quality: track.audioQuality, contentType: nil)
+            : .localFile(url: url, providerID: track.provider, quality: track.audioQuality)
     }
 
     func requests() -> [String] { requestedIDs }
@@ -81,11 +84,15 @@ private actor FakeCache: AudioCaching {
 
 /// Resolves to a remote stream, so the preflight path is exercised.
 private struct StreamResolver: TrackURLResolver {
-    func url(for track: Track) async throws -> URL {
-        URL(string: "https://tracks.test/track/\(track.streamID ?? track.id)")!
+    func playbackSource(for track: Track) async throws -> PlaybackSource {
+        .remoteStream(
+            url: URL(string: "https://tracks.test/track/\(track.streamID ?? track.id)")!,
+            headers: [:],
+            providerID: track.provider,
+            quality: track.audioQuality,
+            contentType: "audio/flac"
+        )
     }
-
-    func contentType(for track: Track) async -> String? { "audio/flac" }
 }
 
 private actor FakePreflight: StreamPreflighting {
