@@ -1,160 +1,302 @@
-# Monochrome — Native iOS
-
 <p align="center">
-  <a href="https://github.com/KatsukiiNeko/monochrome-ios-native/actions">
-    <img src="https://img.shields.io/github/actions/workflow/status/KatsukiiNeko/monochrome-ios-native/swift.yml?branch=main&style=for-the-badge&logo=githubactions&label=CI" alt="CI status">
+  <a href="https://github.com/KatsukiiNeko/monochrome-ios-native/actions/workflows/swift.yml?query=branch%3Adevelopment">
+    <img src="https://img.shields.io/github/actions/workflow/status/KatsukiiNeko/monochrome-ios-native/swift.yml?branch=development&style=for-the-badge&logo=githubactions&label=CI" alt="CI status">
   </a>
-  <img src="https://img.shields.io/badge/Swift-6.4-F05138?style=for-the-badge&logo=swift&logoColor=white" alt="Swift 6.4">
+  <img src="https://img.shields.io/badge/Swift-6.x-F05138?style=for-the-badge&logo=swift&logoColor=white" alt="Swift 6">
   <img src="https://img.shields.io/badge/Framework-SwiftUI-blue?style=for-the-badge&logo=swift" alt="SwiftUI">
-  <img src="https://img.shields.io/badge/Platform-iOS-black?style=for-the-badge&logo=apple" alt="iOS">
+  <img src="https://img.shields.io/badge/Platform-iOS%2017%2B-black?style=for-the-badge&logo=apple" alt="iOS 17 or later">
   <a href="license">
     <img src="https://img.shields.io/badge/License-Apache--2.0-blue?style=for-the-badge" alt="Apache 2.0 License">
   </a>
 </p>
 
 <p align="center">
-  <img
-    src="Branding/monochrome_logo.png"
-    alt="Monochrome logo"
-    width="220"
-  >
+  <a href="https://github.com/KatsukiiNeko/monochrome-ios-native">
+    <img src="Branding/monochrome_logo.png" alt="Monochrome logo" width="150">
+  </a>
 </p>
 
-A native SwiftUI music player inspired by the [Monochrome web app](https://github.com/monochrome-music/monochrome). It plays audio imported from the iOS Files app and streams FLAC tracks from the public catalog endpoint used by Monochrome.
+<h1 align="center">Monochrome — Native iOS</h1>
 
-The app includes Home, Search, and Library tabs; a persistent mini-player; a full Now Playing screen; a queue; a sleep timer; favorites; play history; local audio caching; repeat modes; Lock Screen media controls; an honest audio specification for the current track; on-demand lyrics; a parametric equalizer; local playlists with CSV/JSON import and export; on-device recommendations and radio; and a podcast directory with streamed episodes.
+<p align="center">
+  <strong>A native, local-first music player built with SwiftUI.</strong>
+</p>
 
-**Native app, not a WebView wrapper.** No account is required for the documented public catalog path. The app has no analytics or tracking SDKs and has no third-party Swift package dependencies.
+<p align="center">
+  Discover music, stream progressive FLAC, manage an offline library, and control playback through a native iOS interface.
+</p>
 
-> **Fork notice:** This repository is a native iOS derivative of [monochrome-music/monochrome](https://github.com/monochrome-music/monochrome). See [`docs/REPO_MIGRATION.md`](docs/REPO_MIGRATION.md), [`license`](license), [`NOTICE`](NOTICE), and [`Branding/SOURCE.md`](Branding/SOURCE.md) for project history, license, attribution, and branding provenance.
+<p align="center">
+  <a href="https://github.com/KatsukiiNeko/monochrome-ios-native">Repository</a> ·
+  <a href="https://github.com/KatsukiiNeko/monochrome-ios-native/tree/development/docs">Documentation</a> ·
+  <a href="https://github.com/KatsukiiNeko/monochrome-ios-native/issues">Issues</a> ·
+  <a href="license">License</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/KatsukiiNeko/monochrome-ios-native/stargazers">
+    <img src="https://img.shields.io/github/stars/KatsukiiNeko/monochrome-ios-native?style=for-the-badge&color=ffffff&labelColor=000000" alt="GitHub stars">
+  </a>
+  <a href="https://github.com/KatsukiiNeko/monochrome-ios-native/forks">
+    <img src="https://img.shields.io/github/forks/KatsukiiNeko/monochrome-ios-native?style=for-the-badge&color=ffffff&labelColor=000000" alt="GitHub forks">
+  </a>
+  <a href="https://github.com/KatsukiiNeko/monochrome-ios-native/issues">
+    <img src="https://img.shields.io/github/issues/KatsukiiNeko/monochrome-ios-native?style=for-the-badge&color=ffffff&labelColor=000000" alt="GitHub issues">
+  </a>
+</p>
+
+---
+
+## What is Monochrome?
+
+**Monochrome Native** is an independently maintained iOS music player inspired by the [Monochrome web app](https://github.com/monochrome-music/monochrome). It brings the project to iPhone as a native SwiftUI application rather than embedding the web interface in a WebView.
+
+The app combines an online music catalog with local audio, persistent playback, offline downloads, lyrics, playlists, recommendations, radio, and podcasts. Its design is local-first: the library, favorites, history, playlists, playback state, and listening profile are stored on the device.
+
+The project does not require an account for its documented public catalog path. It ships without analytics or tracking SDKs and has no third-party Swift package dependencies.
+
+> **Project lineage:** This repository is a native iOS derivative of [monochrome-music/monochrome](https://github.com/monochrome-music/monochrome). It is independently maintained. See [`docs/REPO_MIGRATION.md`](docs/REPO_MIGRATION.md), [`NOTICE`](NOTICE), [`Branding/SOURCE.md`](Branding/SOURCE.md), and [`license`](license) for migration history, attribution, branding provenance, and license terms.
 
 ## Features
 
-| Feature | Details |
-|---|---|
-| Local audio | Import audio from Files. The app copies imported files into its own storage; removing an item does not delete the original. |
-| Online catalog | Search tracks, albums, and artists; open album and artist details with the artist's biography and links; select tracks for playback. |
-| Streaming | Resolve a playable track URL at playback time and retry resolution once after a playback failure. |
-| Playback | Play/pause, seeking, next/previous, queue management, and repeat modes. |
-| Library | Local library, favorites, and recently played history persisted on-device. |
-| Playlists | Local playlists stored on-device: create, reorder, add tracks from any track menu. Import a playlist from CSV or JSON with review of uncertain matches and resume of an interrupted import; export as JSON or CSV. Exporting a downloaded FLAC also writes its tags and cover into the file. |
-| Permanent downloads | User-chosen songs are saved under Application Support/Downloads and play offline until removed. Downloads are separate from the temporary cache and imported files. |
-| Audio cache | A five-song rolling on-disk LRU buffer. Playing songs 1–5 keeps all five; playing song 6 evicts song 1, so songs 2–6 still start from cache without re-streaming. Caching over cellular is disabled, and the cache is never cleared on launch. Cache cleanup never touches downloads or imported files. |
-| Audio metadata | Displays the detected audio format and quality where available. Tapping the badge on Now Playing opens an Audio sheet with the measured codec, sample rate, bit depth, channels, bitrate, playback source and output route. Unknown values are omitted rather than inferred; each format value is marked measured or reported. |
-| Equalizer | A ten-band graphic mode and a parametric mode with up to sixteen bands (peak, low and high shelf, low and high pass, notch), twenty original presets plus seventeen classic ones in graphic mode, automatic or manual preamp with a clip light, bass, clarity, stereo width and Dynamic Boost, user presets, and text import/export in the common parametric format. It runs in an audio tap, so it applies to progressive audio only: HLS and items without an audio track report the control as unavailable instead of pretending to work. See [`docs/EQ_RESEARCH.md`](docs/EQ_RESEARCH.md). |
-| Sleep timer | Now Playing's overflow menu arms a 5, 15, 30, 45 or 60 minute timer. A countdown row under the scrubber can cancel it; at expiry playback pauses and keeps its position. The timer lasts for the session and is not persisted. |
-| Lyrics | Synced or plain lyrics from [LRCLIB](https://lrclib.net), fetched only when the Lyrics sheet is opened. Synced lines follow playback, tapping a line seeks, and scrolling pauses follow until Follow is tapped. Lyrics compensate automatically for the active output route's measured latency and keep a per-track manual timing nudge. Loading, instrumental, not-found, offline and error states are explicit. See [`docs/LYRICS.md`](docs/LYRICS.md). |
-| Recommendations | A listening log stays on the device: completions, loops, early skips, favorites and finished downloads build a taste profile with artist, album and source affinity, a day-based decay and a repeat penalty. Home shows a For You shelf with a reason on every pick and a Rediscover shelf from the own library; any track can be marked "More like this" or "Not for me". Settings has one switch and a reset. |
-| Radio | Start a radio from any track menu or an artist page: it tops the queue up when three tracks or fewer are left and skips the last fifty plays. The queue sheet marks it RADIO and can stop it. |
-| Podcasts | Search the public Apple podcast directory, open a show and play an episode through the same player. Episodes come from the show's own HTTPS RSS feed; the app reads the newest episodes and shows the date, duration and a short summary. |
-| Preferences | System/Light/Dark appearance, a selectable state accent (Monochrome, Signal, Amber, Mint, Blue, Violet, or the current artwork's colour), an Enable Endpoint on/off switch, endpoint reset, cache clearing, download management, and project/licensing information. |
-| Privacy | No account system, analytics, or tracking SDK. No credentials are embedded in the source. Lyrics are requested only when the lyrics view is opened, not for every song played; the request carries the track title, artist, album and duration, with no account or device identifier. |
+### Music discovery
 
-Monochrome downloads are available because the upstream web client downloads the same progressive FLAC stream (`js/api.js:3050`, `js/downloads.js:348`). That is capability evidence, not a content licence: the rights caveat below still applies. The YouTube Music companion source has no server configured in this build and never downloads. Cloud playlists, account login, and cross-device synchronization are not implemented. See [`docs/SOURCES.md`](docs/SOURCES.md).
+- Search the Monochrome catalog for tracks, albums, and artists.
+- Browse album tracklists and artist releases.
+- View artist biographies, external links, and social links when supplied by the catalog.
+- Search results and provider capabilities are handled through the source-provider layer.
 
-## Verification
+### Playback
 
-The maintainer completed the physical-device test checklist and reports successful results for the 0.2.0 release, including the downloads, five-song cache, settings and Now Playing changes, on an iPhone 12 Pro Max. The accent-color controls, the audio specification, lyrics, and equalizer were added after that release and have been checked by host tests and the iOS compile check. The equalizer's audio path in particular has not been heard on hardware: whether it applies to streamed, cached, downloaded and remote-progressive items is unverified.
+- Native playback powered by AVFoundation and `AVPlayer`.
+- Persistent mini-player and a dedicated Now Playing screen.
+- Queue management, seeking, previous/next, shuffle, and repeat modes.
+- Lock Screen and system media controls through Now Playing integration.
+- AirPlay route selection and output-route information.
+- Session restoration for queue, playback position, shuffle, and repeat state. Restored sessions remain paused rather than starting audio automatically.
+- Sleep timer with 5, 15, 30, 45, or 60-minute options.
 
-| Level | Meaning | Status |
-|---|---|---|
-| **L1 — Compile** | Swift sources compile for the target platform. | Passed |
-| **L2 — Unit tests** | Portable core behavior is tested on Linux. | Passed: 568 tests across 70 suites at the last recorded run, including the equalizer filters, response curves, render chain, presets, persistence, text format and availability rules, the audio-info chip variants, audio-specification formatters, lyrics parser, matcher, cache, provider, service, timing store, recommendations, radio, podcasts, the source matcher, the link cache and the merged-search reducer, plus the core layering guard. |
-| **L3 — Live service** | Catalog search and stream resolution are checked against the live catalog. | Passed in the recorded live-service checks; the opt-in live test is not run by default. Lyrics response shape and English/Vietnamese coverage were checked against LRCLIB from Linux; see [`docs/LYRICS.md`](docs/LYRICS.md). The upstream audio host was serving no data at the time of the equalizer work, so the tap could not be exercised against a real stream. |
-| **L4 — Physical device** | Playback and iOS-specific behavior are checked on a real iPhone. | Passed for the 0.2.0 release on an iPhone 12 Pro Max. Not run for the equalizer: no device was attached during that work. |
+### Library and offline listening
 
-CI runs the portable `swift test` suite. It does **not** run the live catalog test, build/sign an IPA, or install the app on a device. The iOS cross-compile check remains a separate local step because this workflow does not provision Apple's Darwin SDK.
+- Import audio from the iOS Files app. Imported files are copied into the app's storage; removing an in-app item does not delete the original file.
+- Keep favorites, recently played history, and a local music library on-device.
+- Save supported tracks as permanent downloads for offline playback.
+- Maintain a separate five-track rolling LRU audio cache for recently played streams.
+- Keep imported files, permanent downloads, and temporary cache entries in separate storage locations and cleanup paths.
+
+### Audio information and equalizer
+
+- Show the available codec, container, sample rate, bit depth, channel count, bitrate, playback source, and active output route.
+- Distinguish values measured from the loaded media from values reported by catalog metadata. Unknown values are omitted instead of guessed; bitrate is identified as estimated when applicable.
+- Provide a ten-band graphic equalizer and a parametric equalizer with up to sixteen bands.
+- Include filter types, built-in presets, preamp control, bass, clarity, stereo width, Dynamic Boost, and user presets.
+- Report equalizer availability based on the current playback path rather than presenting an inactive control as functional.
+
+See [`docs/EQ_RESEARCH.md`](docs/EQ_RESEARCH.md) for implementation notes and current limitations.
+
+### Lyrics
+
+- Retrieve plain or time-synchronised lyrics from [LRCLIB](https://lrclib.net) when the Lyrics view is opened.
+- Follow synced lines during playback and seek by selecting a line.
+- Pause automatic following while the listener scrolls, with an option to resume following.
+- Apply output-route latency compensation and per-track manual timing adjustments.
+- Present explicit loading, instrumental, not-found, offline, and error states.
+
+See [`docs/LYRICS.md`](docs/LYRICS.md).
+
+### Playlists, recommendations, and radio
+
+- Create and manage local playlists.
+- Import playlists from CSV or JSON, review uncertain track matches, and resume an interrupted import.
+- Export playlists as CSV or JSON. Exporting a downloaded FLAC also writes its tags and cover artwork.
+- Generate on-device recommendations from listening events, favorites, skips, and downloads.
+- Start a radio queue from a track or artist and let it replenish as the queue approaches its end.
+
+### Podcasts
+
+- Search the public Apple podcast directory.
+- Browse shows and retrieve episodes from each show's HTTPS RSS feed.
+- Play podcast episodes through the shared player.
+
+### Preferences and privacy
+
+- System, Light, and Dark appearance modes.
+- Monochrome, Signal, Amber, Mint, Blue, Violet, and Match Artwork accent options.
+- Enable or disable the online endpoint while retaining local playback.
+- Configure or reset the catalog endpoint, clear the temporary cache, and manage permanent downloads.
+- No embedded service credentials, account system, analytics SDK, or tracking SDK.
+
+## Music sources
+
+The app models providers by their actual capabilities. An unavailable integration is not presented as a working service.
+
+| Source | Search and browse | Playback | Permanent downloads | Availability |
+|---|---|---|---|---|
+| Monochrome catalog | Tracks, albums, and artists | Progressive FLAC | Supported | Configured by default |
+| Local files | On-device library | Local audio files | Managed as imported files | Available after importing files |
+| YouTube Music companion | Requires a user-configured companion server | Requires a user-configured companion server | Not supported | No server is configured in this build |
+
+The YouTube Music integration does not scrape pages, extract audio, use cookies, or call a direct YouTube API. Its supported design is a user-run HTTPS companion service; without a configured server, it remains unavailable. See [`docs/SOURCES.md`](docs/SOURCES.md).
 
 ## Streaming and audio quality
 
-The default catalog path uses the public progressive FLAC endpoint:
+The default Monochrome catalog uses the public progressive stream endpoint:
 
 ```text
 https://tracks.monochrome.st/track/<track-id>
 ```
 
-The documented endpoint provides **FLAC, 16-bit / 44.1 kHz lossless audio**. It does not expose the website's `HI_RES_LOSSLESS` tier through this path.
+The repository's current service audit documents this endpoint as a progressive FLAC stream in the `LOSSLESS` tier, with a **16-bit / 44.1 kHz** format. The audited path does not expose the website's `HI_RES_LOSSLESS` tier. The native client does not call the token-gated `/api/v2/track/` endpoint.
 
-The native client uses HTTPS and a truthful `User-Agent`; it does not spoof `Origin` or `Referer`, include credentials, or call the token-gated `/api/v2/track/` endpoint. The API client contains multi-host failover support and tests, but the current app wiring configures a single host; automatic user-host-to-default-host failover should not be considered an active app feature until that wiring is added.
+The Audio sheet reports the format AVFoundation exposes for the loaded media. It can show measured bit depth and sample rate when available, but that metadata display should not be interpreted as proof that the default catalog provides 24-bit or high-resolution streams. In particular, **24-bit / 88.2 kHz / 96 kHz support is not claimed for the built-in catalog endpoint** by the current repository audit. The sample rate of the active output route is shown separately from the media stream's sample rate.
 
-In Settings, **Enable Endpoint** switches the online catalog and streaming on or off while retaining local playback. The catalog endpoint can be pointed at another HTTPS host (for example, your own instance or a supported paid endpoint) and reset to the built-in default without changing appearance, downloads, favorites or history.
+For local files or another configured endpoint, the available format may differ. The app reports known values from the active asset and leaves unknown values blank rather than deriving them from a quality badge.
 
-"Hi-Fi" in this app is a quality label, not a separate catalogue or provider: the catalog path exposes one lossless tier (FLAC 16-bit / 44.1 kHz). YouTube Music has no authorized integration here; it is a companion-server design with no default URL. Permanent downloads store the same progressive FLAC stream the app plays, and the temporary cache is a separate disposable buffer.
+The native client uses HTTPS and its own truthful `User-Agent`. It does not spoof `Origin` or `Referer`, attach catalog credentials, or use the token-gated playback path. The endpoint can be enabled, disabled, changed, or reset in Settings; local files and existing downloads remain available when online catalog access is disabled.
+
+For the endpoint investigation and request contract, see [`docs/ONLINE_STREAMING_AUDIT.md`](docs/ONLINE_STREAMING_AUDIT.md) and [`docs/STREAMING_START_INVESTIGATION.md`](docs/STREAMING_START_INVESTIGATION.md).
 
 ### Content and distribution notice
 
-The catalog is Tidal-derived and is relayed by a third-party host. The upstream repository's Apache-2.0 license covers source code; it does **not** grant rights to the catalog's recordings or artwork. The availability of a personal build does not establish permission to redistribute the app or its content. Resolve the applicable service terms and content rights before publishing or distributing builds. See [`docs/ONLINE_STREAMING_AUDIT.md`](docs/ONLINE_STREAMING_AUDIT.md).
+The catalog is Tidal-derived and its audio is relayed by a third-party host. The repository's Apache-2.0 license applies to the source code; it does **not** grant rights to third-party recordings, catalog metadata, or artwork. Source availability and personal use do not establish permission to redistribute the app or its content. Resolve the applicable service terms and content rights before publishing or distributing builds.
+
+## Architecture
+
+The application is divided into two Swift package targets:
+
+### `MonochromeCore`
+
+Portable Swift code for models, business rules, services, provider selection, playback state, and persistence. It is designed to remain independent of SwiftUI, UIKit, and AppKit so its behavior can be tested on Linux.
+
+Core responsibilities include:
+
+- Catalog clients, source providers, search, matching, selection, and stream resolution.
+- Playback state, queue management, repeat and shuffle logic.
+- Local library, favorites, history, playlists, downloads, and cache stores.
+- Lyrics parsing, matching, timing, and caching.
+- Audio quality/specification models and equalizer DSP logic.
+- On-device recommendation and radio logic.
+
+### `Monochrome`
+
+The iOS application layer, built with SwiftUI and Apple media frameworks. It contains the app shell, views, AVFoundation playback engine, audio session and route integration, Now Playing controls, and the equalizer audio tap.
+
+### Playback and data flow
+
+The player resolves media through a concrete `PlaybackSource`. For supported tracks, playback checks permanent downloads first, then the temporary cache, and finally the network stream. `PlayerController` owns playback state and queue decisions; SwiftUI views render the state published by the controller.
+
+Persistent application data is stored locally. Settings and lyric timing use `UserDefaults`; larger collections such as favorites, history, library indexes, playlists, equalizer settings, and download indexes use JSON-backed files in Application Support.
+
+**Development rule:** put portable models and business logic in `MonochromeCore`, add host tests, and keep the SwiftUI layer focused on presentation and system integration.
+
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full architecture notes.
 
 ## Build and test
 
 ### Requirements
 
-- Swift 6.4 or compatible Swift 6.x toolchain for the portable core tests.
-- Linux x86-64 for the documented local workflow.
-- The Darwin Swift SDK and xtool 1.22 for the Linux iOS cross-compile and device workflow.
-- No third-party Swift packages.
+- Swift 6.x toolchain.
+- iOS 17 or later for the app target.
+- Swift Package Manager.
+- Linux x86-64 is supported for the portable core test workflow.
+- For the documented Linux-to-iOS compile check: an installed Darwin Swift SDK.
+- For device deployment: the configured `xtool` workflow and the required Apple device-signing/provisioning setup.
+- No third-party Swift package dependencies.
 
-### Run the portable tests
+### Run the portable test suite
 
 ```bash
 swift --version
 swift test
 ```
 
-The portable `MonochromeCore` target uses Foundation and can be tested on Linux without Xcode, an iOS simulator, or a connected iPhone.
+`MonochromeCore` uses portable Swift/Foundation APIs and can be tested on Linux without Xcode, an iOS simulator, or a connected iPhone.
 
-### Cross-compile for iOS on Linux
+### Cross-compile for iOS from Linux
 
 ```bash
 scripts/build.sh
 ```
 
-This invokes the repository's documented SwiftPM iOS compile-check command. It checks compilation; it does not sign, package, install, or launch the application. The current script uses SwiftPM's `--build-system native` option because of the documented platform-resolution limitation in the tested Linux toolchain; SwiftPM reports that this option is deprecated, so this workflow may need updating with a future Swift release. See [`docs/TOOLCHAIN_AUDIT.md`](docs/TOOLCHAIN_AUDIT.md).
+This runs the repository's SwiftPM iOS compile-check command for `arm64-apple-ios`. It verifies compilation; it does **not** create a signed IPA, install the app, or launch it on a device. The current command uses SwiftPM's `--build-system native` option for the documented toolchain compatibility reason. See [`docs/TOOLCHAIN_AUDIT.md`](docs/TOOLCHAIN_AUDIT.md).
 
 ### Optional live catalog test
 
-The live test sends requests to the configured third-party catalog and is deliberately excluded from the default CI run:
+The live catalog test is opt-in because it sends requests to the configured external service:
 
 ```bash
 MONOCHROME_LIVE=1 swift test --filter LiveTracksAPITests
 ```
 
-Run it only when you intend to contact the live service. It searches the catalog, resolves a stream, and checks the response's FLAC signature.
+Run it only when you intend to contact the live catalog. It searches the service, resolves a stream, and checks the returned FLAC signature.
 
 ### Device build and installation
 
-Device installation is a deliberate, manual operation and is not part of CI. The tracked `xtool.yml` holds the bundle identifier and resource settings. `xtool dev build` produces a build without deploying; `xtool dev` installs it on a connected device. The repository's CI does not access Apple credentials, provisioning profiles, or physical devices.
+The repository includes [`xtool.yml`](xtool.yml) for the app's bundle identifier and resources. Device build and installation are manual operations, not CI tasks:
 
-## CI
+```bash
+xtool dev build  # Build without deploying
+xtool dev        # Install on a connected, provisioned device
+```
 
-GitHub Actions runs `swift test` on pushes and pull requests targeting `main` or `development`. The workflow uses read-only repository permissions and requires no secrets. It validates the portable core; it does not claim to validate the iOS-only runtime layer or physical-device behavior.
+Device installation depends on the local Apple signing and provisioning environment. The repository's CI does not access Apple credentials or physical devices.
 
-## Architecture (brief)
+## Continuous integration
 
-The codebase is split into two layers:
+GitHub Actions runs the portable Swift test suite on pushes and pull requests targeting `main` and `development`.
 
-- **MonochromeCore** — portable Swift (`Foundation`, `FoundationNetworking`, `Observation`). Models, stores, API client, cache, downloads, player state machine (`PlayerController`), equalizer DSP (`EQRuntime`, `EQFilters`, `EQChain`), lyrics provider and cache, and the formatted strings used by the UI. Tested on Linux.
-- **Monochrome** — iOS-only SwiftUI and AVFoundation. Views, audio engine (`AVPlayerEngine`), audio session (`AudioSessionController`), Now Playing integration (`NowPlayingController`), equalizer tap (`EQTap`), and the app shell.
+The workflow:
 
-Playback order: downloaded file → cache hit → network resolution. The player controller decides; the view only shows what the controller publishes.
+- Runs on `ubuntu-latest` with Swift 6.2.
+- Executes `swift test -v`.
+- Uses read-only repository permissions and does not require secrets.
 
-Persistence: UserDefaults for settings and per-track lyrics timing; JSON files in Application Support for favorites, history, library index, EQ settings/presets, and download index. Tolerant decoding and schema versions protect upgrades from older releases.
+CI validates the portable core test suite. It does **not** run the opt-in live catalog test, perform the Darwin iOS compile check, sign an app, produce a release IPA, or install the app on a physical iPhone.
 
-To add a feature: model and logic in `MonochromeCore` with host tests, then a thin SwiftUI binding in `Monochrome`.
+[View workflow runs](https://github.com/KatsukiiNeko/monochrome-ios-native/actions/workflows/swift.yml).
 
 ## Repository layout
 
 ```text
-Package.swift                    Swift package and targets
-Resources/Info.plist             App display name and background audio capability
-Branding/                        Upstream icon and logo attribution
-scripts/build.sh                 Linux iOS compile check
-Sources/MonochromeCore/          Portable models, stores, API client, cache, downloads, and player state
-Sources/Monochrome/              SwiftUI interface and iOS audio integration
-Tests/MonochromeCoreTests/        Unit tests and JSON fixtures
-docs/                            Streaming, toolchain, migration, and device-test notes
+.
+├── Package.swift
+├── Resources/
+│   └── Info.plist
+├── Branding/
+│   ├── appicon.png
+│   └── monochrome_logo.png
+├── Sources/
+│   ├── MonochromeCore/       # Portable models, services, state, and persistence
+│   └── Monochrome/           # SwiftUI app and Apple-platform integrations
+├── Tests/
+│   └── MonochromeCoreTests/  # Portable unit tests and fixtures
+├── scripts/
+│   └── build.sh              # Linux-to-iOS compile check
+├── docs/                     # Architecture, audits, and development notes
+├── xtool.yml
+├── NOTICE
+└── license
 ```
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Device test checklist](docs/DEVICE_TEST_CHECKLIST.md)
+- [Equalizer research](docs/EQ_RESEARCH.md)
+- [Lyrics implementation](docs/LYRICS.md)
+- [Online streaming audit](docs/ONLINE_STREAMING_AUDIT.md)
+- [Streaming start investigation](docs/STREAMING_START_INVESTIGATION.md)
+- [Source capabilities](docs/SOURCES.md)
+- [Toolchain audit](docs/TOOLCHAIN_AUDIT.md)
+- [Feature gap](docs/FEATURE_GAP.md)
+- [Repository migration and attribution](docs/REPO_MIGRATION.md)
 
 ## License and attribution
 
-The native source is distributed under Apache-2.0; see [`license`](license) and [`NOTICE`](NOTICE). The upstream app icon and logo are included unchanged and are documented in [`Branding/SOURCE.md`](Branding/SOURCE.md). The code license does not grant rights to third-party recordings, catalog metadata, or artwork.
+The native application source is distributed under the [Apache License 2.0](license). See [`NOTICE`](NOTICE) and [`Branding/SOURCE.md`](Branding/SOURCE.md) for attribution and branding information.
+
+The source-code license does not grant rights to third-party music recordings, catalog metadata, or artwork.
+
+<p align="center">
+  <sub>Native iOS development · SwiftUI · AVFoundation</sub>
+</p>
