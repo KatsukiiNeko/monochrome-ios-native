@@ -44,7 +44,7 @@ final class AVPlayerEngine: PlaybackEngine {
     init() {
         // AVPlayer callbacks arrive on the main queue; hand them to the controller there.
         timeObserver = player.addPeriodicTimeObserver(
-            forInterval: CMTime(seconds: 0.5, preferredTimescale: 600),
+            forInterval: CMTime(seconds: 1.0, preferredTimescale: 600),
             queue: .main
         ) { [relay] time in
             relay.send(.position(time.seconds))
