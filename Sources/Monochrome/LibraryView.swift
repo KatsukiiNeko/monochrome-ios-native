@@ -43,32 +43,28 @@ struct LibraryView: View {
                         NavigationLink {
                             PodcastsView(model: model)
                         } label: {
-                            HStack(spacing: 10) {
-                                TechnicalIcon(name: "antenna.radiowaves.left.and.right")
-                                Text("Podcasts")
-                                    .font(Theme.listRowTitle)
-                                    .foregroundStyle(Theme.primaryText)
-                            }
+                            browseRow(
+                                icon: "antenna.radiowaves.left.and.right",
+                                title: "Podcasts",
+                                meta: nil
+                            )
                         }
-                    }
 
-                    if filter == .downloaded, !model.completedDownloads.isEmpty {
                         NavigationLink {
                             DownloadsView(model: model)
                         } label: {
-                            HStack(spacing: 10) {
-                                TechnicalIcon(name: "arrow.down.circle")
-                                Text("Manage Downloads")
-                                    .font(Theme.listRowTitle)
-                                    .foregroundStyle(Theme.primaryText)
-                                Spacer(minLength: 8)
-                                TechnicalLabel(
-                                    text: model.completedDownloads.count == 1
+                            browseRow(
+                                icon: "arrow.down.circle",
+                                title: "Downloads",
+                                meta: model.completedDownloads.isEmpty
+                                    ? "NONE"
+                                    : (model.completedDownloads.count == 1
                                         ? "1 SONG"
-                                        : "\(model.completedDownloads.count) SONGS"
-                                )
-                            }
+                                        : "\(model.completedDownloads.count) SONGS")
+                            )
                         }
+                    } header: {
+                        TechnicalSectionHeader(title: "Browse")
                     }
 
                     Section {
@@ -286,6 +282,19 @@ struct LibraryView: View {
         .buttonStyle(.plain)
         .accessibilityLabel("Favorites, \(model.favorites.count) songs")
         .accessibilityHint("Shows favorite tracks")
+    }
+
+    private func browseRow(icon: String, title: String, meta: String?) -> some View {
+        HStack(spacing: 10) {
+            TechnicalIcon(name: icon)
+            Text(title)
+                .font(Theme.listRowTitle)
+                .foregroundStyle(Theme.primaryText)
+            Spacer(minLength: 8)
+            if let meta {
+                TechnicalLabel(text: meta)
+            }
+        }
     }
 
     private var sortMenu: some View {
