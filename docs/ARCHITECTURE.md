@@ -28,6 +28,11 @@ If a downloaded or cached file fails to play, the controller falls through to th
 
 The app currently wires only `monochrome`. The YouTube path is scaffolded but not connected to a live server.
 
+`MonochromeCore/SourceResolution/` holds the parts that would pair the two
+sources: a track matcher, a cached verdict file per source pair, and a merged
+search reducer that keeps HiFi rows first. No view or player calls them yet;
+the companion client does not exist, so nothing changes at runtime.
+
 ## Persistence
 
 | What | Format | Location |
