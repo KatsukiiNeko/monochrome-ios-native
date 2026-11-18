@@ -274,12 +274,12 @@ final class EQController {
         clipTask?.cancel()
         clipTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
+                guard let self else { return }
                 if self.settings.isEnabled {
                     try? await Task.sleep(for: .milliseconds(100))
                 } else {
                     try? await Task.sleep(for: .milliseconds(500))
                 }
-                guard let self else { return }
                 guard self.settings.isEnabled else { continue }
                 let peak = self.player.takeEqualizerPeak()
                 if peak > 1 {
