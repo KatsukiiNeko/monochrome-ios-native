@@ -52,7 +52,7 @@ final class AppModel {
 
     public var sourceProviders: [any MusicSourceProvider] {
         [
-            MonochromeSourceProvider(clientProvider: { self.streamingClient }),
+            MonochromeSourceProvider(client: self.streamingClient),
             LocalFileSourceProvider(directory: mediaDirectory),
         ]
     }
@@ -138,13 +138,6 @@ final class AppModel {
             )
         )
         player.log = { message in playbackLog.notice("\(message, privacy: .public)") }
-        player.onPastHalfway = { [weak self] track in
-            guard let self else { return }
-            #if canImport(Network)
-            guard self.networkMonitor.isUnmeteredWiFi else { return }
-            #endif
-            Task { await self.prepareNextTrack(track) }
-        }
         let lyricsDirectory = cacheDirectory
             .deletingLastPathComponent()
             .appendingPathComponent("Lyrics", isDirectory: true)
@@ -180,6 +173,13 @@ final class AppModel {
         self.service = service
         self.catalogHTTP = catalogHTTP
         self.player = player
+        player.onPastHalfway = { [weak self] track in
+            guard let self else { return }
+            #if canImport(Network)
+            guard self.networkMonitor.isUnmeteredWiFi else { return }
+            #endif
+            Task { await self.prepareNextTrack(track) }
+        }
         self.cache = cache
         self.downloadStore = downloadStore
         self.lyricsService = lyricsService

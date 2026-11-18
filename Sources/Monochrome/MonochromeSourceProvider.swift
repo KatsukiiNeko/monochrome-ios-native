@@ -4,9 +4,7 @@ import Foundation
 import MonochromeCore
 
 struct MonochromeSourceProvider: MusicSourceProvider {
-    let clientProvider: @Sendable () -> TracksAPIClient?
-
-    private var client: TracksAPIClient? { clientProvider() }
+    let client: TracksAPIClient?
 
     var id: String { MusicSourceID.monochrome.rawValue }
     var displayName: String { MusicSourceID.monochrome.displayName }
@@ -23,7 +21,7 @@ struct MonochromeSourceProvider: MusicSourceProvider {
 
     func resolve(_ track: Track) async throws -> PlaybackSource {
         guard let client else { throw ProviderError.notConfigured }
-        guard let url = client.streamURL(for: track) else {
+        guard let url = await client.streamURL(for: track) else {
             throw ProviderError.unavailable
         }
         return .remoteStream(

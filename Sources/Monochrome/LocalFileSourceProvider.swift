@@ -6,7 +6,7 @@ import MonochromeCore
 struct LocalFileSourceProvider: MusicSourceProvider {
     let directory: URL
 
-    var id: String { MusicSourceID.localProvider }
+    var id: String { Track.localProvider }
     var displayName: String { "Local files" }
     var capabilities: ProviderCapabilities { [.audio, .browse] }
 

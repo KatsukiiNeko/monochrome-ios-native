@@ -4,7 +4,7 @@ import Foundation
 import Network
 import MonochromeCore
 
-final class NetworkMonitor {
+final class NetworkMonitor: @unchecked Sendable {
     private let monitor = NWPathMonitor()
     private let queue = DispatchQueue(label: "monochrome.network")
     private var path: NWPath?
