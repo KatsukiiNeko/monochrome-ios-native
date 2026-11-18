@@ -566,3 +566,21 @@ the tap is not receiving audio; a curve that does nothing on a track that logged
 - [ ] Play with no network when the queue runs low: playback of the queued
       tracks continues and the radio fills again once the network is back.
 - [ ] VoiceOver reads the Start radio action and the Stop radio action.
+
+## Podcasts
+
+- [ ] Library → Podcasts, type a show name: rows appear with artwork, show
+      title, author and genre.
+- [ ] Open a show: the episode list shows the newest episodes with date,
+      duration and a short plain-text summary.
+- [ ] Tap an episode: it plays through the player with the show artwork, the
+      show title as album and the author as artist; Lock Screen metadata matches.
+- [ ] Seek and resume an episode; the position behaves like a song stream.
+- [ ] A show whose feed is unreachable shows the error with Retry; Retry loads
+      the episodes once the network is back.
+- [ ] A show that lists only a non-HTTPS feed shows the HTTPS error instead of
+      playing.
+- [ ] VoiceOver reads each show row and each episode row with its date and
+      duration; Dynamic Type at the largest size keeps the rows readable.
+- [ ] Background playback and Control Center controls work on a podcast episode
+      exactly as on a song.
