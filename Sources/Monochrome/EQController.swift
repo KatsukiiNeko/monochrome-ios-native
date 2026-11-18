@@ -43,7 +43,9 @@ final class EQController {
     func activate() {
         player.setEqualizer(settings)
         refreshAvailability()
-        startClipMonitor()
+        if settings.isEnabled {
+            startClipMonitor()
+        }
     }
 
     /// Called from the clip poll, so it must not republish an unchanged value:
@@ -259,6 +261,13 @@ final class EQController {
         store.save(state)
         player.setEqualizer(settings)
         refreshAvailability()
+        if settings.isEnabled {
+            startClipMonitor()
+        } else {
+            clipTask?.cancel()
+            clipTask = nil
+            isClipping = false
+        }
     }
 
     private func startClipMonitor() {
@@ -267,6 +276,7 @@ final class EQController {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(100))
                 guard let self else { return }
+                guard self.settings.isEnabled else { continue }
                 let peak = self.player.takeEqualizerPeak()
                 if peak > 1 {
                     self.clipHoldUntil = Date().addingTimeInterval(1)
@@ -275,7 +285,6 @@ final class EQController {
                 if clipped != self.isClipping {
                     self.isClipping = clipped
                 }
-                self.refreshAvailability()
             }
         }
     }
