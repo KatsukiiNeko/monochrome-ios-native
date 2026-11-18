@@ -174,13 +174,6 @@ final class AppModel {
         self.catalogHTTP = catalogHTTP
         self.player = player
         self.cache = cache
-        player.onPastHalfway = { [weak self] track in
-            guard let self else { return }
-            #if canImport(Network)
-            guard self.networkMonitor.isUnmeteredWiFi else { return }
-            #endif
-            Task { await self.prepareNextTrack(track) }
-        }
         self.downloadStore = downloadStore
         self.lyricsService = lyricsService
         self.resolver = resolver
@@ -222,6 +215,13 @@ final class AppModel {
             self?.record(track)
             guard let self, self.accentPreference == .artwork else { return }
             Task { await self.refreshArtworkAccent() }
+        }
+        player.onPastHalfway = { [weak self] track in
+            guard let self else { return }
+            #if canImport(Network)
+            guard self.networkMonitor.isUnmeteredWiFi else { return }
+            #endif
+            Task { await self.prepareNextTrack(track) }
         }
     }
 
