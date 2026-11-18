@@ -181,7 +181,7 @@ struct SearchView: View {
             } description: {
                 Text("Find songs, albums and artists by name.")
             }
-        } else if search.showsNoResults {
+        } else if search.showsNoResults, !skeleton.isVisible {
             ContentUnavailableView.search(text: search.activeQuery ?? trimmedQuery)
         }
     }
