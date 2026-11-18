@@ -28,6 +28,9 @@ public final class PlayerController {
 
     /// Called once per successful start; the app uses it to record history.
     public var onTrackStarted: ((Track) -> Void)?
+    /// Called once when the current track passes halfway, so the next network
+    /// track can be staged into the cache. Nil disables preparation.
+    public var onPastHalfway: ((Track) -> Void)?
     /// Called when a track is heard to the end, left early or looped; the app
     /// forwards these to the listening log.
     public var onPlayEvent: (@MainActor (PlayEvent) -> Void)?
@@ -38,6 +41,7 @@ public final class PlayerController {
     private let resolver: any TrackURLResolver
     private let cache: (any AudioCaching)?
     private let downloads: (any DownloadedAudioProviding)?
+    private let sessionStore: PlaybackSessionStore?
     /// Optional cheap check that the stream answers before an asset is built.
     private let preflight: (any StreamPreflighting)?
     private let now: @Sendable () -> Date
@@ -47,6 +51,7 @@ public final class PlayerController {
     private var didRetryCurrentTrack = false
     /// True while the engine holds a file, so a restart needs no network round trip.
     private var currentItemIsLocal = false
+    private var didPrepareNextForCurrentTrack = false
     /// Stream resolved for the current item, waiting for the parsed format before caching.
     private var pendingCache: PendingCache?
     /// When the current item started, used to decide whether skipping should cancel its cache.
@@ -77,6 +82,7 @@ public final class PlayerController {
         resolver: any TrackURLResolver,
         cache: (any AudioCaching)? = nil,
         downloads: (any DownloadedAudioProviding)? = nil,
+        sessionStore: PlaybackSessionStore? = nil,
         preflight: (any StreamPreflighting)? = nil,
         now: @escaping @Sendable () -> Date = { .now }
     ) {
@@ -84,8 +90,18 @@ public final class PlayerController {
         self.resolver = resolver
         self.cache = cache
         self.downloads = downloads
+        self.sessionStore = sessionStore
         self.preflight = preflight
         self.now = now
+        if sessionStore != nil {
+            Task { [weak self] in
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(10))
+                    guard let self else { return }
+                    await MainActor.run { self.saveSession() }
+                }
+            }
+        }
         engine.onEvent = { [weak self] event in
             guard let self else { return }
             if case .ready(let duration, let format) = event {
@@ -238,6 +254,31 @@ public final class PlayerController {
         cacheDownloadTrack = nil
     }
 
+    /// Persists the current queue and position for restoration after a restart.
+    public func saveSession() {
+        guard let store = sessionStore, let track = queue.current else { return }
+        let session = PlaybackSession(
+            tracks: queue.tracks,
+            currentIndex: queue.currentIndex,
+            position: position,
+            isShuffled: isShuffled,
+            repeatMode: repeatMode,
+            radioRunning: false,
+            savedAt: now()
+        )
+        store.save(session)
+    }
+
+    /// Restores a saved queue without auto-playing.
+    public func restoreSession(_ session: PlaybackSession) async {
+        guard !session.tracks.isEmpty else { return }
+        queue.replace(with: session.tracks, startingAt: session.currentIndex ?? 0)
+        isShuffled = session.isShuffled
+        repeatMode = session.repeatMode
+        await loadCurrent(autoPlay: false)
+        seek(to: session.position)
+    }
+
     /// User-initiated retry, including a fresh stream resolution.
     public func retry() async {
         guard queue.current != nil else { return }
@@ -316,6 +357,7 @@ public final class PlayerController {
             handleReady(duration: engineDuration, format: engineFormat)
         case .position(let seconds):
             position = seconds
+            triggerNextTrackPreparationIfNeeded()
         case .finished:
             await handleEndOfTrack()
         case .failed(let message):
@@ -408,6 +450,30 @@ public final class PlayerController {
         await cache.cancelDownload(for: track, quality: track.audioQuality, reason: "skipped")
     }
 
+    private func triggerNextTrackPreparationIfNeeded() {
+        guard !didPrepareNextForCurrentTrack else { return }
+        guard let handler = onPastHalfway else { return }
+        guard let next = nextNetworkTrack() else { return }
+        let hasNext = true
+        guard NextTrackPreparation.shouldPrepare(
+            currentPosition: position,
+            duration: duration,
+            hasNextTrack: hasNext,
+            isPreparing: false,
+            isUnmeteredWiFi: true,
+            isInBackground: false,
+            nextIsNetwork: next.isStreaming
+        ) else { return }
+        didPrepareNextForCurrentTrack = true
+        handler(next)
+    }
+
+    private func nextNetworkTrack() -> Track? {
+        guard let currentIndex = queue.currentIndex,
+              currentIndex + 1 < queue.tracks.count else { return nil }
+        return queue.tracks[currentIndex + 1]
+    }
+
     private func handleEndOfTrack() async {
         let hasNext = queue.currentIndex.map { $0 + 1 < queue.tracks.count } ?? false
         let action = EndOfTrackDecision.action(
@@ -476,7 +542,7 @@ public final class PlayerController {
         ))
     }
 
-    private func loadCurrent(retrying: Bool = false, forLoop: Bool = false) async {
+    private func loadCurrent(retrying: Bool = false, forLoop: Bool = false, autoPlay: Bool = true) async {
         await cancelCacheDownloadIfSkippedEarly()
         if let cache { await cache.clearProtection() }
         playbackStartedAt = nil
@@ -515,8 +581,8 @@ public final class PlayerController {
                 do {
                     attempt.mark(.asset, at: now(), detail: "download")
                     try await engine.load(url: downloaded.url, contentType: nil)
-                    engine.play()
-                    state = .playing
+                    if autoPlay { engine.play() }
+                    state = autoPlay ? .playing : .paused
                     format = mergedFormat(stored: downloaded.format, measured: format)
                     if let downloadedDuration = downloaded.duration, downloadedDuration > 0 {
                         duration = downloadedDuration
@@ -527,7 +593,7 @@ public final class PlayerController {
                     attempt.mark(.ready, at: now(), detail: "download")
                     if forLoop { log?("loop source=download") }
                     log?("download source=file track=\(track.id)")
-                    onTrackStarted?(track)
+                    if autoPlay { onTrackStarted?(track) }
                     return
                 } catch {
                     log?("download unusable track=\(track.id)")
@@ -542,8 +608,8 @@ public final class PlayerController {
                 do {
                     attempt.mark(.asset, at: now(), detail: "cache")
                     try await engine.load(url: cached.url, contentType: nil)
-                    engine.play()
-                    state = .playing
+                    if autoPlay { engine.play() }
+                    state = autoPlay ? .playing : .paused
                     format = mergedFormat(stored: cached.format, measured: format)
                     if let cachedDuration = cached.duration, cachedDuration > 0 {
                         duration = cachedDuration
@@ -553,7 +619,7 @@ public final class PlayerController {
                     playbackStartedAt = now()
                     attempt.mark(.ready, at: now(), detail: "cache")
                     if forLoop { log?("loop source=cache") }
-                    onTrackStarted?(track)
+                    if autoPlay { onTrackStarted?(track) }
                     return
                 } catch {
                     // A damaged cache entry must not stop playback; resolve the stream instead.
@@ -564,12 +630,15 @@ public final class PlayerController {
         if forLoop { log?("loop source=network reason=cache-miss") }
 
         do {
-            let url = try await resolver.url(for: track)
+            let source = try await resolver.playbackSource(for: track)
             attempt.mark(.resolve, at: now())
-            let contentType = await resolver.contentType(for: track)
+            let url = source.url
+            let resolvedContentType = await resolver.contentType(for: track)
+            let contentType = source.contentType ?? resolvedContentType
+            let headers = source.headers
             pendingCache = PendingCache(
                 track: track,
-                quality: track.audioQuality,
+                quality: source.quality ?? track.audioQuality,
                 url: url,
                 contentType: contentType
             )
@@ -593,13 +662,13 @@ public final class PlayerController {
             }
             attempt.countRequest("item")
             attempt.mark(.asset, at: now(), detail: "network")
-            try await engine.load(url: url, contentType: contentType)
-            engine.play()
-            state = .playing
-            currentItemIsLocal = !track.isStreaming
+            try await engine.load(url: url, contentType: contentType, headers: headers)
+            if autoPlay { engine.play() }
+            state = autoPlay ? .playing : .paused
+            currentItemIsLocal = source.isLocal
             playbackStartedAt = now()
             attempt.mark(.ready, at: now(), detail: "network")
-            onTrackStarted?(track)
+            if autoPlay { onTrackStarted?(track) }
         } catch {
             attempt.mark(.failed, at: now(), detail: PlaybackAttemptLog.errorDetail(error))
             pendingCache = nil

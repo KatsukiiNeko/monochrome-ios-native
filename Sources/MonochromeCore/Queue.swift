@@ -1,7 +1,7 @@
 // Queue.swift: ordered track list with a cursor; no playback knowledge.
 import Foundation
 
-public struct Queue: Equatable, Sendable {
+public struct Queue: Codable, Equatable, Sendable {
     public private(set) var tracks: [Track] = []
     public private(set) var currentIndex: Int?
 

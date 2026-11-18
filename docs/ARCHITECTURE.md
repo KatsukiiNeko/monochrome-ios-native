@@ -1,57 +1,66 @@
 # Architecture
 
-## Two layers
+## Layers
 
-| Layer | Target | Imports | Tested on |
-|---|---|---|---|
-| `MonochromeCore` | portable | `Foundation`, `FoundationNetworking`, `Observation` | Linux (host tests) |
-| `Monochrome` | iOS | `MonochromeCore`, `SwiftUI`, `AVFoundation`, `MediaPlayer`, `os`, `UIKit`, `CoreGraphics`, `ImageIO`, `UniformTypeIdentifiers`, `AVKit`, `MediaToolbox` | iOS device / cross-compile |
+- `MonochromeCore`: portable models, services, persistence and pure logic. It does
+  not import SwiftUI, UIKit or AppKit (enforced by `LayeringImportTests`).
+- `Monochrome` (app target): SwiftUI views, AVFoundation playback, network
+  clients, system integration (audio session, Now Playing), and the composition
+  root in `AppModel`.
 
-`MonochromeCore` must not import Apple-only frameworks. A host test (`CoreLayeringTests`) enforces this by scanning the core sources for imports outside the allowed set.
+## Recording, candidate, playback source
 
-## Playback order
+- A `Track` is what the listener asked for.
+- A `SourceCandidate` is a provider's possible representation of that recording.
+- A `PlaybackSource` (local file, download, cache, remote stream, live stream)
+  is the concrete media source that actually plays. The resolver returns this,
+  never a bare URL, so the player and audio-spec UI can make correct decisions.
 
-`PlayerController` resolves the current track in this order:
+Matching happens before quality ranking: a higher-quality candidate for a
+different recording is rejected first.
 
-1. **Downloaded file** — if the track is marked downloaded and the file exists under `Application Support/Downloads`.
-2. **Cache hit** — if the track is in the on-disk LRU cache (`AudioCache`), five songs, evicts least-recently-used.
-3. **Network** — `TrackURLResolver` asks the catalog for a progressive FLAC URL, `AVPlayerEngine` loads it.
+## Provider abstraction
 
-If a downloaded or cached file fails to play, the controller falls through to the next source automatically.
+`MusicSourceProvider` exposes id, display name, capabilities, search and
+resolve. Failures are normalized to `ProviderError`. `ProviderRegistry` stores
+the enabled set and priority order in the shared JSON store, with safe migration
+for unknown or missing providers.
 
-## Sources model
+## Search, selection, resolution
 
-`MusicSourceID` identifies a catalog. Each source declares `SourceCapabilities` (`search`, `stream`, `downloads`).
+- `SourceSearchService` fans a query out to every enabled provider concurrently,
+  with a per-provider budget. One failure does not block the others; empty is
+  final only when all have completed.
+- `SourceSelectionService` rejects wrong recordings using `TrackMatcher`, then
+  ranks by quality tier and provider priority.
+- `SourceResolutionService` resolves the best candidate and falls back to the
+  next on failure, with a per-play budget and cancellation on skip.
 
-- `monochrome` — the public progressive FLAC endpoint. Supports all three capabilities.
-- `youTubeMusic` — companion-server design, no default URL, `needsSetup` until the user configures a server. Supports `search` and `stream` only.
+## Composition root
 
-The app currently wires only `monochrome`. The YouTube path is scaffolded but not connected to a live server.
+`AppModel.init` constructs the playback stack, cache, downloads, resolver,
+session store and system integration with initializer injection. Services do not
+reach into global state to find their dependencies.
 
-`MonochromeCore/SourceResolution/` holds the parts that would pair the two
-sources: a track matcher, a cached verdict file per source pair, and a merged
-search reducer that keeps HiFi rows first. No view or player calls them yet;
-the companion client does not exist, so nothing changes at runtime.
+## Playback
 
-## Persistence
+`PlayerController` owns state, queue, position and duration. `AVPlayerEngine`
+implements `PlaybackEngine`. The resolver returns a `PlaybackSource`; the engine
+switches on the case for headers and seekability. Cache integrity is checked by
+file existence and size; invalid entries are evicted and the network path runs
+in the same attempt.
 
-| What | Format | Location |
-|---|---|---|
-| Streaming endpoint, enabled toggle | UserDefaults | `streaming.baseURL`, `streaming.enabled` |
-| Appearance, accent, lyrics timing | UserDefaults | `appearance.mode`, `accent.preference`, `lyrics.timingDelay.<track>` |
-| Favorites | JSON (v1 legacy IDs, v2 full tracks) | `Application Support/favorites.json` |
-| History | JSON | `Application Support/history.json` |
-| Library index | JSON | `Application Support/library.json` |
-| EQ settings + user presets | JSON (schema versioned) | `Application Support/eq-settings.json` |
-| Download index | JSON | `Application Support/Downloads/index.json` |
-| Cache | flat files + directory scan | `Caches/AudioCache/` |
+## Reliability
 
-All JSON decoders are tolerant: missing fields get defaults, unknown fields are ignored, and schema versions allow forward migration. Fixtures in `Tests/MonochromeCoreTests/Fixtures/` decode the exact shapes written by v0.3.0.
+- Session restoration persists queue, index, position, shuffle and repeat
+  through `PlaybackSessionStore`; restore is paused, never auto-play.
+- Route changes pause on device loss; interruptions resume only when playback
+  was active before and the system allows it.
+- Next-track preparation stages the following network track into cache past
+  halfway on unmetered Wi-Fi, at most one outstanding.
+- Network recovery retries once.
 
-## Adding a feature
+## Layering rule
 
-1. Model and pure logic in `MonochromeCore` with host tests (`swift test` on Linux).
-2. Wire the iOS integration in `Monochrome` — views bind to published state, send intents to the controller.
-3. If it needs iOS-only frameworks (AVFoundation, MediaPlayer, etc.), keep that code behind `#if canImport(...)` or in the `Monochrome` target.
-4. Run `scripts/build.sh` to verify the iOS cross-compile.
-5. Run `swift test` to verify the core behavior.
+Core and service code must not import SwiftUI, UIKit or AppKit. The layering
+host test enforces this.
