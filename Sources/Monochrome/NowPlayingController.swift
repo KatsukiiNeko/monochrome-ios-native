@@ -14,6 +14,8 @@ final class NowPlayingController {
     private var artworkTask: Task<Void, Never>?
     private var artworkTrackID: String?
     private var artwork: MPMediaItemArtwork?
+    private var lastMetadataUpdate = Date.distantPast
+    private var lastMetadataTrackID: String?
 
     init(player: PlayerController, artworkURL: @escaping (Track) -> URL? = { $0.artworkURL }) {
         self.player = player
@@ -48,16 +50,33 @@ final class NowPlayingController {
     }
 
     private func applyMetadata() {
-        guard let track = player.currentTrack else {
+        // Throttle: the position observer fires every 0.5 s, but republishing
+        // the full metadata dictionary that often is wasteful on A14.
+        // Read these first so withObservationTracking registers them; the throttle
+        // only skips the publish, not the observation.
+        let currentTrack = player.currentTrack
+        let currentState = player.state
+        let currentPosition = player.position
+        let currentDuration = player.duration
+        let canAdvance = player.queue.canAdvance
+        let canRewind = player.queue.canRewind
+
+        let trackChanged = currentTrack?.id != lastMetadataTrackID
+        let now = Date()
+        if !trackChanged, now.timeIntervalSince(lastMetadataUpdate) < 1.0 { return }
+        lastMetadataUpdate = now
+        lastMetadataTrackID = currentTrack?.id
+        guard let track = currentTrack else {
             artworkTask?.cancel()
             artworkTask = nil
             artworkTrackID = nil
             artwork = nil
+            lastMetadataTrackID = nil
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
             MPNowPlayingInfoCenter.default().playbackState = .stopped
             updateCommandAvailability(NowPlayingSnapshot.make(
                 track: nil,
-                state: player.state,
+                state: currentState,
                 position: 0,
                 duration: 0,
                 hasNext: false,
@@ -69,11 +88,11 @@ final class NowPlayingController {
         loadArtworkIfNeeded(for: track)
         let snapshot = NowPlayingSnapshot.make(
             track: track,
-            state: player.state,
-            position: player.position,
-            duration: player.duration,
-            hasNext: player.queue.canAdvance,
-            hasPrevious: player.queue.canRewind
+            state: currentState,
+            position: currentPosition,
+            duration: currentDuration,
+            hasNext: canAdvance,
+            hasPrevious: canRewind
         )
 
         var info: [String: Any] = [
