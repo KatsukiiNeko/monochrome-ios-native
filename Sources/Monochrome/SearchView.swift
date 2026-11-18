@@ -7,11 +7,8 @@ struct SearchView: View {
     let model: AppModel
 
     @State private var query = ""
-    @State private var tracks: [Track] = []
-    @State private var releases: [RemoteRelease] = []
-    @State private var artists: [RemoteArtist] = []
-    @State private var isSearching = false
-    @State private var errorMessage: String?
+    @State private var search = SearchQueryState()
+    @State private var skeleton = SearchSkeletonState()
     @State private var filter: SearchResultKind = .all
     @State private var selectedRelease: RemoteRelease?
     @State private var selectedArtist: RemoteArtist?
@@ -30,7 +27,7 @@ struct SearchView: View {
                     LazyVStack(alignment: .leading, spacing: Theme.sectionSpacing) {
                         if trimmedQuery.isEmpty {
                             if !model.searchRecents.isEmpty { recentSearchesSection }
-                        } else if isSearching && !hasResults {
+                        } else if skeleton.isVisible {
                             loadingPlaceholder
                         } else {
                             resultsContent
@@ -108,15 +105,15 @@ struct SearchView: View {
         query.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var hasResults: Bool {
-        !tracks.isEmpty || !releases.isEmpty || !artists.isEmpty
-    }
+    private var payload: SearchPayload { search.shownPayload }
+
+    private var hasResults: Bool { !payload.isEmpty }
 
     private var availableKinds: [SearchResultKind] {
         SearchResults.availableKinds(
-            hasTracks: !tracks.isEmpty,
-            hasReleases: !releases.isEmpty,
-            hasArtists: !artists.isEmpty
+            hasTracks: !payload.tracks.isEmpty,
+            hasReleases: !payload.releases.isEmpty,
+            hasArtists: !payload.artists.isEmpty
         )
     }
 
@@ -127,9 +124,9 @@ struct SearchView: View {
     private var sections: SearchResultSections {
         SearchResults.apply(
             activeFilter,
-            tracks: tracks,
-            releases: releases,
-            artists: artists
+            tracks: payload.tracks,
+            releases: payload.releases,
+            artists: payload.artists
         )
     }
 
@@ -170,7 +167,7 @@ struct SearchView: View {
             } description: {
                 Text("Enable the endpoint in Settings to search the catalog.")
             }
-        } else if let errorMessage {
+        } else if let errorMessage = search.failureMessage {
             ContentUnavailableView {
                 Label("Search failed", systemImage: "exclamationmark.triangle")
             } description: {
@@ -178,14 +175,14 @@ struct SearchView: View {
             } actions: {
                 Button("Retry") { Task { await runSearch(force: true) } }
             }
-        } else if !isSearching, trimmedQuery.isEmpty, model.searchRecents.isEmpty {
+        } else if trimmedQuery.isEmpty, model.searchRecents.isEmpty, !skeleton.isVisible {
             ContentUnavailableView {
                 Label("Search the catalog", systemImage: "magnifyingglass")
             } description: {
                 Text("Find songs, albums and artists by name.")
             }
-        } else if !isSearching, !trimmedQuery.isEmpty, !hasResults {
-            ContentUnavailableView.search(text: trimmedQuery)
+        } else if search.showsNoResults {
+            ContentUnavailableView.search(text: search.activeQuery ?? trimmedQuery)
         }
     }
 
@@ -571,47 +568,50 @@ struct SearchView: View {
     private func runSearch(force: Bool = false) async {
         filter = .all
         guard model.isStreamingConfigured else {
-            tracks = []
-            releases = []
-            artists = []
-            errorMessage = nil
-            isSearching = false
+            search.clear()
+            await trackSkeleton(waiting: false)
             return
         }
-        let text = trimmedQuery
-        guard text.count >= 2 else {
-            tracks = []
-            releases = []
-            artists = []
-            errorMessage = nil
-            isSearching = false
+        search.queryChanged(trimmedQuery)
+        guard let active = search.activeQuery else {
+            await trackSkeleton(waiting: false)
             return
         }
         if !force {
-            // Debounce. SwiftUI cancels this task when the query changes, and the
-            // cancellation checks below drop the stale response.
+            // Debounce. SwiftUI cancels this task when the query changes, so a
+            // stale request never outlives its text.
             try? await Task.sleep(for: .milliseconds(300))
         }
         guard !Task.isCancelled else { return }
+        search.requestStarted(for: active)
 
-        isSearching = true
-        defer { isSearching = false }
+        async let skeletonTask: Void = trackSkeleton(waiting: true)
         do {
-            async let foundTracks = model.searchTracks(text)
-            async let foundReleases = model.searchReleases(text)
-            async let foundArtists = model.searchArtists(text)
+            async let foundTracks = model.searchTracks(active)
+            async let foundReleases = model.searchReleases(active)
+            async let foundArtists = model.searchArtists(active)
             let (tracks, releases, artists) = try await (foundTracks, foundReleases, foundArtists)
             guard !Task.isCancelled else { return }
-            self.tracks = tracks
-            self.releases = releases
-            self.artists = artists
-            errorMessage = nil
+            search.received(
+                SearchPayload(tracks: tracks, releases: releases, artists: artists),
+                for: active
+            )
         } catch {
             guard !Task.isCancelled else { return }
-            tracks = []
-            releases = []
-            artists = []
-            errorMessage = error.localizedDescription
+            search.failed(error.localizedDescription, for: active)
+        }
+        await skeletonTask
+        await trackSkeleton(waiting: false)
+    }
+
+    /// Moves the skeleton to `waiting` and keeps it in step with its grace and
+    /// minimum visibility, so a fast answer never flashes placeholder rows.
+    private func trackSkeleton(waiting: Bool) async {
+        skeleton.update(waiting: waiting, at: .now)
+        while let delay = skeleton.nextChangeDelay(at: .now) {
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled else { return }
+            skeleton.update(waiting: waiting, at: .now)
         }
     }
 }
