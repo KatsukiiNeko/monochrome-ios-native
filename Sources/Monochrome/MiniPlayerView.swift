@@ -43,6 +43,7 @@ struct MiniPlayerView: View {
 
                 progressBar(bar.progress)
             }
+            .frame(minHeight: Theme.miniPlayerHeight)
             .background(tint, in: RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: Theme.cardRadius, style: .continuous)

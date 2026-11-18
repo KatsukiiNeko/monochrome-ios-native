@@ -147,6 +147,10 @@ enum Theme {
 
     static let controlSize: CGFloat = 44
     static let miniArtworkSize: CGFloat = 42
+    /// Minimum card height and the band the bar reserves from scroll content.
+    static let miniPlayerHeight = LayoutSpec.miniPlayerHeight
+    /// Vertical touch target of the player scrubber.
+    static let scrubberHitTarget = LayoutSpec.scrubberHitTarget
     static let sectionMarker: CGFloat = 5
     static let markerHeight: CGFloat = 13
 
