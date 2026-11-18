@@ -225,6 +225,18 @@ chip variants and the build check covers compilation.
 - [ ] Let one track reach the end: the next queued track starts.
 - [ ] Tap a track while another is playing: the new one replaces it cleanly.
 
+## First play of a stream
+
+- [ ] Fresh launch, search, tap a track that is not downloaded: no "Resource
+      Unavailable" alert appears, and audio starts.
+- [ ] Tap the same track again in a new session: it starts without a visible
+      error or a manual Retry.
+- [ ] Put the phone in airplane mode, tap a catalog track: after the bounded
+      attempt the app shows "The stream did not answer. Check the connection,
+      then retry.", and Retry with the network back starts playback.
+- [ ] Skip through three catalog tracks quickly: each one starts, no
+      overlapping audio, no error alert between them.
+
 ## Format badge
 
 - [ ] Each catalog row shows a small `FLAC` badge next to the title.
