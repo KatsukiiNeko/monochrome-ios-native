@@ -39,6 +39,19 @@ struct LibraryView: View {
                 List {
                     PlaylistsSection(model: model) { isNamingPlaylist = true }
 
+                    Section {
+                        NavigationLink {
+                            PodcastsView(model: model)
+                        } label: {
+                            HStack(spacing: 10) {
+                                TechnicalIcon(name: "antenna.radiowaves.left.and.right")
+                                Text("Podcasts")
+                                    .font(Theme.listRowTitle)
+                                    .foregroundStyle(Theme.primaryText)
+                            }
+                        }
+                    }
+
                     if filter == .downloaded, !model.completedDownloads.isEmpty {
                         NavigationLink {
                             DownloadsView(model: model)
@@ -75,7 +88,7 @@ struct LibraryView: View {
                             .contextMenu {
                                 AddToPlaylistMenu(track: track)
                                 RecommendationMenu(track: track)
-                            RadioMenu(track: track)
+                                RadioMenu(track: track)
                                 if model.player.currentTrack != nil {
                                     Button("Play next", systemImage: "text.line.first.and.arrowtriangle.forward") {
                                         model.player.playNext(track)

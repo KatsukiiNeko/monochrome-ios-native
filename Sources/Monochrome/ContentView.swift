@@ -9,6 +9,7 @@ struct ContentView: View {
     @State private var importer: PlaylistImportModel
     @State private var recommendations: RecommendationModel
     @State private var radio: RadioModel
+    @State private var podcasts: PodcastModel
     @State private var tab: AppTab = .home
     @State private var isShowingPlayer = false
     @State private var isShowingSettings = false
@@ -36,6 +37,8 @@ struct ContentView: View {
             search: { try await model.searchTracks($0) },
             recents: { model.recents }
         ))
+        // Podcast episodes play through the same player.
+        _podcasts = State(initialValue: PodcastModel(player: model.player))
     }
 
     private enum AppTab: Hashable {
@@ -76,6 +79,7 @@ struct ContentView: View {
         .environment(importer)
         .environment(recommendations)
         .environment(radio)
+        .environment(podcasts)
         .sheet(isPresented: $isShowingPlayer) {
             PlayerView(model: model)
                 .presentationDetents([.large])
@@ -88,6 +92,7 @@ struct ContentView: View {
                 .environment(importer)
                 .environment(recommendations)
                 .environment(radio)
+                .environment(podcasts)
         }
         .sheet(isPresented: $isShowingSettings) {
             NavigationStack {
@@ -101,6 +106,7 @@ struct ContentView: View {
             .environment(importer)
             .environment(recommendations)
             .environment(radio)
+            .environment(podcasts)
         }
         .alert(
             "Something went wrong",
