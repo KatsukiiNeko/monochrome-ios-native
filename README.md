@@ -22,7 +22,7 @@
 
 A native SwiftUI music player inspired by the [Monochrome web app](https://github.com/monochrome-music/monochrome). It plays audio imported from the iOS Files app and streams FLAC tracks from the public catalog endpoint used by Monochrome.
 
-The app includes Home, Search, and Library tabs; a persistent mini-player; a full Now Playing screen; a queue; a sleep timer; favorites; play history; local audio caching; repeat modes; Lock Screen media controls; an honest audio specification for the current track; on-demand lyrics; and a parametric equalizer.
+The app includes Home, Search, and Library tabs; a persistent mini-player; a full Now Playing screen; a queue; a sleep timer; favorites; play history; local audio caching; repeat modes; Lock Screen media controls; an honest audio specification for the current track; on-demand lyrics; a parametric equalizer; local playlists with CSV/JSON import and export; on-device recommendations and radio; and a podcast directory with streamed episodes.
 
 **Native app, not a WebView wrapper.** No account is required for the documented public catalog path. The app has no analytics or tracking SDKs and has no third-party Swift package dependencies.
 
@@ -33,17 +33,20 @@ The app includes Home, Search, and Library tabs; a persistent mini-player; a ful
 | Feature | Details |
 |---|---|
 | Local audio | Import audio from Files. The app copies imported files into its own storage; removing an item does not delete the original. |
-| Online catalog | Search tracks, albums, and artists; open album and artist details; select tracks for playback. |
+| Online catalog | Search tracks, albums, and artists; open album and artist details with the artist's biography and links; select tracks for playback. |
 | Streaming | Resolve a playable track URL at playback time and retry resolution once after a playback failure. |
 | Playback | Play/pause, seeking, next/previous, queue management, and repeat modes. |
 | Library | Local library, favorites, and recently played history persisted on-device. |
+| Playlists | Local playlists stored on-device: create, reorder, add tracks from any track menu. Import a playlist from CSV or JSON with review of uncertain matches and resume of an interrupted import; export as JSON or CSV. Exporting a downloaded FLAC also writes its tags and cover into the file. |
 | Permanent downloads | User-chosen songs are saved under Application Support/Downloads and play offline until removed. Downloads are separate from the temporary cache and imported files. |
 | Audio cache | A five-song rolling on-disk LRU buffer. Playing songs 1–5 keeps all five; playing song 6 evicts song 1, so songs 2–6 still start from cache without re-streaming. Caching over cellular is disabled, and the cache is never cleared on launch. Cache cleanup never touches downloads or imported files. |
 | Audio metadata | Displays the detected audio format and quality where available. Tapping the badge on Now Playing opens an Audio sheet with the measured codec, sample rate, bit depth, channels, bitrate, playback source and output route. Unknown values are omitted rather than inferred; each format value is marked measured or reported. |
 | Equalizer | A ten-band graphic mode and a parametric mode with up to sixteen bands (peak, low and high shelf, low and high pass, notch), twenty original presets plus seventeen classic ones in graphic mode, automatic or manual preamp with a clip light, bass, clarity, stereo width and Dynamic Boost, user presets, and text import/export in the common parametric format. It runs in an audio tap, so it applies to progressive audio only: HLS and items without an audio track report the control as unavailable instead of pretending to work. See [`docs/EQ_RESEARCH.md`](docs/EQ_RESEARCH.md). |
 | Sleep timer | Now Playing's overflow menu arms a 5, 15, 30, 45 or 60 minute timer. A countdown row under the scrubber can cancel it; at expiry playback pauses and keeps its position. The timer lasts for the session and is not persisted. |
 | Lyrics | Synced or plain lyrics from [LRCLIB](https://lrclib.net), fetched only when the Lyrics sheet is opened. Synced lines follow playback, tapping a line seeks, and scrolling pauses follow until Follow is tapped. Lyrics compensate automatically for the active output route's measured latency and keep a per-track manual timing nudge. Loading, instrumental, not-found, offline and error states are explicit. See [`docs/LYRICS.md`](docs/LYRICS.md). |
-| iOS integration | Background audio, Now Playing metadata with album and artwork, Lock Screen controls, remote commands, interruption handling, and route-change handling. |
+| Recommendations | A listening log stays on the device: completions, loops, early skips, favorites and finished downloads build a taste profile with artist, album and source affinity, a day-based decay and a repeat penalty. Home shows a For You shelf with a reason on every pick and a Rediscover shelf from the own library; any track can be marked "More like this" or "Not for me". Settings has one switch and a reset. |
+| Radio | Start a radio from any track menu or an artist page: it tops the queue up when three tracks or fewer are left and skips the last fifty plays. The queue sheet marks it RADIO and can stop it. |
+| Podcasts | Search the public Apple podcast directory, open a show and play an episode through the same player. Episodes come from the show's own HTTPS RSS feed; the app reads the newest episodes and shows the date, duration and a short summary. |
 | Preferences | System/Light/Dark appearance, a selectable state accent (Monochrome, Signal, Amber, Mint, Blue, Violet, or the current artwork's colour), an Enable Endpoint on/off switch, endpoint reset, cache clearing, download management, and project/licensing information. |
 | Privacy | No account system, analytics, or tracking SDK. No credentials are embedded in the source. Lyrics are requested only when the lyrics view is opened, not for every song played; the request carries the track title, artist, album and duration, with no account or device identifier. |
 
