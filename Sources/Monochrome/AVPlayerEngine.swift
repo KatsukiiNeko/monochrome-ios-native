@@ -58,7 +58,7 @@ final class AVPlayerEngine: PlaybackEngine {
         }
     }
 
-    func load(url: URL, contentType: String?) async throws {
+    func load(url: URL, contentType: String?, headers: [String: String] = [:]) async throws {
         playbackLog.notice(
             "load start host=\(url.host ?? "none", privacy: .public) path=\(shortHash(url.path), privacy: .public) type=\(contentType ?? "none", privacy: .public)"
         )
@@ -67,6 +67,11 @@ final class AVPlayerEngine: PlaybackEngine {
         var options: [String: Any] = [:]
         if let contentType {
             options[overrideMIMETypeKey] = contentType
+        }
+        if !headers.isEmpty {
+            // AVURLAssetHTTPHeaderFieldsKey is the documented way to attach
+            // request headers; it is honored on iOS 14 and later.
+            options["AVURLAssetHTTPHeaderFieldsKey"] = headers
         }
         let asset = AVURLAsset(url: url, options: options)
 

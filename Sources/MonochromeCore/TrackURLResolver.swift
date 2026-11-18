@@ -2,13 +2,18 @@
 import Foundation
 
 public protocol TrackURLResolver: Sendable {
-    func url(for track: Track) async throws -> URL
+    /// Resolves the concrete playback source for a track.
+    func playbackSource(for track: Track) async throws -> PlaybackSource
     /// Out-of-band MIME type for the resolved source, when it is known.
     func contentType(for track: Track) async -> String?
 }
 
 extension TrackURLResolver {
     public func contentType(for track: Track) async -> String? { nil }
+    /// Convenience accessor for callers that only need the URL.
+    public func url(for track: Track) async throws -> URL {
+        try await playbackSource(for: track).url
+    }
 }
 
 public enum TrackResolutionError: LocalizedError, Equatable {
@@ -51,20 +56,33 @@ public actor DefaultTrackResolver: TrackURLResolver {
         track.isStreaming && track.source == .monochrome ? Self.streamContentType : nil
     }
 
-    public func url(for track: Track) async throws -> URL {
+    public func playbackSource(for track: Track) async throws -> PlaybackSource {
         if track.provider == PodcastEpisode.provider {
             guard let streamID = track.streamID,
                   let url = URL(string: streamID),
                   url.scheme?.lowercased() == "https" else {
                 throw TrackResolutionError.notStreamable(track.title)
             }
-            return url
+            // Podcast episodes are finite episodes; they keep their duration.
+            return .remoteStream(
+                url: url,
+                headers: [:],
+                providerID: track.provider,
+                quality: track.audioQuality,
+                contentType: nil
+            )
         }
         if track.isStreaming {
             guard let client, let streamURL = await client.streamURL(for: track) else {
                 throw TrackResolutionError.notStreamable(track.title)
             }
-            return streamURL
+            return .remoteStream(
+                url: streamURL,
+                headers: [:],
+                providerID: track.provider,
+                quality: track.audioQuality,
+                contentType: Self.streamContentType
+            )
         }
         guard !track.fileName.isEmpty else {
             throw TrackResolutionError.missingFile(track.title)
@@ -73,6 +91,9 @@ public actor DefaultTrackResolver: TrackURLResolver {
         guard FileManager.default.fileExists(atPath: url.path) else {
             throw TrackResolutionError.missingFile(track.title)
         }
-        return url
+        if track.provider == Track.localProvider {
+            return .localFile(url: url, providerID: track.provider, quality: track.audioQuality)
+        }
+        return .download(url: url, providerID: track.provider, quality: track.audioQuality)
     }
 }

@@ -14,8 +14,10 @@ public enum PlaybackEvent: Equatable, Sendable {
 public protocol PlaybackEngine: AnyObject {
     var onEvent: ((PlaybackEvent) -> Void)? { get set }
     /// `contentType` is the out-of-band MIME type when the server does not state
-    /// a usable one; nil lets AVFoundation decide.
-    func load(url: URL, contentType: String?) async throws
+    /// a usable one; nil lets AVFoundation decide. `headers` are applied only
+    /// when the backend supports them; unsupported headers are ignored (recorded
+    /// as a limitation rather than worked around).
+    func load(url: URL, contentType: String?, headers: [String: String]) async throws
     func play()
     func pause()
     func seek(to seconds: Double)
@@ -33,4 +35,7 @@ public extension PlaybackEngine {
     func setEqualizer(_ settings: EQSettings) {}
     var eqAvailability: EQAvailability { .available }
     func takeEqualizerPeak() -> Double { 0 }
+    func load(url: URL, contentType: String?) async throws {
+        try await load(url: url, contentType: contentType, headers: [:])
+    }
 }
