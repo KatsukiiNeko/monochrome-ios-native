@@ -25,6 +25,8 @@ final class AVPlayerEngine: PlaybackEngine {
     private var endObserver: NSObjectProtocol?
     private var failureObserver: NSObjectProtocol?
     private var statusObservation: NSKeyValueObservation?
+    private var errorLogObserver: NSObjectProtocol?
+    private var accessLogObserver: NSObjectProtocol?
     private var timeControlObservation: NSKeyValueObservation?
     /// Set while `load` waits for the item, so the status observer does not race it.
     private var isWaitingForReadiness = false
@@ -57,7 +59,9 @@ final class AVPlayerEngine: PlaybackEngine {
     }
 
     func load(url: URL, contentType: String?) async throws {
-        playerLog.notice("load start url=\(url.absoluteString, privacy: .public) type=\(contentType ?? "none", privacy: .public)")
+        playbackLog.notice(
+            "load start host=\(url.host ?? "none", privacy: .public) path=\(shortHash(url.path), privacy: .public) type=\(contentType ?? "none", privacy: .public)"
+        )
         // The catalog host serves FLAC as application/octet-stream without a path
         // extension, which leaves AVFoundation unable to pick a parser on its own.
         var options: [String: Any] = [:]
@@ -85,6 +89,22 @@ final class AVPlayerEngine: PlaybackEngine {
             let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
             playerLog.error("item failed to play to end: \(describe(error), privacy: .public)")
             relay.send(.failed(error?.localizedDescription ?? "Playback failed."))
+        }
+        errorLogObserver = NotificationCenter.default.addObserver(
+            forName: AVPlayerItem.newErrorLogEntryNotification, object: item, queue: .main
+        ) { notification in
+            guard let entry = (notification.object as? AVPlayerItem)?.errorLog()?.events.last else { return }
+            playbackLog.error(
+                "item errorLog status=\(entry.errorStatusCode, privacy: .public) domain=\(entry.errorDomain, privacy: .public) host=\(entry.serverAddress.map(hostOnly) ?? "none", privacy: .public) path=\(shortHash(entry.uri), privacy: .public)"
+            )
+        }
+        accessLogObserver = NotificationCenter.default.addObserver(
+            forName: AVPlayerItem.newAccessLogEntryNotification, object: item, queue: .main
+        ) { notification in
+            guard let log = (notification.object as? AVPlayerItem)?.accessLog()?.events.last else { return }
+            playbackLog.notice(
+                "item accessLog requests=\(log.numberOfMediaRequests) host=\(log.serverAddress.map(hostOnly) ?? "none", privacy: .public) path=\(shortHash(log.uri), privacy: .public) bytes=\(log.numberOfBytesTransferred)"
+            )
         }
         statusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
             let status = item.status.rawValue
@@ -298,8 +318,12 @@ final class AVPlayerEngine: PlaybackEngine {
     private func stopObservingItem() {
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         if let failureObserver { NotificationCenter.default.removeObserver(failureObserver) }
+        if let errorLogObserver { NotificationCenter.default.removeObserver(errorLogObserver) }
+        if let accessLogObserver { NotificationCenter.default.removeObserver(accessLogObserver) }
         endObserver = nil
         failureObserver = nil
+        errorLogObserver = nil
+        accessLogObserver = nil
         statusObservation = nil
     }
 
@@ -314,12 +338,28 @@ final class AVPlayerEngine: PlaybackEngine {
 private func describe(_ error: (any Error)?) -> String {
     guard let error else { return "none" }
     let nsError = error as NSError
-    let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError
-    var text = "domain=\(nsError.domain) code=\(nsError.code) description=\(nsError.localizedDescription)"
-    if let underlying {
-        text += " underlying=\(underlying.domain)/\(underlying.code) \(underlying.localizedDescription)"
+    var text = "domain=\(nsError.domain) code=\(nsError.code)"
+    if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? NSError {
+        text += " underlying=\(underlying.domain)/\(underlying.code)"
     }
     return text
+}
+
+/// Host without a path or query, for a log line.
+private func hostOnly(_ address: String) -> String {
+    URL(string: address)?.host ?? address
+}
+
+/// Eight hex characters of an FNV-1a hash: enough to match requests in one run
+/// without writing a full path to the log.
+private func shortHash(_ value: String?) -> String {
+    guard let value else { return "none" }
+    let path = URL(string: value)?.path ?? value
+    var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+    for byte in path.utf8 {
+        hash = (hash ^ UInt64(byte)) &* 0x0000_0100_0000_01b3
+    }
+    return String(format: "%08x", UInt32(truncatingIfNeeded: hash >> 16))
 }
 
 /// FourCC as text, e.g. `flac`; trimming keeps `aac ` and `.mp3` readable.
@@ -335,8 +375,8 @@ private func logErrorLog(_ item: AVPlayerItem) {
         return
     }
     for event in log.events {
-        playerLog.error(
-            "errorLog status=\(event.errorStatusCode) domain=\(event.errorDomain, privacy: .public) comment=\(event.errorComment ?? "none", privacy: .public) uri=\(event.uri ?? "none", privacy: .public)"
+        playbackLog.error(
+            "errorLog status=\(event.errorStatusCode) domain=\(event.errorDomain, privacy: .public) host=\(event.serverAddress.map(hostOnly) ?? "none", privacy: .public) path=\(shortHash(event.uri), privacy: .public)"
         )
     }
 }

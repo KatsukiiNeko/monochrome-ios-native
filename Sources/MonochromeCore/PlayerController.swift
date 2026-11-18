@@ -491,53 +491,67 @@ public final class PlayerController {
         isCurrentFromDownload = false
         pendingCache = nil
 
-        if track.isStreaming, let downloads,
-           let downloaded = await downloads.downloadedFile(for: track) {
-            do {
-                try await engine.load(url: downloaded.url, contentType: nil)
-                engine.play()
-                state = .playing
-                format = mergedFormat(stored: downloaded.format, measured: format)
-                if let downloadedDuration = downloaded.duration, downloadedDuration > 0 {
-                    duration = downloadedDuration
+        var attempt = PlaybackAttemptLog(trackKey: track.sourceKey, at: now())
+        defer { log?(attempt.summary) }
+
+        if track.isStreaming, let downloads {
+            let downloaded = await downloads.downloadedFile(for: track)
+            attempt.mark(.lookup, at: now(), detail: downloaded == nil ? "download-miss" : "download-hit")
+            if let downloaded {
+                do {
+                    attempt.mark(.asset, at: now(), detail: "download")
+                    try await engine.load(url: downloaded.url, contentType: nil)
+                    engine.play()
+                    state = .playing
+                    format = mergedFormat(stored: downloaded.format, measured: format)
+                    if let downloadedDuration = downloaded.duration, downloadedDuration > 0 {
+                        duration = downloadedDuration
+                    }
+                    currentItemIsLocal = true
+                    isCurrentFromDownload = true
+                    playbackStartedAt = now()
+                    attempt.mark(.ready, at: now(), detail: "download")
+                    if forLoop { log?("loop source=download") }
+                    log?("download source=file track=\(track.id)")
+                    onTrackStarted?(track)
+                    return
+                } catch {
+                    log?("download unusable track=\(track.id)")
                 }
-                currentItemIsLocal = true
-                isCurrentFromDownload = true
-                playbackStartedAt = now()
-                if forLoop { log?("loop source=download") }
-                log?("download source=file track=\(track.id)")
-                onTrackStarted?(track)
-                return
-            } catch {
-                log?("download unusable track=\(track.id)")
             }
         }
 
-        if track.isStreaming, let cache,
-           let cached = await cache.cachedAudio(for: track, quality: track.audioQuality) {
-            do {
-                try await engine.load(url: cached.url, contentType: nil)
-                engine.play()
-                state = .playing
-                format = mergedFormat(stored: cached.format, measured: format)
-                if let cachedDuration = cached.duration, cachedDuration > 0 {
-                    duration = cachedDuration
+        if track.isStreaming, let cache {
+            let cached = await cache.cachedAudio(for: track, quality: track.audioQuality)
+            attempt.mark(.lookup, at: now(), detail: cached == nil ? "cache-miss" : "cache-hit")
+            if let cached {
+                do {
+                    attempt.mark(.asset, at: now(), detail: "cache")
+                    try await engine.load(url: cached.url, contentType: nil)
+                    engine.play()
+                    state = .playing
+                    format = mergedFormat(stored: cached.format, measured: format)
+                    if let cachedDuration = cached.duration, cachedDuration > 0 {
+                        duration = cachedDuration
+                    }
+                    currentItemIsLocal = true
+                    isCurrentFromCache = true
+                    playbackStartedAt = now()
+                    attempt.mark(.ready, at: now(), detail: "cache")
+                    if forLoop { log?("loop source=cache") }
+                    onTrackStarted?(track)
+                    return
+                } catch {
+                    // A damaged cache entry must not stop playback; resolve the stream instead.
+                    log?("cache hit unusable track=\(track.id)")
                 }
-                currentItemIsLocal = true
-                isCurrentFromCache = true
-                playbackStartedAt = now()
-                if forLoop { log?("loop source=cache") }
-                onTrackStarted?(track)
-                return
-            } catch {
-                // A damaged cache entry must not stop playback; resolve the stream instead.
-                log?("cache hit unusable track=\(track.id)")
             }
         }
         if forLoop { log?("loop source=network reason=cache-miss") }
 
         do {
             let url = try await resolver.url(for: track)
+            attempt.mark(.resolve, at: now())
             let contentType = await resolver.contentType(for: track)
             pendingCache = PendingCache(
                 track: track,
@@ -545,13 +559,17 @@ public final class PlayerController {
                 url: url,
                 contentType: contentType
             )
+            attempt.countRequest("item")
+            attempt.mark(.asset, at: now(), detail: "network")
             try await engine.load(url: url, contentType: contentType)
             engine.play()
             state = .playing
             currentItemIsLocal = !track.isStreaming
             playbackStartedAt = now()
+            attempt.mark(.ready, at: now(), detail: "network")
             onTrackStarted?(track)
         } catch {
+            attempt.mark(.failed, at: now(), detail: PlaybackAttemptLog.errorDetail(error))
             pendingCache = nil
             if !retrying, track.isStreaming, !didRetryCurrentTrack {
                 didRetryCurrentTrack = true

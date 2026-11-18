@@ -178,6 +178,42 @@ struct PlayerControllerTests {
         #expect(await cache.lookups == 1)
     }
 
+    @Test func networkAttemptLogsEveryPhase() async {
+        let controller = PlayerController(
+            engine: FakeEngine(),
+            resolver: FakeResolver(),
+            cache: FakeCache(),
+            downloads: FakeDownloads()
+        )
+        var lines: [String] = []
+        controller.log = { lines.append($0) }
+
+        await controller.play(tracks: [streamTrack("a")], startingAt: 0)
+
+        let attempt = lines.last(where: { $0.hasPrefix("attempt=") })
+        #expect(attempt?.contains("lookup=") == true)
+        #expect(attempt?.contains("resolve=") == true)
+        #expect(attempt?.contains("asset=") == true)
+        #expect(attempt?.contains("ready=") == true)
+        #expect(attempt?.contains("via=network") == true)
+        #expect(attempt?.contains("stream:a") == false)
+    }
+
+    @Test func failedAttemptLogsOneErrorShape() async {
+        let (controller, engine) = makeController()
+        engine.loadError = LoadFailure()
+        var lines: [String] = []
+        controller.log = { lines.append($0) }
+
+        await controller.play(tracks: [streamTrack("a")], startingAt: 0)
+
+        let attempts = lines.filter { $0.hasPrefix("attempt=") }
+        #expect(attempts.count == 2)
+        #expect(attempts.last?.contains("failed=") == true)
+        #expect(attempts.last?.contains("error=") == true)
+        #expect(controller.state == .failed("cannot decode audio"))
+    }
+
     @Test func playLoadsAndStartsSelectedTrack() async {
         let (controller, engine) = makeController()
 

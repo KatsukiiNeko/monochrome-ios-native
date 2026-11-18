@@ -110,7 +110,7 @@ final class AppModel {
             cache: cache,
             downloads: downloadStore
         )
-        player.log = { message in playerLog.notice("\(message, privacy: .public)") }
+        player.log = { message in playbackLog.notice("\(message, privacy: .public)") }
         let lyricsDirectory = cacheDirectory
             .deletingLastPathComponent()
             .appendingPathComponent("Lyrics", isDirectory: true)
