@@ -173,6 +173,7 @@ final class AppModel {
         self.service = service
         self.catalogHTTP = catalogHTTP
         self.player = player
+        self.cache = cache
         player.onPastHalfway = { [weak self] track in
             guard let self else { return }
             #if canImport(Network)
@@ -180,7 +181,6 @@ final class AppModel {
             #endif
             Task { await self.prepareNextTrack(track) }
         }
-        self.cache = cache
         self.downloadStore = downloadStore
         self.lyricsService = lyricsService
         self.resolver = resolver
