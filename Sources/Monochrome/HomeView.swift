@@ -12,13 +12,22 @@ struct HomeView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.accentColor) private var accent
     @Environment(RecommendationModel.self) private var recommendations
+    @Environment(RadioModel.self) private var radio
 
     private var quickAccess: [Track] {
         QuickAccess.merge(recents: model.recents, favorites: model.favorites)
     }
 
     private var hasContent: Bool {
-        !model.recents.isEmpty || !model.favorites.isEmpty
+        !model.recents.isEmpty || !model.favorites.isEmpty || !model.completedDownloads.isEmpty
+    }
+
+    private var stationArtists: [String] {
+        HomeStations.artists(favorites: model.favorites, recents: model.recents)
+    }
+
+    private var recentDownloads: [DownloadItem] {
+        Array(model.completedDownloads.prefix(6))
     }
 
     var body: some View {
@@ -34,6 +43,12 @@ struct HomeView: View {
                     if !model.recents.isEmpty {
                         listenAgainSection
                     }
+                    if !recentDownloads.isEmpty {
+                        recentlyDownloadedSection
+                    }
+                    if !stationArtists.isEmpty {
+                        stationsSection
+                    }
                     if !model.favorites.isEmpty {
                         favoritesSection
                     }
@@ -45,6 +60,10 @@ struct HomeView: View {
                 .padding(.bottom, 24)
             }
             .background(Theme.background.ignoresSafeArea())
+            .refreshable {
+                if recommendations.isEnabled { await recommendations.refreshIfNeeded() }
+                await model.refreshDownloads()
+            }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { logo }
@@ -186,6 +205,84 @@ struct HomeView: View {
                     }
                 }
                 .padding(.vertical, 2)
+            }
+        }
+    }
+
+    private var recentlyDownloadedSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ShelfHeader(
+                title: "Recently downloaded",
+                meta: recentDownloads.count == 1 ? "1 SONG" : "\(recentDownloads.count) SONGS",
+                actionTitle: "Manage"
+            ) {
+                onOpenLibrary()
+            }
+            VStack(spacing: 0) {
+                ForEach(Array(recentDownloads.enumerated()), id: \.element.id) { index, item in
+                    if index > 0 {
+                        Rectangle()
+                            .fill(Theme.separator)
+                            .frame(height: Theme.hairline)
+                            .padding(.leading, 64)
+                            .accessibilityHidden(true)
+                    }
+                    Button {
+                        Task { await model.play(item.track, in: recentDownloads.map(\.track)) }
+                    } label: {
+                        TrackRow(
+                            track: item.track,
+                            localArtworkURL: model.artworkURL(for: item.track),
+                            isCurrent: model.player.currentTrack?.id == item.track.id
+                        )
+                        .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Plays this track")
+                }
+            }
+        }
+    }
+
+    private var stationsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ShelfHeader(
+                title: "Stations",
+                meta: "FROM YOUR ARTISTS"
+            )
+            VStack(spacing: 0) {
+                ForEach(Array(stationArtists.enumerated()), id: \.element) { index, artist in
+                    if index > 0 {
+                        Rectangle()
+                            .fill(Theme.separator)
+                            .frame(height: Theme.hairline)
+                            .padding(.leading, 48)
+                            .accessibilityHidden(true)
+                    }
+                    Button {
+                        radio.start(.artist(artist))
+                    } label: {
+                        HStack(spacing: Theme.rowSpacing) {
+                            TechnicalIcon(name: "dot.radiowaves.left.and.right")
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(artist)
+                                    .font(Theme.listRowTitle)
+                                    .foregroundStyle(Theme.primaryText)
+                                    .lineLimit(1)
+                                TechnicalLabel(text: "Radio")
+                            }
+                            Spacer(minLength: 8)
+                            Image(systemName: "play.fill")
+                                .font(Theme.caption)
+                                .foregroundStyle(Theme.tertiaryText)
+                                .accessibilityHidden(true)
+                        }
+                        .frame(minHeight: Theme.rowMinHeight)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Start a radio from \(artist)")
+                }
             }
         }
     }
