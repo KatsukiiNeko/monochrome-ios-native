@@ -596,3 +596,26 @@ the tap is not receiving audio; a curve that does nothing on a track that logged
       duration; Dynamic Type at the largest size keeps the rows readable.
 - [ ] Background playback and Control Center controls work on a podcast episode
       exactly as on a song.
+
+## Layout pass
+
+- [ ] Home: the recently downloaded and station rows appear when there is
+      data and stay hidden when there is not.
+- [ ] Home: pull to refresh updates the recommendations and the downloads.
+- [ ] Every tab and pushed screen: the mini-player never covers the last row.
+- [ ] Search: skeleton rows appear only after a short pause, and no "No
+      results" flashes before an answer has actually arrived.
+- [ ] Search: a slow answer for an older query never replaces the current one.
+- [ ] Search: the field stays visible while the results scroll.
+- [ ] Library: Podcasts and Downloads are reachable from every filter.
+- [ ] Album sheet: sleeve, year and count, Play in order, Shuffle starts on a
+      random track.
+- [ ] Artist sheet: avatar, catalog count and Start radio in the app control
+      style.
+- [ ] Player: on a short phone the artwork is smaller and every control stays
+      reachable; the scrubber is easy to grab.
+- [ ] Player: swiping down dismisses the sheet.
+- [ ] VoiceOver: the new Home rows, the album and artist actions and the
+      searching placeholder have sensible labels.
+- [ ] At the largest Dynamic Type size, Home, Search and the player still read
+      in order.
