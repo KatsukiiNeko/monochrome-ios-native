@@ -123,8 +123,9 @@ accent.
 4. Listen again: horizontal artwork carousel of recent plays.
 5. Recently downloaded: up to six completed downloads, as rows. Hidden when
    nothing is downloaded.
-6. Stations: radio seeds taken from the most played artists in favorites and
-   recents; each button starts a real radio. Hidden when there is no seed.
+6. Stations: one station per artist, taken from favorites first and then
+   recent plays; each button starts a real radio. Hidden when there is no
+   seed.
 7. Favorites: up to five rows with a See all link into Library.
 8. Empty state for a new listener: one search action and one import hint.
 
@@ -136,7 +137,7 @@ refresh re-runs recommendations and downloads.
 
 1. Filter chips: All, Favorites, Downloaded, Local.
 2. Pinned Favorites row (count and link into the favorites filter).
-3. Browse: `List` section with Playlists, Podcasts and Downloads. These links
+3. Playlists, then a Browse section with Podcasts and Downloads. These links
    exist in every filter, not only the downloaded one.
 4. Tracks: the current filter and sort, one `TrackRow` per track with the
    existing context menu, swipe-to-favorite and swipe-to-download or delete.
@@ -148,11 +149,13 @@ error alert. Importing shows a glass progress card.
 
 ## Detail screens
 
-- Album: close action, large artwork with title, artist and year, then
-  `Play`, `Shuffle`, favorite and download (when the source supports it), then
-  the track list as `TrackRow`s.
-- Artist: close action, avatar, name, `Start radio`, top tracks, then the
-  releases carousel and the full release list.
+- Album: close action, a 108 pt sleeve beside the title, artist, a technical
+  year and track count, then `Play` and `Shuffle` in the playlist control
+  style, then the track list as `TrackRow`s. Shuffle starts on a random track
+  and pins it. An album has no favorite or download of its own in this app, so
+  none is shown.
+- Artist: close action, avatar beside the name, a technical count of what the
+  catalog returned, `Start radio`, top tracks, then every release as a row.
 - Playlist: header with title, count and duration, transport actions, then the
   rows with reorder, remove and play-next, plus rename, duplicate, export and
   delete in the toolbar.
@@ -177,13 +180,24 @@ never an empty result before a request has finished.
 6. Failed: error text with Retry, never "no results".
 7. Disabled catalog: one explanatory state with a link to Settings.
 
+## Sources (blocked)
+
+The multi-source screens are specified but not built: the app has a track
+`provider`, a source resolver and a source link store, but no provider
+registry, source search, selection or resolution service to drive a source
+list, a priority order, a source filter or a per-track variant list. The
+screens will be added to Settings (enable, drag order, one status word per
+source), Search (filter chips) and the player (an "Other sources" sheet) once
+those services exist. Nothing is faked in the meantime.
+
 ## Full player
 
 Sheet with a dismiss chevron and a dot-matrix `Now Playing` label, one column,
 top to bottom:
 
-1. Artwork, square, at most 360 pt wide, `albumRadius`, hairline and shadow;
-   scaled down on short screens rather than shrinking the controls.
+1. Artwork, square, `albumRadius`, hairline and shadow. Its width is 360 pt,
+   or 264 pt when `PlayerLayout` sees a short or narrow screen, so the controls
+   keep their size instead of scrolling away.
 2. Title (hero), artist, album as a technical label, favorite on the trailing
    edge.
 3. One source/quality line: format chips through `QualityBadgeLabel`, the
