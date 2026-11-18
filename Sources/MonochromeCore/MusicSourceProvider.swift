@@ -52,6 +52,7 @@ extension AudioQuality {
         case .dolbyAtmos: 3
         case .high: 2
         case .low: 1
+        case .lossy: 1
         }
     }
 }

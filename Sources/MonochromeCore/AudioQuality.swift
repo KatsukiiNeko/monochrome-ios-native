@@ -7,6 +7,7 @@ public enum AudioQuality: String, Codable, Sendable, CaseIterable {
     case hiResLossless = "HI_RES_LOSSLESS"
     case high = "HIGH"
     case low = "LOW"
+    case lossy = "LOSSY"
     case dolbyAtmos = "DOLBY_ATMOS"
 
     /// Spoken form for VoiceOver, e.g. "Lossless, FLAC".
@@ -16,6 +17,7 @@ public enum AudioQuality: String, Codable, Sendable, CaseIterable {
         case .hiResLossless: "High-resolution lossless"
         case .high: "High"
         case .low: "Low"
+        case .lossy: "Lossy"
         case .dolbyAtmos: "Dolby Atmos"
         }
     }
@@ -77,7 +79,7 @@ public enum AudioBadge {
         switch quality {
         case .lossless: "FLAC"
         case .hiResLossless: "HD FLAC"
-        case .high, .low: "AAC"
+        case .high, .low, .lossy: "AAC"
         case .dolbyAtmos: "Atmos"
         case nil: nil
         }
