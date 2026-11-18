@@ -573,7 +573,9 @@ public final class PlayerController {
                 url: url,
                 contentType: contentType
             )
-            if let preflight, !url.isFileURL {
+            // Only the catalog stream measured here is preflighted; a podcast or
+            // radio URL may be a live chunked stream without a length.
+            if let preflight, !url.isFileURL, track.provider == MusicSourceID.monochrome.rawValue {
                 let result = await preflight.waitUntilReady(
                     url: url,
                     isCancelled: { attemptCancellation.isCancelled }

@@ -276,6 +276,26 @@ struct PlayerControllerTests {
         #expect(await preflight.requestCount() == 0)
     }
 
+    @Test func aPodcastSkipsThePreflight() async {
+        let engine = FakeEngine()
+        let preflight = FakePreflight()
+        var podcast = streamTrack("episode-1")
+        podcast.provider = MusicSourceID.podcast.rawValue
+        let controller = PlayerController(
+            engine: engine,
+            resolver: StreamResolver(),
+            cache: FakeCache(),
+            downloads: FakeDownloads(),
+            preflight: preflight
+        )
+
+        await controller.play(tracks: [podcast], startingAt: 0)
+
+        #expect(controller.state == .playing)
+        #expect(await preflight.requestCount() == 0)
+        #expect(engine.loadedURLs.count == 1)
+    }
+
     @Test func aColdStreamFailsOnceThenRetriesFresh() async {
         let engine = FakeEngine()
         let preflight = FakePreflight(
