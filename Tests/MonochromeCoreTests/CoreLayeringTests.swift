@@ -5,7 +5,7 @@ import Testing
 @Suite("Core layering")
 struct CoreLayeringTests {
     /// Observation is allowed because PlayerController is observable in core.
-    private static let allowedImports: Set<String> = ["Foundation", "FoundationNetworking", "Observation"]
+    private static let allowedImports: Set<String> = ["Foundation", "FoundationNetworking", "FoundationXML", "Observation"]
 
     @Test func coreImportsOnlyPortableModules() throws {
         let root = URL(filePath: #filePath)

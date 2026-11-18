@@ -1,0 +1,33 @@
+{
+  "resultCount": 3,
+  "results": [
+    {
+      "wrapperType": "track",
+      "kind": "podcast",
+      "artistId": 125443881,
+      "collectionId": 121493675,
+      "artistName": "NPR",
+      "collectionName": "NPR News Now",
+      "trackName": "NPR News Now",
+      "feedUrl": "https://feeds.npr.org/500005/podcast.xml",
+      "artworkUrl600": "https://media.npr.org/assets/img/2023/01/24/npr-news-now_tile_sq.jpg",
+      "primaryGenreName": "News",
+      "trackCount": 1000
+    },
+    {
+      "wrapperType": "track",
+      "kind": "song",
+      "collectionId": 99,
+      "artistName": "A Band",
+      "collectionName": "An Album",
+      "trackName": "A Song"
+    },
+    {
+      "wrapperType": "track",
+      "kind": "podcast",
+      "collectionId": 4242,
+      "artistName": "No Feed Show",
+      "collectionName": "No Feed"
+    }
+  ]
+}

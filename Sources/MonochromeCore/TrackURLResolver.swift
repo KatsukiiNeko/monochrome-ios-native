@@ -47,10 +47,19 @@ public actor DefaultTrackResolver: TrackURLResolver {
     public static let streamContentType = "audio/flac"
 
     public func contentType(for track: Track) async -> String? {
-        track.isStreaming ? Self.streamContentType : nil
+        // Only the catalog serves FLAC; the player sniffs podcast files.
+        track.isStreaming && track.source == .monochrome ? Self.streamContentType : nil
     }
 
     public func url(for track: Track) async throws -> URL {
+        if track.provider == PodcastEpisode.provider {
+            guard let streamID = track.streamID,
+                  let url = URL(string: streamID),
+                  url.scheme?.lowercased() == "https" else {
+                throw TrackResolutionError.notStreamable(track.title)
+            }
+            return url
+        }
         if track.isStreaming {
             guard let client, let streamURL = await client.streamURL(for: track) else {
                 throw TrackResolutionError.notStreamable(track.title)

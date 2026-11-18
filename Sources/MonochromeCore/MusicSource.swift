@@ -16,11 +16,14 @@ public struct SourceCapabilities: OptionSet, Sendable, Equatable {
 public enum MusicSourceID: String, Codable, CaseIterable, Sendable, Equatable {
     case monochrome
     case youTubeMusic
+    /// Episodes stream from the feed's own audio URL; the app stores no copy.
+    case podcast
 
     public var displayName: String {
         switch self {
         case .monochrome: "Monochrome (HiFi)"
         case .youTubeMusic: "YouTube Music (companion server)"
+        case .podcast: "Podcasts"
         }
     }
 
@@ -32,6 +35,8 @@ public enum MusicSourceID: String, Codable, CaseIterable, Sendable, Equatable {
             [.search, .stream, .downloads]
         case .youTubeMusic:
             [.search, .stream]
+        case .podcast:
+            [.stream]
         }
     }
 
