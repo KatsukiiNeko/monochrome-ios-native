@@ -16,31 +16,14 @@ struct ReleaseDetailView: View {
         NavigationStack {
             List {
                 Section {
-                    HStack(spacing: 16) {
-                        TrackArtwork(
-                            track: Track(
-                                title: release.title,
-                                artist: release.artist,
-                                artworkURL: release.artworkURL
-                            ),
-                            cornerRadius: 10
-                        )
-                        .frame(width: 96, height: 96)
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(release.title)
-                                .font(.headline)
-                            Text(release.artist)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            if let count = release.trackCount {
-                                Text("\(count) tracks")
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                    }
-                    .padding(.vertical, 4)
+                    header
+                        .listRowInsets(EdgeInsets(
+                            top: 8,
+                            leading: Theme.screenPadding,
+                            bottom: 12,
+                            trailing: Theme.screenPadding
+                        ))
+                        .listRowBackground(Color.clear)
                 }
 
                 Section {
@@ -65,6 +48,9 @@ struct ReleaseDetailView: View {
                 }
             }
             .listStyle(.plain)
+            .listRowSeparatorTint(Theme.separator)
+            .scrollContentBackground(.hidden)
+            .background(Theme.background)
             .overlay { stateOverlay }
             .navigationTitle(release.title)
             .navigationBarTitleDisplayMode(.inline)
@@ -75,6 +61,93 @@ struct ReleaseDetailView: View {
                 }
             }
             .task { await load() }
+        }
+    }
+
+    private var shownRelease: RemoteRelease { detail?.release ?? release }
+
+    /// The first four digits of a catalog date, when the host sends one.
+    private var yearLabel: String? {
+        guard let date = shownRelease.releaseDate,
+              date.count >= 4,
+              date.prefix(4).allSatisfy(\.isNumber) else { return nil }
+        return String(date.prefix(4))
+    }
+
+    private var summary: String {
+        var parts: [String] = []
+        if let yearLabel { parts.append(yearLabel) }
+        if let count = shownRelease.trackCount {
+            parts.append(count == 1 ? "1 TRACK" : "\(count) TRACKS")
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 14) {
+                TrackArtwork(
+                    track: Track(
+                        title: shownRelease.title,
+                        artist: shownRelease.artist,
+                        artworkURL: shownRelease.artworkURL
+                    ),
+                    cornerRadius: Theme.albumRadius
+                )
+                .frame(width: 108, height: 108)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(shownRelease.title)
+                        .font(Theme.sectionTitle)
+                        .foregroundStyle(Theme.primaryText)
+                        .lineLimit(2)
+                        .accessibilityAddTraits(.isHeader)
+                    Text(shownRelease.artist)
+                        .font(Theme.rowSubtitle)
+                        .foregroundStyle(Theme.secondaryText)
+                        .lineLimit(1)
+                    if !summary.isEmpty {
+                        TechnicalLabel(text: summary)
+                    }
+                }
+            }
+
+            HStack(spacing: 10) {
+                Button {
+                    Task { await play(shuffled: false) }
+                } label: {
+                    Label("Play", systemImage: "play.fill")
+                        .font(Theme.listRowTitle)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Theme.primaryAction)
+                .foregroundStyle(Theme.onPrimaryAction)
+                .disabled(!hasTracks)
+                .accessibilityHint("Plays this album in order")
+
+                Button {
+                    Task { await play(shuffled: true) }
+                } label: {
+                    Label("Shuffle", systemImage: "shuffle")
+                        .font(Theme.listRowTitle)
+                }
+                .glassControlStyle()
+                .disabled(!hasTracks)
+                .accessibilityHint("Plays this album in a random order")
+            }
+        }
+    }
+
+    private var hasTracks: Bool { !(detail?.tracks.isEmpty ?? true) }
+
+    /// Shuffle starts on a random track and pins it, so the first song is not
+    /// always track one.
+    private func play(shuffled: Bool) async {
+        guard let detail, !detail.tracks.isEmpty else { return }
+        let index = shuffled ? Int.random(in: 0..<detail.tracks.count) : 0
+        await model.play(detail.tracks[index], in: detail.tracks)
+        if shuffled, !model.player.isShuffled {
+            model.player.toggleShuffle()
         }
     }
 
