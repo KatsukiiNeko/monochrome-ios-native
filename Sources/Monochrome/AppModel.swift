@@ -40,6 +40,7 @@ final class AppModel {
     private let historyStore: HistoryStore
     private let searchHistoryStore: HistoryStore
     private let resolver: DefaultTrackResolver
+    private let sessionStore: PlaybackSessionStore
     private let streamingSettings: StreamingSettings
     private let appearanceSettings: AppearanceSettings
     private let accentSettings: AccentSettings
@@ -48,7 +49,25 @@ final class AppModel {
     /// One caching transport for every catalog call, so a recreated client keeps the cache.
     private let catalogHTTP: CachedHTTPClient
     private let mediaDirectory: URL
+
+    public var sourceProviders: [any MusicSourceProvider] {
+        [
+            MonochromeSourceProvider(clientProvider: { self.streamingClient }),
+            LocalFileSourceProvider(directory: mediaDirectory),
+        ]
+    }
+
+    public var providerRegistry: ProviderRegistry {
+        ProviderRegistry(
+            providers: sourceProviders,
+            fileURL: mediaDirectory.deletingLastPathComponent().appendingPathComponent("providers.json"),
+            log: { message in playerLog.notice("\(message, privacy: .public)") }
+        )
+    }
     private let audioSession: AudioSessionController
+    #if canImport(Network)
+    private let networkMonitor = NetworkMonitor()
+    #endif
     private let nowPlaying: NowPlayingController
     private let artworkTints = ArtworkTintStore()
     /// Cache cleanup is launch-only; import/delete reloads must not touch a download.
@@ -104,17 +123,28 @@ final class AppModel {
             downloader: URLSessionFileDownloader(allowsCellular: { true }),
             log: { message in playerLog.notice("\(message, privacy: .public)") }
         )
+        let sessionStore = PlaybackSessionStore(
+            fileURL: base.appendingPathComponent("playback-session.json")
+        )
         let player = PlayerController(
             engine: AVPlayerEngine(),
             resolver: resolver,
             cache: cache,
             downloads: downloadStore,
+            sessionStore: sessionStore,
             preflight: StreamPreflight(
                 http: URLSessionHTTPClient(timeout: 6),
                 userAgent: TracksAPIClient.userAgent
             )
         )
         player.log = { message in playbackLog.notice("\(message, privacy: .public)") }
+        player.onPastHalfway = { [weak self] track in
+            guard let self else { return }
+            #if canImport(Network)
+            guard self.networkMonitor.isUnmeteredWiFi else { return }
+            #endif
+            Task { await self.prepareNextTrack(track) }
+        }
         let lyricsDirectory = cacheDirectory
             .deletingLastPathComponent()
             .appendingPathComponent("Lyrics", isDirectory: true)
@@ -154,6 +184,7 @@ final class AppModel {
         self.downloadStore = downloadStore
         self.lyricsService = lyricsService
         self.resolver = resolver
+        self.sessionStore = sessionStore
         self.streamingSettings = settings
         self.appearanceSettings = appearanceSettings
         self.accentSettings = accentSettings
@@ -183,11 +214,31 @@ final class AppModel {
         }
         applyStreamingSettings()
         equalizer.activate()
+        if let session = sessionStore.load() {
+            Task { await player.restoreSession(session) }
+        }
         // One source of truth: every track the player actually starts lands in history.
         player.onTrackStarted = { [weak self] track in
             self?.record(track)
             guard let self, self.accentPreference == .artwork else { return }
             Task { await self.refreshArtworkAccent() }
+        }
+    }
+
+    func prepareNextTrack(_ track: Track) async {
+        guard track.isStreaming else { return }
+        do {
+            let source = try await resolver.playbackSource(for: track)
+            await cache.store(
+                track,
+                quality: source.quality ?? track.audioQuality,
+                url: source.url,
+                contentType: source.contentType,
+                format: nil,
+                duration: track.durationSeconds
+            )
+        } catch {
+            // Preparation is best-effort; failures are silent.
         }
     }
 

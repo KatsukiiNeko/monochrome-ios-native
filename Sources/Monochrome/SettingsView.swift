@@ -12,11 +12,13 @@ struct SettingsView: View {
     @State private var clearedCache = false
     @State private var isConfirmingEndpointReset = false
     @State private var isConfirmingTasteReset = false
+    @AppStorage("preferLossless") private var preferLossless = true
 
     var body: some View {
         List {
             appearanceSection
             streamingSection
+            sourcesSection
             cacheSection
             downloadsSection
             recommendationsSection
@@ -210,6 +212,52 @@ struct SettingsView: View {
     }
 
     // MARK: - Cache
+
+    private var sourcesSection: some View {
+        Section {
+            ForEach(model.providerRegistry.all(), id: \.id) { entry in
+                HStack(spacing: 10) {
+                    Toggle(isOn: Binding(
+                        get: { entry.enabled },
+                        set: { model.providerRegistry.setEnabled(entry.id, enabled: $0) }
+                    )) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(model.sourceProviders.first { $0.id == entry.id }?.displayName ?? entry.id)
+                                .font(Theme.listRowTitle)
+                                .foregroundStyle(Theme.primaryText)
+                            Text(status(for: entry))
+                                .font(Theme.caption)
+                                .foregroundStyle(Theme.secondaryText)
+                        }
+                    }
+                    .tint(accent)
+                }
+            }
+            .onMove { from, to in
+                // Move by index in the persisted list.
+                if let first = from.first {
+                    model.providerRegistry.move(from: first, to: to)
+                }
+            }
+            Toggle("Prefer lossless version", isOn: $preferLossless)
+                .font(Theme.listRowTitle)
+                .tint(accent)
+        } header: {
+            TechnicalSectionHeader(title: "Sources")
+        } footer: {
+            Text("Drag to reorder. A provider that is off takes no part in search.")
+                .font(Theme.caption)
+                .foregroundStyle(Theme.secondaryText)
+        }
+    }
+
+    private func status(for entry: ProviderRegistryEntry) -> String {
+        guard entry.enabled else { return "Off" }
+        if entry.id == MusicSourceID.monochrome.rawValue, !model.isStreamingConfigured {
+            return "Needs setup"
+        }
+        return "Ready"
+    }
 
     private var cacheSection: some View {
         Section {
