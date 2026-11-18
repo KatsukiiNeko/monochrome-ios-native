@@ -193,7 +193,7 @@ struct ArtistDetailView: View {
         NavigationStack {
             List {
                 Section {
-                    HStack(spacing: 16) {
+                    HStack(spacing: 14) {
                         AsyncImage(url: artist.avatarURL) { phase in
                             if let image = phase.image {
                                 image.resizable().scaledToFill()
@@ -201,19 +201,36 @@ struct ArtistDetailView: View {
                                 Circle().fill(Theme.elevated)
                             }
                         }
-                        .frame(width: 88, height: 88)
+                        .frame(width: 96, height: 96)
                         .clipShape(Circle())
 
-                        Text(artist.name)
-                            .font(.title3.weight(.semibold))
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(artist.name)
+                                .font(Theme.sectionTitle)
+                                .foregroundStyle(Theme.primaryText)
+                                .lineLimit(2)
+                                .accessibilityAddTraits(.isHeader)
+                            if let summary {
+                                TechnicalLabel(text: summary)
+                            }
+                        }
                     }
-                    .padding(.vertical, 4)
+                    .listRowInsets(EdgeInsets(
+                        top: 8,
+                        leading: Theme.screenPadding,
+                        bottom: 12,
+                        trailing: Theme.screenPadding
+                    ))
+                    .listRowBackground(Color.clear)
 
-                    Button("Start radio", systemImage: "dot.radiowaves.left.and.right") {
+                    Button {
                         radio.start(.artist(artist.name))
+                    } label: {
+                        Label("Start radio", systemImage: "dot.radiowaves.left.and.right")
+                            .font(Theme.listRowTitle)
                     }
-                    .font(Theme.technical)
-                    .foregroundStyle(Theme.primaryText)
+                    .glassControlStyle()
+                    .accessibilityHint("Plays a station built from this artist")
                 }
 
                 if let detail {
@@ -257,22 +274,23 @@ struct ArtistDetailView: View {
                                                 artist: release.artist,
                                                 artworkURL: release.artworkURL
                                             ),
-                                            cornerRadius: 6
+                                            cornerRadius: Theme.tileRadius
                                         )
                                         .frame(width: 48, height: 48)
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text(release.title)
-                                                .font(.subheadline)
+                                                .font(Theme.rowTitle)
+                                                .foregroundStyle(Theme.primaryText)
                                                 .lineLimit(1)
                                             Text(release.artist)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
+                                                .font(Theme.rowSubtitle)
+                                                .foregroundStyle(Theme.secondaryText)
                                                 .lineLimit(1)
                                         }
                                         Spacer()
                                         Image(systemName: "chevron.right")
-                                            .font(.caption)
-                                            .foregroundStyle(.tertiary)
+                                            .font(Theme.caption)
+                                            .foregroundStyle(Theme.tertiaryText)
                                     }
                                     .contentShape(Rectangle())
                                 }
@@ -288,6 +306,9 @@ struct ArtistDetailView: View {
                 }
             }
             .listStyle(.plain)
+            .listRowSeparatorTint(Theme.separator)
+            .scrollContentBackground(.hidden)
+            .background(Theme.background)
             .overlay { stateOverlay }
             .navigationTitle(artist.name)
             .navigationBarTitleDisplayMode(.inline)
@@ -302,6 +323,21 @@ struct ArtistDetailView: View {
                 ReleaseDetailView(model: model, release: release)
             }
         }
+    }
+
+    /// What the loaded catalog knows about the artist.
+    private var summary: String? {
+        guard let detail else { return nil }
+        var parts: [String] = []
+        if !detail.topTracks.isEmpty {
+            let count = detail.topTracks.count
+            parts.append(count == 1 ? "1 TOP TRACK" : "\(count) TOP TRACKS")
+        }
+        if !detail.releases.isEmpty {
+            let count = detail.releases.count
+            parts.append(count == 1 ? "1 RELEASE" : "\(count) RELEASES")
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     @ViewBuilder
