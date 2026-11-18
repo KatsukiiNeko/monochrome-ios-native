@@ -61,7 +61,7 @@ struct Scrubber: View {
                         }
                 )
             }
-            .frame(height: 24)
+            .frame(height: Theme.scrubberHitTarget)
 
             HStack {
                 Text(formatDuration(displayedPosition))

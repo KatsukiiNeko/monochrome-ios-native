@@ -46,29 +46,37 @@ struct PlayerView: View {
 
             VStack(spacing: 0) {
                 topBar
-                ScrollView {
-                    VStack(spacing: 20) {
-                        artwork
-                        titleBlock
-                        audioInfoLine
-                        if case .failed(let message) = player.state {
-                            errorBlock(message)
+                GeometryReader { proxy in
+                    // A short screen gets smaller artwork; the controls keep
+                    // their size rather than shrinking or scrolling away.
+                    let artworkWidth = PlayerLayout.artworkMaxWidth(
+                        forWidth: proxy.size.width,
+                        height: proxy.size.height
+                    )
+                    ScrollView {
+                        VStack(spacing: 20) {
+                            artwork(maxWidth: artworkWidth)
+                            titleBlock
+                            audioInfoLine
+                            if case .failed(let message) = player.state {
+                                errorBlock(message)
+                            }
+                            Scrubber(
+                                position: player.position,
+                                duration: player.duration,
+                                onSeek: { player.seek(to: $0) }
+                            )
+                            if player.sleepTimerEnd != nil {
+                                sleepTimerRow
+                            }
+                            transportBlock
+                            actionRow
                         }
-                        Scrubber(
-                            position: player.position,
-                            duration: player.duration,
-                            onSeek: { player.seek(to: $0) }
-                        )
-                        if player.sleepTimerEnd != nil {
-                            sleepTimerRow
-                        }
-                        transportBlock
-                        actionRow
+                        .padding(.horizontal, Theme.screenPadding)
+                        .padding(.bottom, 24)
                     }
-                    .padding(.horizontal, Theme.screenPadding)
-                    .padding(.bottom, 24)
+                    .scrollIndicators(.hidden)
                 }
-                .scrollIndicators(.hidden)
             }
         }
         .task(id: player.currentTrack?.id) {
@@ -235,13 +243,13 @@ struct PlayerView: View {
         return "\(index + 1)/\(player.queue.tracks.count)"
     }
 
-    private var artwork: some View {
+    private func artwork(maxWidth: CGFloat) -> some View {
         TrackArtwork(
             track: player.currentTrack,
             localURL: model.artworkURL(for: player.currentTrack),
             cornerRadius: Theme.albumRadius
         )
-        .frame(maxWidth: 360)
+        .frame(maxWidth: maxWidth)
         .frame(maxWidth: .infinity)
         .overlay {
             RoundedRectangle(cornerRadius: Theme.albumRadius, style: .continuous)
