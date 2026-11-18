@@ -117,6 +117,7 @@ struct PlaylistDetailView: View {
         .listStyle(.plain)
         .listRowSeparatorTint(Theme.separator)
         .scrollContentBackground(.hidden)
+        .contentMargins(.bottom, Theme.scrollBottomPadding, for: .scrollContent)
         .overlay {
             if playlist.items.isEmpty {
                 ContentUnavailableView {

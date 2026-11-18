@@ -17,6 +17,9 @@ public enum LayoutSpec {
     public static let playerCompactHeight: CGFloat = 700
     /// A player narrower than this switches to the compact composition.
     public static let playerCompactWidth: CGFloat = 360
+    /// Extra scrollable space below the last row, so it can rise above the
+    /// mini-player. About one and a half track rows.
+    public static let scrollBottomPadding: CGFloat = 80
     /// Skeleton rows wait this long before appearing, so a fast answer never flashes.
     public static let searchSkeletonGraceMs = 150
     /// Once shown, skeleton rows stay at least this long.

@@ -50,6 +50,7 @@ struct ReleaseDetailView: View {
             .listStyle(.plain)
             .listRowSeparatorTint(Theme.separator)
             .scrollContentBackground(.hidden)
+            .contentMargins(.bottom, Theme.scrollBottomPadding, for: .scrollContent)
             .background(Theme.background)
             .overlay { stateOverlay }
             .navigationTitle(release.title)
@@ -308,6 +309,7 @@ struct ArtistDetailView: View {
             .listStyle(.plain)
             .listRowSeparatorTint(Theme.separator)
             .scrollContentBackground(.hidden)
+            .contentMargins(.bottom, Theme.scrollBottomPadding, for: .scrollContent)
             .background(Theme.background)
             .overlay { stateOverlay }
             .navigationTitle(artist.name)

@@ -75,6 +75,7 @@ struct DownloadsView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .contentMargins(.bottom, Theme.scrollBottomPadding, for: .scrollContent)
         .listRowSeparatorTint(Theme.separator)
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle("Downloads")

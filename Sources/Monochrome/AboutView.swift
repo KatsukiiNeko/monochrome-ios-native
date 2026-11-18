@@ -52,6 +52,7 @@ struct AboutView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .contentMargins(.bottom, Theme.scrollBottomPadding, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .listRowBackground(Theme.surface)
         .listRowSeparatorTint(Theme.separator)
@@ -98,6 +99,7 @@ private struct LicenseNoticeView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .contentMargins(.bottom, Theme.scrollBottomPadding, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .listRowBackground(Theme.surface)
         .listRowSeparatorTint(Theme.separator)
@@ -131,6 +133,7 @@ private struct MusicLicensingView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .contentMargins(.bottom, Theme.scrollBottomPadding, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .listRowBackground(Theme.surface)
         .listRowSeparatorTint(Theme.separator)

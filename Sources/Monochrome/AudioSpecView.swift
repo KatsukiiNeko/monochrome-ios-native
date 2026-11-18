@@ -155,6 +155,7 @@ struct AudioSpecView: View {
             }
             .listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
+        .contentMargins(.bottom, Theme.scrollBottomPadding, for: .scrollContent)
             .listRowBackground(Theme.surface)
             .listRowSeparatorTint(Theme.separator)
             .background(Theme.background.ignoresSafeArea())

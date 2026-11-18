@@ -103,6 +103,7 @@ struct QueueView: View {
                     .listStyle(.plain)
                     .listRowSeparatorTint(Theme.separator)
                     .scrollContentBackground(.hidden)
+        .contentMargins(.bottom, Theme.scrollBottomPadding, for: .scrollContent)
                     .tint(accent)
                 }
             }

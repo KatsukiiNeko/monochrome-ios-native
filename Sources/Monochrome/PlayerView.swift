@@ -73,7 +73,7 @@ struct PlayerView: View {
                             actionRow
                         }
                         .padding(.horizontal, Theme.screenPadding)
-                        .padding(.bottom, 24)
+                        .padding(.bottom, Theme.scrollBottomPadding)
                     }
                     .scrollIndicators(.hidden)
                 }

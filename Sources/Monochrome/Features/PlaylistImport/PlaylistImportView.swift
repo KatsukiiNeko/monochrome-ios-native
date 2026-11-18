@@ -37,6 +37,7 @@ struct PlaylistImportView: View {
             .listStyle(.plain)
             .listRowSeparatorTint(Theme.separator)
             .scrollContentBackground(.hidden)
+        .contentMargins(.bottom, Theme.scrollBottomPadding, for: .scrollContent)
             .background(Theme.background.ignoresSafeArea())
             .navigationTitle("Import Playlist")
             .navigationBarTitleDisplayMode(.inline)

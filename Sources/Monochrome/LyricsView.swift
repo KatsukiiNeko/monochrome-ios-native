@@ -137,6 +137,7 @@ struct LyricsView: View {
                 }
                 .padding(.horizontal, Theme.screenPadding)
                 .padding(.vertical, 24)
+                .padding(.bottom, Theme.scrollBottomPadding)
             }
             .onAppear {
                 if let active { proxy.scrollTo(active, anchor: .center) }

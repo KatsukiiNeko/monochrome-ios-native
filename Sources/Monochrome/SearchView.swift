@@ -34,7 +34,7 @@ struct SearchView: View {
                         }
                     }
                     .padding(.horizontal, Theme.screenPadding)
-                    .padding(.bottom, 24)
+                    .padding(.bottom, Theme.scrollBottomPadding)
                 }
                 .background(Theme.background)
                 .overlay { stateOverlay }

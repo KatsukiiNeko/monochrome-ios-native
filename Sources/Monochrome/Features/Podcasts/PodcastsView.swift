@@ -189,6 +189,7 @@ struct PodcastShowView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .contentMargins(.bottom, Theme.scrollBottomPadding, for: .scrollContent)
         .background(Theme.background.ignoresSafeArea())
         .navigationTitle(show.title)
         .navigationBarTitleDisplayMode(.inline)

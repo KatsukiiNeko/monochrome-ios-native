@@ -129,6 +129,7 @@ struct LibraryView: View {
                 .listStyle(.plain)
                 .listRowSeparatorTint(Theme.separator)
                 .scrollContentBackground(.hidden)
+        .contentMargins(.bottom, Theme.scrollBottomPadding, for: .scrollContent)
                 .overlay {
                     if model.isImporting {
                         ProgressView("Importing…")
@@ -338,15 +339,7 @@ struct LibraryView: View {
                 Text("Download a song from its menu to keep it available offline.")
             }
         case .local:
-            ContentUnavailableView {
-                Label("No local files", systemImage: "folder")
-            } description: {
-                Text("Import audio files from the Files app.")
-            } actions: {
-                Button("Import audio files") { isShowingImporter = true }
-                    .buttonStyle(.borderedProminent)
-                    .tint(Theme.primaryAction)
-            }
+            EmptyView()
         }
     }
 }

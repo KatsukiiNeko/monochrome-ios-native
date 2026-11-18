@@ -629,6 +629,7 @@ struct EqualizerView: View {
                 }
             }
             .scrollContentBackground(.hidden)
+        .contentMargins(.bottom, Theme.scrollBottomPadding, for: .scrollContent)
             .background(Theme.background.ignoresSafeArea())
             .navigationTitle("Save Preset")
             .navigationBarTitleDisplayMode(.inline)
