@@ -61,8 +61,10 @@ carries DNS, TLS and CDN warm-up on top of that, inside a readiness window.
 - One attempt now logs its phases: lookup, resolve, preflight, asset, ready or
   failed, plus durations, a short track hash, request counts and the error
   domain/code. No URL, title, host path or description is logged.
-- Before AVPlayer sees a remote URL, the controller sends one ranged request
-  with the app identity. If the reply is not 200 or 206 with a usable length,
+- Before AVPlayer sees a catalog URL, the controller sends one ranged request
+  with the app identity. Podcast, radio and companion-server URLs are exempt:
+  they can be live chunked streams with no length, where a range check would
+  fail a stream that plays fine. If the reply is not 200 or 206 with a usable length,
   it waits 0.4, 0.8, 1.6 and 3.2 s and asks again, at most five requests in
   eight seconds. A newer load cancels the wait. When the ladder is exhausted
   the attempt fails with the app's own sentence, and the existing single retry
@@ -77,8 +79,10 @@ still opens its own connection.
 
 ## Still unverified
 
-- No device run in this pass. The four checks in the "First play of a stream"
-  section of `DEVICE_TEST_CHECKLIST.md` need a person.
+- The build installed and verified on the connected iPhone on 2026-11-18
+  (`xtool dev run`), but nothing tapped a track afterwards. The four checks in
+  the "First play of a stream" section of `DEVICE_TEST_CHECKLIST.md` still
+  need a person.
 - The cold-start theory can only be confirmed from a device log: look for
   `preflight=... status=... requests=...` followed by
   `item ready seconds=... `. If preflight is ready on the first request and the
