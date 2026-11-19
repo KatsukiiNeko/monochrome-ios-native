@@ -132,10 +132,6 @@ public struct SourceLinkStore: Sendable {
         try save(content)
     }
 
-    public func clearAll() throws {
-        try save(Content())
-    }
-
     private func load() -> Content {
         file.read(Content.self) ?? Content()
     }

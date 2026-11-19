@@ -244,15 +244,6 @@ public enum AudioSpecFormat {
         return values.isEmpty ? nil : values.joined(separator: " / ")
     }
 
-    /// Spoken version of the summary, with the codec and sample rate expanded.
-    public static func spokenSummary(for spec: AudioSpec) -> String? {
-        var parts: [String] = []
-        if let name = AudioCodecName.displayName(for: spec.codec) { parts.append(name) }
-        if let depth = bitDepth(spec.bitDepth) { parts.append(depth) }
-        if let rate = spokenSampleRate(spec.sampleRateHz) { parts.append(rate) }
-        return parts.isEmpty ? nil : parts.joined(separator: ", ")
-    }
-
     /// Spoken version of `detail(for:)`, using the expanded sample-rate unit.
     public static func spokenDetail(for spec: AudioSpec) -> String? {
         let values = [bitDepth(spec.bitDepth), spokenSampleRate(spec.sampleRateHz)].compactMap { $0 }

@@ -437,12 +437,6 @@ public actor AudioCache: AudioCaching {
         cachedTracks().reduce(0) { $0 + $1.byteSize }
     }
 
-    /// Count and bytes in one directory scan for the Settings row.
-    public func stats() -> (count: Int, bytes: Int) {
-        let tracks = cachedTracks()
-        return (tracks.count, tracks.reduce(0) { $0 + $1.byteSize })
-    }
-
     public func entryCount() -> Int {
         cachedTracks().count
     }
@@ -541,10 +535,6 @@ public actor AudioCache: AudioCaching {
         if !running.isEmpty {
             log("cache slot released")
         }
-    }
-
-    public func purgePartials() {
-        Self.removePartials(in: directory)
     }
 
     // MARK: - Download slot

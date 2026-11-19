@@ -56,9 +56,3 @@ extension Track {
         MusicSourceID(rawValue: provider) ?? .monochrome
     }
 }
-
-public enum SourceStatus: String, Sendable, Equatable {
-    case on
-    case off
-    case needsSetup
-}

@@ -39,11 +39,6 @@ public struct NowPlayingState: Equatable, Sendable {
         self.stopReason = stopReason
         self.artworkReady = artworkReady
     }
-
-    /// Keeps the stop reason and drops the identity, so a repeated stop is a no-op.
-    public func withoutIdentity() -> NowPlayingState {
-        NowPlayingState(identity: nil, isPlaying: false, stopReason: stopReason, artworkReady: false)
-    }
 }
 
 public enum NowPlayingAction: Equatable, Sendable {
