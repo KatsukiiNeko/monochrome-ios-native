@@ -15,7 +15,7 @@ struct ContentView: View {
     @State private var isShowingSettings = false
 
     init() {
-        let model = AppModel()
+        let model = AppModel.shared
         let playlists = PlaylistModel()
         _model = State(initialValue: model)
         _playlists = State(initialValue: playlists)

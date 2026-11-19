@@ -7,6 +7,11 @@ import Observation
 @MainActor
 @Observable
 final class AppModel {
+    /// SwiftUI can build `ContentView` more than once, and its initializer creates
+    /// this type eagerly. The model owns the only player, audio session and
+    /// now-playing integration, so it exists once per process.
+    static let shared = AppModel()
+
     private(set) var tracks: [Track] = []
     private(set) var favorites: [Track] = []
     private(set) var recents: [Track] = []

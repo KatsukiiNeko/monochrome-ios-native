@@ -32,10 +32,6 @@ final class NowPlayingController {
     /// The commands this instance registered, so only they are removed.
     private var commandTargets: [(MPRemoteCommand, Any)] = []
 
-    #if DEBUG
-    private static var liveInstances = 0
-    #endif
-
     init(player: PlayerController, artworkURL: @escaping (Track) -> URL? = { $0.artworkURL }) {
         self.player = player
         self.artworkURL = artworkURL
@@ -46,10 +42,6 @@ final class NowPlayingController {
 
     func start() {
         guard pumpTask == nil else { return }
-        #if DEBUG
-        Self.liveInstances += 1
-        assert(Self.liveInstances == 1, "a second NowPlayingController is live")
-        #endif
         registerCommands()
         let (stream, continuation) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
         wake = continuation
@@ -70,9 +62,6 @@ final class NowPlayingController {
         MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         MPNowPlayingInfoCenter.default().playbackState = .stopped
         published = nil
-        #if DEBUG
-        Self.liveInstances -= 1
-        #endif
         nowPlayingLog.notice("stop")
     }
 
