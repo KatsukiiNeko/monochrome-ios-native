@@ -89,3 +89,50 @@ still opens its own connection.
   item still fails, H1 is wrong and the next suspect is the AVFoundation
   request itself (H3/H4), which would need the asset-level user agent and its
   own measured run.
+
+## Follow-up: 2026-11-19, the probe was the failure
+
+Symptom on the owner's device: the first tap sometimes showed
+`The stream did not answer. Check the connection, then retry.`, and a manual
+Retry usually played the same track. Recovery was random, not a warm-up
+pattern.
+
+Measurement from the build host on the same day, five sequential ranged
+`bytes=0-1` requests for one track, one second apart, on a connection where
+`example.com` answered in 0.10-0.14 s:
+
+| Attempt | Status | Time to first byte |
+|---|---|---|
+| 1 | 206 | 8.50 s |
+| 2 | 206 | 13.02 s |
+| 3 | 206 | 2.72 s |
+| 4 | 206 | 9.80 s |
+| 5 | 206 | 1.96 s |
+
+Every response was a correct `206` with `bytes 0-1/40572194`; only the timing
+varied. `cf-cache-status: DYNAMIC` and 1.8-7.1 s for the search endpoint show
+the origin, not the client network, is the slow part, and repeats do not warm
+it.
+
+The probe used `request.timeoutInterval = 4`, so attempts 1, 2 and 4 were
+discarded as failures, and the 8 s budget stopped the ladder after roughly two
+timeouts. A healthy stream therefore failed whenever the origin was slower than
+four seconds, and succeeded only by luck, which is exactly the reported
+behaviour. The single automatic retry re-ran the same probe and failed the same
+way, so it never rescued the tap.
+
+What changed:
+
+- The probe is no longer a gate. A catalog load goes straight to the player on
+  the first attempt; the probe runs only before a retry, where it warms DNS and
+  the edge, and its result is logged rather than thrown.
+- `StreamPreflight.requestTimeout` is 10 s, matching the measured spread; the
+  8 s policy budget still bounds the retry probe.
+- `StreamStartError` is gone. The only remaining message for a stream that will
+  not start is the player's own.
+
+Host tests cover the new contract: a cold probe result does not block the first
+load, and a retry warms the stream once before loading again.
+
+Still unverified: none of this was observed on a device. The next device log
+should show no `preflight=` line on a successful first tap and one on a retry.

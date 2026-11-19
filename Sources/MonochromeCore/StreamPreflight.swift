@@ -33,16 +33,6 @@ public struct PreflightPolicy: Sendable, Equatable {
     }
 }
 
-/// Why a stream never reached the player. The text is the app's own, so the
-/// listener never sees a framework description such as "Resource Unavailable".
-public enum StreamStartError: LocalizedError, Equatable {
-    case notReady(lastStatus: Int?)
-
-    public var errorDescription: String? {
-        "The stream did not answer. Check the connection, then retry."
-    }
-}
-
 /// A flag a request loop can read from any thread; a newer load cancels an
 /// older preflight so a skipped tap does not keep sending requests.
 public final class AttemptCancellation: @unchecked Sendable {
@@ -87,7 +77,9 @@ public protocol StreamPreflighting: Sendable {
 /// answers like a progressive file: 200 or 206 with a usable length.
 public struct StreamPreflight: StreamPreflighting {
     public static let rangeHeader = "bytes=0-1"
-    public static let requestTimeout: TimeInterval = 4
+    /// The origin answers a cold ranged request in 2-13 s (measured 2026-11-19),
+    /// so a shorter timeout would cut off a healthy warm-up.
+    public static let requestTimeout: TimeInterval = 10
 
     private let http: any HTTPClient
     private let userAgent: String

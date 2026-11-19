@@ -711,9 +711,11 @@ public final class PlayerController {
                 url: url,
                 contentType: contentType
             )
-            // Only the catalog stream measured here is preflighted; a podcast or
-            // radio URL may be a live chunked stream without a length.
-            if let preflight, !url.isFileURL, track.provider == MusicSourceID.monochrome.rawValue {
+            // Only a catalog retry is probed: the measured origin answers a ranged
+            // request in 2-13 s, far past any probe timeout, so a cold probe says
+            // nothing about whether the player can start the item. On a retry it
+            // still warms DNS and the edge before the second attempt.
+            if let preflight, retrying, !url.isFileURL, track.provider == MusicSourceID.monochrome.rawValue {
                 let result = await preflight.waitUntilReady(
                     url: url,
                     isCancelled: { attemptCancellation.isCancelled }
@@ -721,9 +723,6 @@ public final class PlayerController {
                 attempt.countRequest("preflight", count: result.requestCount)
                 attempt.mark(.preflight, at: now(), detail: Self.preflightDetail(result))
                 guard stillOwns(token, track) else { return }
-                guard result.isReady else {
-                    throw StreamStartError.notReady(lastStatus: result.lastStatus)
-                }
             }
             attempt.countRequest("item")
             attempt.mark(.asset, at: now(), detail: "network")

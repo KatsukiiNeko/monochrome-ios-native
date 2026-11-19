@@ -15,12 +15,18 @@ private final class FakeEngine: PlaybackEngine {
     private(set) var seeks: [Double] = []
     private(set) var stopCount = 0
     var loadError: (any Error)?
+    /// The next `loadFailures` loads throw, then `loadError` repeats forever.
+    var loadFailures = 0
 
     func load(url: URL, contentType: String?, headers: [String: String], token: PlaybackToken) async throws {
         lastToken = token
         tokens.append(token)
         loadedURLs.append(url)
         contentTypes.append(contentType)
+        if loadFailures > 0 {
+            loadFailures -= 1
+            throw LoadFailure()
+        }
         if let loadError { throw loadError }
     }
 
@@ -260,7 +266,7 @@ struct PlayerControllerTests {
         #expect(controller.state == .failed("cannot decode audio"))
     }
 
-    @Test func networkPlayPreflightsTheStreamOnce() async {
+    @Test func networkPlayLoadsWithoutAProbe() async {
         let engine = FakeEngine()
         let preflight = FakePreflight()
         let controller = PlayerController(
@@ -274,7 +280,7 @@ struct PlayerControllerTests {
         await controller.play(tracks: [streamTrack("a")], startingAt: 0)
 
         #expect(controller.state == .playing)
-        #expect(await preflight.requestCount() == 1)
+        #expect(await preflight.requestCount() == 0)
         #expect(engine.loadedURLs.count == 1)
     }
 
@@ -317,7 +323,7 @@ struct PlayerControllerTests {
         #expect(engine.loadedURLs.count == 1)
     }
 
-    @Test func aColdStreamFailsOnceThenRetriesFresh() async {
+    @Test func aColdPreflightDoesNotBlockTheFirstLoad() async {
         let engine = FakeEngine()
         let preflight = FakePreflight(
             result: PreflightResult(isReady: false, requestCount: 5, elapsedMs: 7_900, lastStatus: 503)
@@ -332,10 +338,32 @@ struct PlayerControllerTests {
 
         await controller.play(tracks: [streamTrack("a")], startingAt: 0)
 
-        // One fresh attempt after the first failure, and the engine never saw the URL.
-        #expect(await preflight.requestCount() == 2)
-        #expect(engine.loadedURLs.isEmpty)
-        #expect(controller.state == .failed("The stream did not answer. Check the connection, then retry."))
+        #expect(controller.state == .playing)
+        #expect(engine.loadedURLs.count == 1)
+        #expect(await preflight.requestCount() == 0)
+    }
+
+    @Test func aRetryWarmsTheStreamBeforeLoadingAgain() async {
+        let engine = FakeEngine()
+        engine.loadFailures = 1
+        let preflight = FakePreflight(
+            result: PreflightResult(isReady: false, requestCount: 1, elapsedMs: 9_800, lastStatus: nil)
+        )
+        let controller = PlayerController(
+            engine: engine,
+            resolver: StreamResolver(),
+            cache: FakeCache(),
+            downloads: FakeDownloads(),
+            preflight: preflight
+        )
+
+        await controller.play(tracks: [streamTrack("a")], startingAt: 0)
+
+        // The retry warms the stream once, and a cold probe result still lets
+        // the second load play.
+        #expect(controller.state == .playing)
+        #expect(engine.loadedURLs.count == 2)
+        #expect(await preflight.requestCount() == 1)
     }
 
     @Test func playLoadsAndStartsSelectedTrack() async {
