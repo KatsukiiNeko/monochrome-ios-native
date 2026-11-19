@@ -55,7 +55,8 @@ private func makeFLAC(
         blocks[last][0] |= 0x80
     }
 
-    return Data("fLaC".utf8) + blocks.joined() + frames
+    let blockBytes = blocks.reduce(into: Data()) { $0.append($1) }
+    return Data("fLaC".utf8) + blockBytes + frames
 }
 
 private func temporaryFLAC(_ data: Data) throws -> URL {
