@@ -9,11 +9,18 @@ private final class TestClock: @unchecked Sendable {
 
 @MainActor
 private final class QuietEngine: PlaybackEngine {
-    var onEvent: ((PlaybackEvent) -> Void)?
+    var onEvent: ((PlaybackEngineEvent) -> Void)?
     private(set) var loadedURLs: [URL] = []
+    private(set) var lastToken: PlaybackToken?
 
-    func load(url: URL, contentType: String?, headers: [String: String]) async throws {
+    func load(url: URL, contentType: String?, headers: [String: String], token: PlaybackToken) async throws {
+        lastToken = token
         loadedURLs.append(url)
+    }
+
+    func emit(_ event: PlaybackEvent) {
+        guard let lastToken else { return }
+        onEvent?(PlaybackEngineEvent(token: lastToken, event: event))
     }
 
     func play() {}
@@ -68,14 +75,15 @@ struct PlayerCacheSkipTests {
     @Test func skippingWithinTenSecondsCancelsTheDownload() async {
         let clock = TestClock()
         let cache = RecordingCache()
+        let engine = QuietEngine()
         let controller = PlayerController(
-            engine: QuietEngine(),
+            engine: engine,
             resolver: FixedResolver(),
             cache: cache,
             now: { clock.now }
         )
         await controller.play(tracks: [streamTrack("1"), streamTrack("2")], startingAt: 0)
-        await controller.handle(.ready(duration: 100, format: AudioFormat(codec: "flac")))
+        engine.emit(.ready(duration: 100, format: AudioFormat(codec: "flac")))
         try? await Task.sleep(for: .milliseconds(20))
 
         clock.now += 5
@@ -90,14 +98,15 @@ struct PlayerCacheSkipTests {
     @Test func skippingAfterTenSecondsLetsTheDownloadFinish() async {
         let clock = TestClock()
         let cache = RecordingCache()
+        let engine = QuietEngine()
         let controller = PlayerController(
-            engine: QuietEngine(),
+            engine: engine,
             resolver: FixedResolver(),
             cache: cache,
             now: { clock.now }
         )
         await controller.play(tracks: [streamTrack("1"), streamTrack("2")], startingAt: 0)
-        await controller.handle(.ready(duration: 100, format: AudioFormat(codec: "flac")))
+        engine.emit(.ready(duration: 100, format: AudioFormat(codec: "flac")))
         try? await Task.sleep(for: .milliseconds(20))
 
         clock.now += 11
@@ -110,16 +119,17 @@ struct PlayerCacheSkipTests {
 
     @Test func twoSequentialStreamsBothStartAStore() async {
         let cache = RecordingCache()
+        let engine = QuietEngine()
         let controller = PlayerController(
-            engine: QuietEngine(),
+            engine: engine,
             resolver: FixedResolver(),
             cache: cache
         )
         await controller.play(tracks: [streamTrack("1"), streamTrack("2")], startingAt: 0)
-        await controller.handle(.ready(duration: 100, format: AudioFormat(codec: "flac")))
+        engine.emit(.ready(duration: 100, format: AudioFormat(codec: "flac")))
         try? await Task.sleep(for: .milliseconds(20))
         await controller.next()
-        await controller.handle(.ready(duration: 90, format: AudioFormat(codec: "flac")))
+        engine.emit(.ready(duration: 90, format: AudioFormat(codec: "flac")))
         try? await Task.sleep(for: .milliseconds(20))
 
         let stored = await cache.storedIDs

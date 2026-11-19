@@ -49,10 +49,10 @@ private actor GatedResolver: TrackURLResolver {
 
 @MainActor
 private final class RecordingEngine: PlaybackEngine {
-    var onEvent: ((PlaybackEvent) -> Void)?
+    var onEvent: ((PlaybackEngineEvent) -> Void)?
     private(set) var loadedURLs: [URL] = []
 
-    func load(url: URL, contentType: String?, headers: [String: String]) async throws {
+    func load(url: URL, contentType: String?, headers: [String: String], token: PlaybackToken) async throws {
         loadedURLs.append(url)
     }
 

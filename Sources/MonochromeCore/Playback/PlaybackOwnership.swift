@@ -55,6 +55,11 @@ public struct PlaybackLoadArbiter: Sendable {
     public func owns(_ token: PlaybackToken) -> Bool {
         token.value == newest
     }
+
+    /// A stop kills every load in flight; a waiting load then throws superseded.
+    public mutating func invalidateAll() {
+        newest &+= 1
+    }
 }
 
 /// Not a failure: a newer attempt owns playback, so this one must say nothing.

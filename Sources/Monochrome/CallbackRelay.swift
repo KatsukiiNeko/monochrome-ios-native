@@ -8,7 +8,13 @@ final class CallbackRelay<Value: Sendable>: @unchecked Sendable {
     var handler: ((Value) -> Void)?
 
     func send(_ value: Value) {
-        Task { @MainActor in handler?(value) }
+        // Main-queue framework callbacks are delivered in order; hopping through
+        // a task would let a later event overtake an earlier one.
+        if Thread.isMainThread {
+            MainActor.assumeIsolated { handler?(value) }
+        } else {
+            Task { @MainActor in handler?(value) }
+        }
     }
 }
 #endif

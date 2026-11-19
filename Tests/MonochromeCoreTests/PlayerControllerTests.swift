@@ -5,8 +5,10 @@ import Testing
 
 @MainActor
 private final class FakeEngine: PlaybackEngine {
-    var onEvent: ((PlaybackEvent) -> Void)?
+    var onEvent: ((PlaybackEngineEvent) -> Void)?
     private(set) var loadedURLs: [URL] = []
+    private(set) var lastToken: PlaybackToken?
+    private(set) var tokens: [PlaybackToken] = []
     private(set) var contentTypes: [String?] = []
     private(set) var playCount = 0
     private(set) var pauseCount = 0
@@ -14,10 +16,22 @@ private final class FakeEngine: PlaybackEngine {
     private(set) var stopCount = 0
     var loadError: (any Error)?
 
-    func load(url: URL, contentType: String?, headers: [String: String]) async throws {
+    func load(url: URL, contentType: String?, headers: [String: String], token: PlaybackToken) async throws {
+        lastToken = token
+        tokens.append(token)
         loadedURLs.append(url)
         contentTypes.append(contentType)
         if let loadError { throw loadError }
+    }
+
+    /// Emits an event with the token of the most recent load.
+    func emit(_ event: PlaybackEvent) {
+        guard let lastToken else { return }
+        emit(event, token: lastToken)
+    }
+
+    func emit(_ event: PlaybackEvent, token: PlaybackToken) {
+        onEvent?(PlaybackEngineEvent(token: token, event: event))
     }
 
     func play() { playCount += 1 }
@@ -402,7 +416,7 @@ struct PlayerControllerTests {
     @Test func previousRestartsTrackAfterThreeSeconds() async {
         let (controller, engine) = makeController()
         await controller.play(tracks: [track("a"), track("b")], startingAt: 1)
-        await controller.handle(.position(12))
+        engine.emit(.position(12))
 
         await controller.previous()
 
@@ -422,20 +436,22 @@ struct PlayerControllerTests {
     }
 
     @Test func finishedAdvancesToNextTrack() async {
-        let (controller, _) = makeController()
+        let (controller, engine) = makeController()
         await controller.play(tracks: [track("a"), track("b")], startingAt: 0)
 
-        await controller.handle(.finished)
+        engine.emit(.finished)
+        await controller.waitForPendingEvents()
 
         #expect(controller.currentTrack?.id == "b")
         #expect(controller.state == .playing)
     }
 
     @Test func finishedAtEndGoesIdle() async {
-        let (controller, _) = makeController()
+        let (controller, engine) = makeController()
         await controller.play(tracks: [track("a")], startingAt: 0)
 
-        await controller.handle(.finished)
+        engine.emit(.finished)
+        await controller.waitForPendingEvents()
 
         #expect(controller.state == .idle)
         #expect(controller.position == 0)
@@ -454,11 +470,11 @@ struct PlayerControllerTests {
     }
 
     @Test func engineDurationFillsInMissingTag() async {
-        let (controller, _) = makeController()
+        let (controller, engine) = makeController()
         await controller.play(tracks: [track("a")], startingAt: 0)
         #expect(controller.duration == 0)
 
-        await controller.handle(.ready(duration: 42, format: nil))
+        engine.emit(.ready(duration: 42, format: nil))
 
         #expect(controller.duration == 42)
     }
@@ -494,13 +510,14 @@ struct PlayerControllerTests {
     }
 
     @Test func positionAndFailureEventsUpdateState() async {
-        let (controller, _) = makeController()
+        let (controller, engine) = makeController()
         await controller.play(tracks: [track("a", duration: 50)], startingAt: 0)
 
-        await controller.handle(.position(17.5))
+        engine.emit(.position(17.5))
         #expect(controller.position == 17.5)
 
-        await controller.handle(.failed("stream ended"))
+        engine.emit(.failed("stream ended"))
+        await controller.waitForPendingEvents()
         #expect(controller.state == .failed("stream ended"))
     }
 
@@ -538,7 +555,8 @@ struct PlayerControllerTests {
         let (controller, engine) = makeController()
         await controller.play(tracks: [streamTrack("42")], startingAt: 0)
 
-        await controller.handle(.failed("HTTP 403"))
+        engine.emit(.failed("HTTP 403"))
+        await controller.waitForPendingEvents()
 
         #expect(controller.state == .playing)
         #expect(engine.loadedURLs.count == 2)
@@ -573,12 +591,13 @@ struct PlayerControllerTests {
     // MARK: - Listening events
 
     @Test func finishedTrackReportsACompletedPlayEvent() async {
-        let (controller, _) = makeController()
+        let (controller, engine) = makeController()
         var events: [PlayEvent] = []
         controller.onPlayEvent = { events.append($0) }
 
         await controller.play(tracks: [track("a", duration: 100)], startingAt: 0)
-        await controller.handle(.finished)
+        engine.emit(.finished)
+        await controller.waitForPendingEvents()
 
         #expect(events.count == 1)
         #expect(events.first?.outcome == .completed)
@@ -587,12 +606,12 @@ struct PlayerControllerTests {
     }
 
     @Test func leavingATrackEarlyReportsASkippedPlayEvent() async {
-        let (controller, _) = makeController()
+        let (controller, engine) = makeController()
         var events: [PlayEvent] = []
         controller.onPlayEvent = { events.append($0) }
 
         await controller.play(tracks: [track("a", duration: 100), track("b", duration: 100)], startingAt: 0)
-        await controller.handle(.position(12))
+        engine.emit(.position(12))
         await controller.next()
 
         #expect(events.count == 1)
@@ -601,25 +620,27 @@ struct PlayerControllerTests {
     }
 
     @Test func advancingAfterTheEndDoesNotReportASkip() async {
-        let (controller, _) = makeController()
+        let (controller, engine) = makeController()
         var events: [PlayEvent] = []
         controller.onPlayEvent = { events.append($0) }
 
         await controller.play(tracks: [track("a", duration: 100), track("b", duration: 100)], startingAt: 0)
-        await controller.handle(.finished)
+        engine.emit(.finished)
+        await controller.waitForPendingEvents()
 
         #expect(events.count == 1)
         #expect(events.first?.outcome == .completed)
     }
 
     @Test func repeatOneReportsALoopedPlayEvent() async {
-        let (controller, _) = makeController()
+        let (controller, engine) = makeController()
         var events: [PlayEvent] = []
         controller.onPlayEvent = { events.append($0) }
 
         await controller.play(tracks: [track("a", duration: 100)], startingAt: 0)
         controller.setRepeatMode(.one)
-        await controller.handle(.finished)
+        engine.emit(.finished)
+        await controller.waitForPendingEvents()
 
         #expect(events.count == 1)
         #expect(events.first?.outcome == .completed)
@@ -633,7 +654,8 @@ struct PlayerControllerTests {
         await controller.play(tracks: [track("a")], startingAt: 0)
         controller.setRepeatMode(.one)
 
-        await controller.handle(.finished)
+        engine.emit(.finished)
+        await controller.waitForPendingEvents()
 
         #expect(controller.state == .playing)
         #expect(controller.position == 0)
@@ -648,7 +670,8 @@ struct PlayerControllerTests {
         await controller.play(tracks: [streamTrack("42")], startingAt: 0)
         controller.setRepeatMode(.one)
 
-        await controller.handle(.finished)
+        engine.emit(.finished)
+        await controller.waitForPendingEvents()
 
         #expect(controller.state == .playing)
         #expect(engine.loadedURLs.count == 2)
@@ -661,17 +684,19 @@ struct PlayerControllerTests {
         await controller.play(tracks: [track("a"), track("b")], startingAt: 1)
         controller.setRepeatMode(.all)
 
-        await controller.handle(.finished)
+        engine.emit(.finished)
+        await controller.waitForPendingEvents()
 
         #expect(controller.currentTrack?.id == "a")
         #expect(engine.loadedURLs.last?.lastPathComponent == "a.m4a")
     }
 
     @Test func repeatOffStillAdvances() async {
-        let (controller, _) = makeController()
+        let (controller, engine) = makeController()
         await controller.play(tracks: [track("a"), track("b")], startingAt: 0)
 
-        await controller.handle(.finished)
+        engine.emit(.finished)
+        await controller.waitForPendingEvents()
 
         #expect(controller.currentTrack?.id == "b")
     }
@@ -723,7 +748,7 @@ struct PlayerControllerTests {
         let controller = PlayerController(engine: engine, resolver: resolver, cache: cache)
 
         await controller.play(tracks: [streamTrack("42")], startingAt: 0)
-        await controller.handle(.ready(duration: 100, format: AudioFormat(codec: "flac")))
+        engine.emit(.ready(duration: 100, format: AudioFormat(codec: "flac")))
         try? await Task.sleep(for: .milliseconds(20))
 
         #expect(await cache.storedIDs == [Track.remoteIDPrefix + "42"])
@@ -743,7 +768,8 @@ struct PlayerControllerTests {
         var lines: [String] = []
         controller.log = { lines.append($0) }
 
-        await controller.handle(.finished)
+        engine.emit(.finished)
+        await controller.waitForPendingEvents()
 
         #expect(controller.state == .playing)
         #expect(engine.seeks == [0])
@@ -785,7 +811,7 @@ struct PlayerControllerTests {
 
         var lines: [String] = []
         controller.log = { lines.append($0) }
-        await controller.handle(
+        engine.emit(
             .ready(
                 duration: 210,
                 format: AudioFormat(codec: "flac", sampleRateHz: 48_000, channels: 2, bitrateKbps: 1_411)

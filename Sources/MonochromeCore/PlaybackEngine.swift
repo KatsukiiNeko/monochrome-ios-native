@@ -7,17 +7,41 @@ public enum PlaybackEvent: Equatable, Sendable {
     case position(Double)
     case finished
     case failed(String)
+
+    /// Short name for a log line.
+    public var kind: String {
+        switch self {
+        case .ready: "ready"
+        case .position: "position"
+        case .finished: "finished"
+        case .failed: "failed"
+        }
+    }
+}
+
+/// An engine event wearing the token of the attempt that produced it. The
+/// controller ignores events whose token is no longer the newest attempt.
+public struct PlaybackEngineEvent: Equatable, Sendable {
+    public let token: PlaybackToken
+    public let event: PlaybackEvent
+
+    public init(token: PlaybackToken, event: PlaybackEvent) {
+        self.token = token
+        self.event = event
+    }
 }
 
 /// Implemented by the iOS layer with AVPlayer; faked in tests.
 @MainActor
 public protocol PlaybackEngine: AnyObject {
-    var onEvent: ((PlaybackEvent) -> Void)? { get set }
+    var onEvent: ((PlaybackEngineEvent) -> Void)? { get set }
     /// `contentType` is the out-of-band MIME type when the server does not state
     /// a usable one; nil lets AVFoundation decide. `headers` are applied only
     /// when the backend supports them; unsupported headers are ignored (recorded
-    /// as a limitation rather than worked around).
-    func load(url: URL, contentType: String?, headers: [String: String]) async throws
+    /// as a limitation rather than worked around). `token` identifies the
+    /// attempt: a load older than the newest accepted load must not replace the
+    /// item and must throw `PlaybackSuperseded`.
+    func load(url: URL, contentType: String?, headers: [String: String], token: PlaybackToken) async throws
     func play()
     func pause()
     func seek(to seconds: Double)
@@ -35,7 +59,4 @@ public extension PlaybackEngine {
     func setEqualizer(_ settings: EQSettings) {}
     var eqAvailability: EQAvailability { .available }
     func takeEqualizerPeak() -> Double { 0 }
-    func load(url: URL, contentType: String?) async throws {
-        try await load(url: url, contentType: contentType, headers: [:])
-    }
 }

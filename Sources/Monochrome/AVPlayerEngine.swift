@@ -15,12 +15,22 @@ private let readinessPollInterval = Duration.milliseconds(100)
 
 @MainActor
 final class AVPlayerEngine: PlaybackEngine {
-    var onEvent: ((PlaybackEvent) -> Void)? {
+    var onEvent: ((PlaybackEngineEvent) -> Void)? {
         didSet { relay.handler = onEvent }
     }
 
     private let player = AVPlayer()
-    private let relay = CallbackRelay<PlaybackEvent>()
+    private let relay = CallbackRelay<PlaybackEngineEvent>()
+    /// The token of the item that is allowed to speak; the main queue reads it.
+    private let activeTokenLock = OSAllocatedUnfairLock<PlaybackToken?>(initialState: nil)
+    private var activeToken: PlaybackToken? {
+        get { activeTokenLock.withLock { $0 } }
+        set { activeTokenLock.withLock { $0 = newValue } }
+    }
+    /// Refuses a load older than the newest one this engine accepted.
+    private var arbiter = PlaybackLoadArbiter()
+    /// The load currently waiting for its item, if any.
+    private var loadingToken: PlaybackToken?
     private var timeObserver: Any?
     private var endObserver: NSObjectProtocol?
     private var failureObserver: NSObjectProtocol?
@@ -28,8 +38,6 @@ final class AVPlayerEngine: PlaybackEngine {
     private var errorLogObserver: NSObjectProtocol?
     private var accessLogObserver: NSObjectProtocol?
     private var timeControlObservation: NSKeyValueObservation?
-    /// Set while `load` waits for the item, so the status observer does not race it.
-    private var isWaitingForReadiness = false
     private var eqTapStorage: EQTapStorage?
     private var eqTap: MTAudioProcessingTap?
     private var eqFrameLogTask: Task<Void, Never>?
@@ -46,8 +54,9 @@ final class AVPlayerEngine: PlaybackEngine {
         timeObserver = player.addPeriodicTimeObserver(
             forInterval: CMTime(seconds: 1.0, preferredTimescale: 600),
             queue: .main
-        ) { [relay] time in
-            relay.send(.position(time.seconds))
+        ) { [relay, activeTokenLock] time in
+            guard let token = activeTokenLock.withLock({ $0 }) else { return }
+            relay.send(PlaybackEngineEvent(token: token, event: .position(time.seconds)))
         }
         timeControlObservation = player.observe(\.timeControlStatus, options: [.initial, .new]) { player, _ in
             let status = player.timeControlStatus.rawValue
@@ -58,9 +67,11 @@ final class AVPlayerEngine: PlaybackEngine {
         }
     }
 
-    func load(url: URL, contentType: String?, headers: [String: String] = [:]) async throws {
+    func load(url: URL, contentType: String?, headers: [String: String] = [:], token: PlaybackToken) async throws {
+        guard arbiter.accept(token) else { throw PlaybackSuperseded() }
+        activeToken = token
         playbackLog.notice(
-            "load start host=\(url.host ?? "none", privacy: .public) path=\(shortHash(url.path), privacy: .public) type=\(contentType ?? "none", privacy: .public)"
+            "load start host=\(url.host ?? "none", privacy: .public) path=\(shortHash(url.path), privacy: .public) type=\(contentType ?? "none", privacy: .public) g=\(token.value, privacy: .public)"
         )
         // The catalog host serves FLAC as application/octet-stream without a path
         // extension, which leaves AVFoundation unable to pick a parser on its own.
@@ -78,6 +89,8 @@ final class AVPlayerEngine: PlaybackEngine {
         // The tap needs the item's audio track before the item reaches the
         // player, otherwise the first buffers bypass the chain entirely.
         let audioTracks = (try? await asset.loadTracks(withMediaType: .audio)) ?? []
+        // A newer attempt may have started while the asset was loading.
+        guard arbiter.owns(token) else { throw PlaybackSuperseded() }
         let item = AVPlayerItem(asset: asset)
         currentItem = item
         prepareEQ(for: item, audioTracks: audioTracks, url: url, contentType: contentType)
@@ -86,14 +99,17 @@ final class AVPlayerEngine: PlaybackEngine {
             forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main
         ) { [relay] _ in
             playerLog.notice("item reached end")
-            relay.send(.finished)
+            relay.send(PlaybackEngineEvent(token: token, event: .finished))
         }
         failureObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemFailedToPlayToEndTime, object: item, queue: .main
         ) { [relay] notification in
             let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
             playerLog.error("item failed to play to end: \(describe(error), privacy: .public)")
-            relay.send(.failed(error?.localizedDescription ?? "Playback failed."))
+            relay.send(PlaybackEngineEvent(
+                token: token,
+                event: .failed(error?.localizedDescription ?? "Playback failed.")
+            ))
         }
         errorLogObserver = NotificationCenter.default.addObserver(
             forName: AVPlayerItem.newErrorLogEntryNotification, object: item, queue: .main
@@ -113,7 +129,7 @@ final class AVPlayerEngine: PlaybackEngine {
         }
         statusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
             let status = item.status.rawValue
-            playerLog.notice("item.status=\(status, privacy: .public)")
+            playerLog.notice("item.status=\(status, privacy: .public) g=\(token.value, privacy: .public)")
             guard item.status == .failed else { return }
             let error = item.error
             playerLog.error("item error: \(describe(error), privacy: .public)")
@@ -121,21 +137,28 @@ final class AVPlayerEngine: PlaybackEngine {
             // Mid-playback failures reach the controller here; initial-load failures
             // are thrown from `load` so the retry path stays in one place.
             Task { @MainActor [weak self] in
-                guard let self, !self.isWaitingForReadiness else { return }
-                self.relay.send(.failed(error?.localizedDescription ?? "Playback failed."))
+                guard let self, self.loadingToken != token, self.arbiter.owns(token) else { return }
+                self.relay.send(PlaybackEngineEvent(
+                    token: token,
+                    event: .failed(error?.localizedDescription ?? "Playback failed.")
+                ))
             }
         }
+        guard arbiter.owns(token) else { throw PlaybackSuperseded() }
         player.replaceCurrentItem(with: item)
-        playerLog.notice("replaced current item")
+        playerLog.notice("replaced current item g=\(token.value, privacy: .public)")
 
-        isWaitingForReadiness = true
-        defer { isWaitingForReadiness = false }
+        loadingToken = token
+        defer { if loadingToken == token { loadingToken = nil } }
         var waited = Duration.zero
         while true {
+            // A stop or a newer load ends this attempt without touching its item.
+            guard arbiter.owns(token) else { throw PlaybackSuperseded() }
             switch item.status {
             case .readyToPlay:
                 let duration = item.duration.isNumeric ? item.duration.seconds : nil
                 let format = await audioFormat(of: asset)
+                guard arbiter.owns(token) else { throw PlaybackSuperseded() }
                 playerLog.notice(
                     "item ready seconds=\(duration ?? -1) codec=\(format?.codec ?? "none", privacy: .public) depth=\(format?.bitDepth ?? 0) rate=\(format?.sampleRateHz ?? 0)"
                 )
@@ -144,7 +167,7 @@ final class AVPlayerEngine: PlaybackEngine {
                         "audiospec measured codec=\(format.codec, privacy: .public) sr=\(format.sampleRateHz ?? 0) ch=\(format.channels ?? 0) bitrate=\(format.bitrateKbps ?? 0)"
                     )
                 }
-                onEvent?(.ready(duration: duration, format: format))
+                onEvent?(PlaybackEngineEvent(token: token, event: .ready(duration: duration, format: format)))
                 return
             case .failed:
                 let error = item.error ?? EngineError.unreadable
@@ -177,6 +200,8 @@ final class AVPlayerEngine: PlaybackEngine {
     }
 
     func stop() {
+        activeToken = nil
+        arbiter.invalidateAll()
         player.pause()
         stopObservingItem()
         eqFrameLogTask?.cancel()

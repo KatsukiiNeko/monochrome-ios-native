@@ -104,17 +104,8 @@ public final class PlayerController {
                 }
             }
         }
-        engine.onEvent = { [weak self] event in
-            guard let self else { return }
-            if case .ready(let duration, let format) = event {
-                // Handle ready on the spot: a deferred handler can consume the next
-                // track's pending cache after a quick skip.
-                MainActor.assumeIsolated {
-                    self.handleReady(duration: duration, format: format)
-                }
-            } else {
-                Task { await self.handle(event) }
-            }
+        engine.onEvent = { [weak self] tagged in
+            self?.handle(tagged)
         }
     }
 
@@ -355,23 +346,47 @@ public final class PlayerController {
 
     // MARK: - Engine events
 
-    func handle(_ event: PlaybackEvent) async {
-        switch event {
+    /// Events arrive on the main actor in order. Stale attempts die here, before
+    /// any state changes. Only the two events that need playback work start a
+    /// task; those tasks run one after another, never concurrently.
+    func handle(_ tagged: PlaybackEngineEvent) {
+        let accepted = ownership.owns(tagged.token)
+        log?("[Playback] event g=\(tagged.token.value) kind=\(tagged.event.kind) accepted=\(accepted)")
+        guard accepted else { return }
+        switch tagged.event {
         case .ready(let engineDuration, let engineFormat):
             handleReady(duration: engineDuration, format: engineFormat)
         case .position(let seconds):
             position = seconds
             triggerNextTrackPreparationIfNeeded()
         case .finished:
-            await handleEndOfTrack()
+            enqueue { [weak self] in await self?.handleEndOfTrack(token: tagged.token) }
         case .failed(let message):
-            // A stream can expire mid-playback; resolve once more before giving up.
-            if queue.current?.isStreaming == true, !didRetryCurrentTrack {
-                didRetryCurrentTrack = true
-                await loadCurrent(retrying: true)
-            } else {
-                state = .failed(message)
-            }
+            enqueue { [weak self] in await self?.handleFailure(message, token: tagged.token) }
+        }
+    }
+
+    /// A single serial queue for event work, so a finished event cannot overtake
+    /// the failure or reload that follows it.
+    private var eventTask: Task<Void, Never>?
+    private var eventGeneration = 0
+
+    private func enqueue(_ operation: @escaping @MainActor () async -> Void) {
+        eventGeneration += 1
+        let previous = eventTask
+        eventTask = Task { @MainActor in
+            await previous?.value
+            await operation()
+        }
+    }
+
+    /// Test hook: wait until every queued event task has finished.
+    func waitForPendingEvents() async {
+        while true {
+            let generation = eventGeneration
+            guard let task = eventTask else { return }
+            await task.value
+            if eventGeneration == generation { return }
         }
     }
 
@@ -478,7 +493,19 @@ public final class PlayerController {
         return queue.tracks[currentIndex + 1]
     }
 
-    private func handleEndOfTrack() async {
+    private func handleFailure(_ message: String, token: PlaybackToken) async {
+        guard ownership.owns(token) else { return }
+        // A stream can expire mid-playback; resolve once more before giving up.
+        if queue.current?.isStreaming == true, !didRetryCurrentTrack {
+            didRetryCurrentTrack = true
+            await loadCurrent(retrying: true)
+        } else {
+            state = .failed(message)
+        }
+    }
+
+    private func handleEndOfTrack(token: PlaybackToken) async {
+        guard ownership.owns(token) else { return }
         let hasNext = queue.currentIndex.map { $0 + 1 < queue.tracks.count } ?? false
         let action = EndOfTrackDecision.action(
             repeatMode: repeatMode,
@@ -503,6 +530,7 @@ public final class PlayerController {
         case .reload:
             await loadCurrent(forLoop: true)
         case .stop:
+            ownership.invalidateAll()
             engine.stop()
             position = 0
             state = .idle
@@ -599,7 +627,7 @@ public final class PlayerController {
             if let downloaded {
                 do {
                     attempt.mark(.asset, at: now(), detail: "download")
-                    try await engine.load(url: downloaded.url, contentType: nil)
+                    try await engine.load(url: downloaded.url, contentType: nil, headers: [:], token: token)
                     guard stillOwns(token, track) else { return }
                     if autoPlay { engine.play() }
                     state = autoPlay ? .playing : .paused
@@ -630,7 +658,7 @@ public final class PlayerController {
             if let cached {
                 do {
                     attempt.mark(.asset, at: now(), detail: "cache")
-                    try await engine.load(url: cached.url, contentType: nil)
+                    try await engine.load(url: cached.url, contentType: nil, headers: [:], token: token)
                     guard stillOwns(token, track) else { return }
                     if autoPlay { engine.play() }
                     state = autoPlay ? .playing : .paused
@@ -686,7 +714,7 @@ public final class PlayerController {
             }
             attempt.countRequest("item")
             attempt.mark(.asset, at: now(), detail: "network")
-            try await engine.load(url: url, contentType: contentType, headers: headers)
+            try await engine.load(url: url, contentType: contentType, headers: headers, token: token)
             guard stillOwns(token, track) else { return }
             if autoPlay { engine.play() }
             state = autoPlay ? .playing : .paused
