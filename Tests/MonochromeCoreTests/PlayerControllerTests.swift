@@ -469,6 +469,17 @@ struct PlayerControllerTests {
         #expect(controller.position == 0)
     }
 
+    @Test func everySeekBumpsTheCounterEvenAtTheSamePosition() async {
+        let (controller, _) = makeController()
+        await controller.play(tracks: [track("a", duration: 100)], startingAt: 0)
+
+        controller.seek(to: 30)
+        controller.seek(to: 30)
+
+        // Observers that wake on position alone would miss the second seek.
+        #expect(controller.seekCount == 2)
+    }
+
     @Test func engineDurationFillsInMissingTag() async {
         let (controller, engine) = makeController()
         await controller.play(tracks: [track("a")], startingAt: 0)

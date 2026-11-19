@@ -9,6 +9,8 @@ public final class PlayerController {
     public private(set) var queue = Queue()
     public private(set) var position: Double = 0
     public private(set) var duration: Double = 0
+    /// Bumped by every seek, so observers wake even when the position repeats.
+    public private(set) var seekCount = 0
     /// Parsed format of the current stream; nil until the item is ready.
     public private(set) var format: AudioFormat?
     /// Repeat control; `one` restarts the current track at its end.
@@ -205,6 +207,7 @@ public final class PlayerController {
         guard queue.current != nil else { return }
         let clamped = max(0, duration > 0 ? min(seconds, duration) : seconds)
         position = clamped
+        seekCount += 1
         engine.seek(to: clamped)
     }
 

@@ -205,6 +205,7 @@ final class AppModel {
             }
             return track.artworkURL
         }
+        nowPlaying.start()
         applyStreamingSettings()
         equalizer.activate()
         if let session = sessionStore.load() {
