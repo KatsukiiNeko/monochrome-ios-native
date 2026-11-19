@@ -61,6 +61,8 @@ public final class PlayerController {
     private var didFinishCurrentTrack = false
     /// Cancels the running preflight when a newer load supersedes it.
     private var cancellation: AttemptCancellation?
+    /// Numbers every attempt to start a track; a stale attempt drops its results.
+    private var ownership = PlaybackOwnership()
     /// The track whose background download belongs to the current item.
     private var cacheDownloadTrack: Track?
     private var sleepTimerTask: Task<Void, Never>?
@@ -177,6 +179,7 @@ public final class PlayerController {
         if queue.advance() != nil {
             await loadCurrent()
         } else {
+            ownership.invalidateAll()
             await cancelCacheDownloadIfSkippedEarly()
             playbackStartedAt = nil
             cacheDownloadTrack = nil
@@ -240,6 +243,7 @@ public final class PlayerController {
     /// Stops playback and empties the queue.
     public func clearQueue() {
         reportAbandonedTrack()
+        ownership.invalidateAll()
         engine.stop()
         position = 0
         duration = 0
@@ -542,7 +546,19 @@ public final class PlayerController {
         ))
     }
 
+    /// True while this attempt is still the newest and the queue still names its
+    /// track. A stale attempt clears only its own pending cache and says nothing.
+    private func stillOwns(_ token: PlaybackToken, _ track: Track) -> Bool {
+        guard ownership.owns(token), queue.current?.id == track.id else {
+            if pendingCache?.track.id == track.id { pendingCache = nil }
+            log?("[Playback] drop g=\(token.value) track=\(track.id.prefix(8)) reason=superseded")
+            return false
+        }
+        return true
+    }
+
     private func loadCurrent(retrying: Bool = false, forLoop: Bool = false, autoPlay: Bool = true) async {
+        let token = ownership.begin()
         await cancelCacheDownloadIfSkippedEarly()
         if let cache { await cache.clearProtection() }
         playbackStartedAt = nil
@@ -557,6 +573,8 @@ public final class PlayerController {
             pendingCache = nil
             return
         }
+        guard stillOwns(token, track) else { return }
+        log?("[Playback] begin g=\(token.value) track=\(track.id.prefix(8))")
         if !retrying { didRetryCurrentTrack = false }
         cancellation?.cancel()
         let attemptCancellation = AttemptCancellation()
@@ -577,10 +595,12 @@ public final class PlayerController {
         if track.isStreaming, let downloads {
             let downloaded = await downloads.downloadedFile(for: track)
             attempt.mark(.lookup, at: now(), detail: downloaded == nil ? "download-miss" : "download-hit")
+            guard stillOwns(token, track) else { return }
             if let downloaded {
                 do {
                     attempt.mark(.asset, at: now(), detail: "download")
                     try await engine.load(url: downloaded.url, contentType: nil)
+                    guard stillOwns(token, track) else { return }
                     if autoPlay { engine.play() }
                     state = autoPlay ? .playing : .paused
                     format = mergedFormat(stored: downloaded.format, measured: format)
@@ -595,6 +615,8 @@ public final class PlayerController {
                     log?("download source=file track=\(track.id)")
                     if autoPlay { onTrackStarted?(track) }
                     return
+                } catch is PlaybackSuperseded {
+                    return
                 } catch {
                     log?("download unusable track=\(track.id)")
                 }
@@ -604,10 +626,12 @@ public final class PlayerController {
         if track.isStreaming, let cache {
             let cached = await cache.cachedAudio(for: track, quality: track.audioQuality)
             attempt.mark(.lookup, at: now(), detail: cached == nil ? "cache-miss" : "cache-hit")
+            guard stillOwns(token, track) else { return }
             if let cached {
                 do {
                     attempt.mark(.asset, at: now(), detail: "cache")
                     try await engine.load(url: cached.url, contentType: nil)
+                    guard stillOwns(token, track) else { return }
                     if autoPlay { engine.play() }
                     state = autoPlay ? .playing : .paused
                     format = mergedFormat(stored: cached.format, measured: format)
@@ -621,6 +645,8 @@ public final class PlayerController {
                     if forLoop { log?("loop source=cache") }
                     if autoPlay { onTrackStarted?(track) }
                     return
+                } catch is PlaybackSuperseded {
+                    return
                 } catch {
                     // A damaged cache entry must not stop playback; resolve the stream instead.
                     log?("cache hit unusable track=\(track.id)")
@@ -632,8 +658,10 @@ public final class PlayerController {
         do {
             let source = try await resolver.playbackSource(for: track)
             attempt.mark(.resolve, at: now())
+            guard stillOwns(token, track) else { return }
             let url = source.url
             let resolvedContentType = await resolver.contentType(for: track)
+            guard stillOwns(token, track) else { return }
             let contentType = source.contentType ?? resolvedContentType
             let headers = source.headers
             pendingCache = PendingCache(
@@ -651,26 +679,26 @@ public final class PlayerController {
                 )
                 attempt.countRequest("preflight", count: result.requestCount)
                 attempt.mark(.preflight, at: now(), detail: Self.preflightDetail(result))
+                guard stillOwns(token, track) else { return }
                 guard result.isReady else {
                     throw StreamStartError.notReady(lastStatus: result.lastStatus)
-                }
-                // A skip during the preflight supersedes this load.
-                guard !attemptCancellation.isCancelled, queue.current?.id == track.id else {
-                    log?("play aborted reason=superseded")
-                    return
                 }
             }
             attempt.countRequest("item")
             attempt.mark(.asset, at: now(), detail: "network")
             try await engine.load(url: url, contentType: contentType, headers: headers)
+            guard stillOwns(token, track) else { return }
             if autoPlay { engine.play() }
             state = autoPlay ? .playing : .paused
             currentItemIsLocal = source.isLocal
             playbackStartedAt = now()
             attempt.mark(.ready, at: now(), detail: "network")
             if autoPlay { onTrackStarted?(track) }
+        } catch is PlaybackSuperseded {
+            return
         } catch {
             attempt.mark(.failed, at: now(), detail: PlaybackAttemptLog.errorDetail(error))
+            guard stillOwns(token, track) else { return }
             pendingCache = nil
             if !retrying, track.isStreaming, !didRetryCurrentTrack {
                 didRetryCurrentTrack = true
