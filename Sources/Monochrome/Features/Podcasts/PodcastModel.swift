@@ -64,12 +64,6 @@ final class PodcastModel {
         }
     }
 
-    func closeShow() {
-        selectedShow = nil
-        episodes = []
-        errorMessage = nil
-    }
-
     /// Plays an episode inside the context of its show.
     func play(_ episode: PodcastEpisode) {
         guard let show = selectedShow else { return }

@@ -185,12 +185,6 @@ final class EQController {
         commit()
     }
 
-    func resetToFlat() {
-        settings.apply(EQPresetCatalog.flat)
-        settings.isEnabled = true
-        commit()
-    }
-
     /// Saves the current curve under a new name. Returns the reason when the
     /// name is rejected so the sheet can show it.
     @discardableResult

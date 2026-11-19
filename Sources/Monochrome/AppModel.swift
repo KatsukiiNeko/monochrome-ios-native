@@ -278,11 +278,6 @@ final class AppModel {
         try? themeSettings.exportData(for: theme)
     }
 
-    func resetTheme() {
-        themeSettings.reset()
-        theme = themeSettings.current
-    }
-
     func setAccentPreference(_ preference: AccentPreference) {
         accentSettings.setPreference(preference)
         accentPreference = preference
