@@ -409,7 +409,7 @@ struct PlayerControllerTests {
         #expect(controller.state == .playing)
 
         await controller.next()
-        #expect(controller.state == .idle)
+        #expect(controller.state == .stopped(.endOfQueue))
         #expect(engine.stopCount == 1)
     }
 
@@ -446,14 +446,14 @@ struct PlayerControllerTests {
         #expect(controller.state == .playing)
     }
 
-    @Test func finishedAtEndGoesIdle() async {
+    @Test func finishedAtEndStopsWithEndOfQueue() async {
         let (controller, engine) = makeController()
         await controller.play(tracks: [track("a")], startingAt: 0)
 
         engine.emit(.finished)
         await controller.waitForPendingEvents()
 
-        #expect(controller.state == .idle)
+        #expect(controller.state == .stopped(.endOfQueue))
         #expect(controller.position == 0)
     }
 
@@ -917,7 +917,7 @@ struct QueueCommandTests {
 
         player.clearQueue()
         #expect(player.queue.isEmpty)
-        #expect(player.state == .idle)
+        #expect(player.state == .stopped(.queueCleared))
         #expect(player.currentTrack == nil)
         #expect(player.position == 0)
         #expect(!player.isShuffled)

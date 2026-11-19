@@ -20,6 +20,11 @@ struct PlayerView: View {
 
     private var player: PlayerController { model.player }
 
+    private var isPlayerLoading: Bool {
+        if case .loading = player.state { return true }
+        return false
+    }
+
     private var audioSpec: AudioSpec {
         let source: AudioPlaybackSource
         if player.isCurrentFromDownload {
@@ -374,7 +379,7 @@ struct PlayerView: View {
 
             RoundPlayButton(
                 isPlaying: player.isPlaying,
-                isLoading: player.state == .loading,
+                isLoading: isPlayerLoading,
                 size: 72
             ) {
                 Task { await player.togglePlayPause() }

@@ -112,7 +112,7 @@ struct NowPlayingSnapshotTests {
     @Test func loadingSnapshotDisablesTransportUntilReady() {
         let snapshot = NowPlayingSnapshot.make(
             track: snapshotTrack(),
-            state: .loading,
+            state: .loading(autoPlay: true),
             position: 0,
             duration: 120,
             hasNext: true,
@@ -140,6 +140,22 @@ struct NowPlayingSnapshotTests {
 
         #expect(snapshot.rate == 0)
         #expect(snapshot.canPlay)
+        #expect(!snapshot.canPause)
+        #expect(!snapshot.canSeek)
+        #expect(snapshot.playbackState == .paused)
+    }
+
+    @Test func stoppedSnapshotDisablesTransport() {
+        let snapshot = NowPlayingSnapshot.make(
+            track: snapshotTrack(),
+            state: .stopped(.queueCleared),
+            position: 0,
+            duration: 120,
+            hasNext: false,
+            hasPrevious: false
+        )
+
+        #expect(!snapshot.canPlay)
         #expect(!snapshot.canPause)
         #expect(!snapshot.canSeek)
         #expect(snapshot.playbackState == .stopped)

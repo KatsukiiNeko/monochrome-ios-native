@@ -92,6 +92,26 @@ struct PlaybackOwnershipRaceTests {
         #expect(engine.loadedURLs.map { $0.deletingPathExtension().lastPathComponent } == ["b"])
     }
 
+    @Test func clearingTheQueueKillsASuspendedLoad() async {
+        let gateA = Gate()
+        let resolver = GatedResolver(gates: ["a": gateA])
+        let engine = RecordingEngine()
+        let player = PlayerController(engine: engine, resolver: resolver)
+
+        let load = Task { await player.play(tracks: [track("a")], startingAt: 0) }
+        await gateA.waitUntilStarted()
+
+        player.clearQueue()
+        #expect(player.state == .stopped(.queueCleared))
+        #expect(player.currentTrack == nil)
+
+        await gateA.release()
+        await load.value
+
+        #expect(player.state == .stopped(.queueCleared))
+        #expect(engine.loadedURLs.isEmpty)
+    }
+
     @Test func fiveRapidSkipsResolveOutOfOrderAndOnlyTheLastWins() async {
         let gates = ["a": Gate(), "b": Gate(), "c": Gate(), "d": Gate()]
         let resolver = GatedResolver(gates: gates)

@@ -105,9 +105,15 @@ public struct NowPlayingSnapshot: Equatable, Sendable {
             canPause = false
             canSeek = duration > 0
         case .failed:
-            // Play retries the failed item.
-            playbackState = .stopped
+            // The track keeps its identity; play retries the failed item.
+            playbackState = .paused
             canPlay = true
+            canPause = false
+            canSeek = false
+        case .stopped:
+            // An explicit stop is the only state with nothing to show.
+            playbackState = .stopped
+            canPlay = false
             canPause = false
             canSeek = false
         }

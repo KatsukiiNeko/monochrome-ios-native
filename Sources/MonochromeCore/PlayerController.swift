@@ -158,7 +158,7 @@ public final class PlayerController {
         case .paused:
             engine.play()
             state = .playing
-        case .idle, .failed:
+        case .idle, .failed, .stopped:
             await retry()
         case .loading:
             break
@@ -176,7 +176,8 @@ public final class PlayerController {
             cacheDownloadTrack = nil
             engine.stop()
             position = 0
-            state = .idle
+            state = .stopped(.endOfQueue)
+            log?("[Playback] stop reason=endOfQueue")
             isCurrentFromCache = false
             isCurrentFromDownload = false
             currentItemIsLocal = false
@@ -238,7 +239,8 @@ public final class PlayerController {
         engine.stop()
         position = 0
         duration = 0
-        state = .idle
+        state = .stopped(.queueCleared)
+        log?("[Playback] stop reason=queueCleared")
         queue = Queue()
         isShuffled = false
         unshuffledTracks = []
@@ -533,7 +535,8 @@ public final class PlayerController {
             ownership.invalidateAll()
             engine.stop()
             position = 0
-            state = .idle
+            state = .stopped(.endOfQueue)
+            log?("[Playback] stop reason=endOfQueue")
             isCurrentFromCache = false
             isCurrentFromDownload = false
             currentItemIsLocal = false
@@ -591,8 +594,11 @@ public final class PlayerController {
         if let cache { await cache.clearProtection() }
         playbackStartedAt = nil
         guard let track = queue.current else {
+            if state != .idle {
+                log?("[Playback] queue-empty while phase=\(state.logName) reason=endOfQueue")
+            }
             engine.stop()
-            state = .idle
+            state = .stopped(.endOfQueue)
             position = 0
             duration = 0
             currentItemIsLocal = false
@@ -608,7 +614,7 @@ public final class PlayerController {
         let attemptCancellation = AttemptCancellation()
         cancellation = attemptCancellation
 
-        state = .loading
+        state = .loading(autoPlay: autoPlay)
         format = nil
         position = 0
         duration = track.durationSeconds ?? 0

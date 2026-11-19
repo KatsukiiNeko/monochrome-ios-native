@@ -22,7 +22,7 @@ struct NowPlayingBarTests {
     }
 
     @Test func showsTheLoadedTrackEvenWhileLoading() {
-        let bar = NowPlayingBar.make(track: track(), state: .loading, position: 0, duration: 0)
+        let bar = NowPlayingBar.make(track: track(), state: .loading(autoPlay: true), position: 0, duration: 0)
         #expect(bar?.title == "Song")
         #expect(bar?.subtitle == "Artist")
         #expect(bar?.isLoading == true)

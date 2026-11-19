@@ -53,8 +53,13 @@ public struct NowPlayingBar: Equatable, Sendable {
             badgeSpokenText: AudioBadge.accessibilityLabel(format: format, quality: track.audioQuality),
             progress: fraction,
             isPlaying: state == .playing,
-            isLoading: state == .loading,
+            isLoading: isLoading(state),
             failureMessage: failure
         )
+    }
+
+    private static func isLoading(_ state: PlaybackState) -> Bool {
+        if case .loading = state { return true }
+        return false
     }
 }
