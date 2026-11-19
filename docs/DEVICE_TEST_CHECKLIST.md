@@ -471,6 +471,26 @@ still be audible as a click, a gap or no change at all.
       playback state.
 - [ ] An interruption (for example a call) resumes only if audio was playing
       before it began.
+- [ ] Press play after an interruption that did not auto-resume: audio reaches
+      the speaker/headphones (the session is reactivated when the call ends).
+
+### Now Playing identity (needs logs)
+
+Capture `idevicesyslog` while doing each step, then read the
+`category=nowplaying` lines.
+
+- [ ] Start a track: the Lock Screen shows it; no later line says `clear`
+      unless you stopped playback on purpose.
+- [ ] Skip quickly through five tracks: the Lock Screen ends on the fifth, and
+      no `clear reason=` appears during the skips.
+- [ ] Seek while paused: the Lock Screen time jumps to the new position.
+- [ ] Let an album finish: exactly one `clear reason=endOfQueue` appears after
+      the last track, and the tile empties then.
+- [ ] Clear the queue: exactly one `clear reason=queueCleared` appears.
+- [ ] Play a stream that fails: the Lock Screen keeps the title and artist, and
+      play retries instead of emptying the tile.
+- [ ] Count `publish` lines over one playing minute: expected about one per
+      track change plus one every 10 s for the elapsed-time anchor.
 
 ## If something fails
 

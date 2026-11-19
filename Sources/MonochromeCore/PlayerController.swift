@@ -356,7 +356,11 @@ public final class PlayerController {
     /// task; those tasks run one after another, never concurrently.
     func handle(_ tagged: PlaybackEngineEvent) {
         let accepted = ownership.owns(tagged.token)
-        log?("[Playback] event g=\(tagged.token.value) kind=\(tagged.event.kind) accepted=\(accepted)")
+        if case .position = tagged.event {
+            // Ticks once a second; logging them would drown the useful lines.
+        } else {
+            log?("[Playback] event g=\(tagged.token.value) kind=\(tagged.event.kind) accepted=\(accepted)")
+        }
         guard accepted else { return }
         switch tagged.event {
         case .ready(let engineDuration, let engineFormat):
