@@ -69,6 +69,20 @@ final class AudioSessionController {
         sessionLog.notice("output latency=\(latency, privacy: .public)")
     }
 
+    /// iOS deactivates the session when an interruption ends; without this the
+    /// next play would route to nothing.
+    private func reactivateAfterInterruption() {
+        do {
+            try AVAudioSession.sharedInstance().setActive(true)
+            sessionLog.notice("session reactivated")
+        } catch {
+            let nsError = error as NSError
+            sessionLog.error(
+                "session reactivation failed domain=\(nsError.domain, privacy: .public) code=\(nsError.code) description=\(nsError.localizedDescription, privacy: .public)"
+            )
+        }
+    }
+
     private func handle(_ event: AudioInterruption) {
         switch event {
         case .began:
@@ -77,6 +91,7 @@ final class AudioSessionController {
             if player.isPlaying { Task { await player.togglePlayPause() } }
         case .ended(let shouldResume):
             sessionLog.notice("interruption ended shouldResume=\(shouldResume, privacy: .public)")
+            reactivateAfterInterruption()
             let resume = shouldResume && wasPlayingBeforeInterruption
             wasPlayingBeforeInterruption = false
             if resume, player.state == .paused { Task { await player.togglePlayPause() } }
