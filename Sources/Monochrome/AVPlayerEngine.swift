@@ -32,11 +32,8 @@ final class AVPlayerEngine: PlaybackEngine {
     /// The load currently waiting for its item, if any.
     private var loadingToken: PlaybackToken?
     private var timeObserver: Any?
-    private var endObserver: NSObjectProtocol?
-    private var failureObserver: NSObjectProtocol?
-    private var statusObservation: NSKeyValueObservation?
-    private var errorLogObserver: NSObjectProtocol?
-    private var accessLogObserver: NSObjectProtocol?
+    /// Every observer tied to the current item; one call removes them all.
+    private let itemObservers = ItemObservers()
     private var timeControlObservation: NSKeyValueObservation?
     private var eqTapStorage: EQTapStorage?
     private var eqTap: MTAudioProcessingTap?
@@ -95,13 +92,13 @@ final class AVPlayerEngine: PlaybackEngine {
         currentItem = item
         prepareEQ(for: item, audioTracks: audioTracks, url: url, contentType: contentType)
         stopObservingItem()
-        endObserver = NotificationCenter.default.addObserver(
+        itemObservers.end = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main
         ) { [relay] _ in
             playerLog.notice("item reached end")
             relay.send(PlaybackEngineEvent(token: token, event: .finished))
         }
-        failureObserver = NotificationCenter.default.addObserver(
+        itemObservers.failure = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemFailedToPlayToEndTime, object: item, queue: .main
         ) { [relay] notification in
             let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error
@@ -111,7 +108,7 @@ final class AVPlayerEngine: PlaybackEngine {
                 event: .failed(error?.localizedDescription ?? "Playback failed.")
             ))
         }
-        errorLogObserver = NotificationCenter.default.addObserver(
+        itemObservers.errorLog = NotificationCenter.default.addObserver(
             forName: AVPlayerItem.newErrorLogEntryNotification, object: item, queue: .main
         ) { notification in
             guard let entry = (notification.object as? AVPlayerItem)?.errorLog()?.events.last else { return }
@@ -119,7 +116,7 @@ final class AVPlayerEngine: PlaybackEngine {
                 "item errorLog status=\(entry.errorStatusCode, privacy: .public) domain=\(entry.errorDomain, privacy: .public) host=\(entry.serverAddress.map(hostOnly) ?? "none", privacy: .public) path=\(shortHash(entry.uri), privacy: .public)"
             )
         }
-        accessLogObserver = NotificationCenter.default.addObserver(
+        itemObservers.accessLog = NotificationCenter.default.addObserver(
             forName: AVPlayerItem.newAccessLogEntryNotification, object: item, queue: .main
         ) { notification in
             guard let log = (notification.object as? AVPlayerItem)?.accessLog()?.events.last else { return }
@@ -127,7 +124,7 @@ final class AVPlayerEngine: PlaybackEngine {
                 "item accessLog requests=\(log.numberOfMediaRequests) host=\(log.serverAddress.map(hostOnly) ?? "none", privacy: .public) path=\(shortHash(log.uri), privacy: .public) bytes=\(log.numberOfBytesTransferred)"
             )
         }
-        statusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
+        itemObservers.status = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
             let status = item.status.rawValue
             playerLog.notice("item.status=\(status, privacy: .public) g=\(token.value, privacy: .public)")
             guard item.status == .failed else { return }
@@ -201,6 +198,7 @@ final class AVPlayerEngine: PlaybackEngine {
 
     func stop() {
         activeToken = nil
+        loadingToken = nil
         arbiter.invalidateAll()
         player.pause()
         stopObservingItem()
@@ -346,15 +344,7 @@ final class AVPlayerEngine: PlaybackEngine {
     }
 
     private func stopObservingItem() {
-        if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
-        if let failureObserver { NotificationCenter.default.removeObserver(failureObserver) }
-        if let errorLogObserver { NotificationCenter.default.removeObserver(errorLogObserver) }
-        if let accessLogObserver { NotificationCenter.default.removeObserver(accessLogObserver) }
-        endObserver = nil
-        failureObserver = nil
-        errorLogObserver = nil
-        accessLogObserver = nil
-        statusObservation = nil
+        itemObservers.invalidate()
     }
 
     private func logFailure(_ message: String, _ error: any Error) {
@@ -362,6 +352,30 @@ final class AVPlayerEngine: PlaybackEngine {
         playerLog.error(
             "\(message, privacy: .public) domain=\(nsError.domain, privacy: .public) code=\(nsError.code) description=\(nsError.localizedDescription, privacy: .public)"
         )
+    }
+}
+
+/// The observers that belong to one `AVPlayerItem`. Replacing the item calls
+/// `invalidate()`; a late callback from the old item then has no path to the
+/// engine. Must be used on the main actor only.
+@MainActor
+private final class ItemObservers {
+    var end: NSObjectProtocol?
+    var failure: NSObjectProtocol?
+    var errorLog: NSObjectProtocol?
+    var accessLog: NSObjectProtocol?
+    var status: NSKeyValueObservation?
+
+    func invalidate() {
+        if let end { NotificationCenter.default.removeObserver(end) }
+        if let failure { NotificationCenter.default.removeObserver(failure) }
+        if let errorLog { NotificationCenter.default.removeObserver(errorLog) }
+        if let accessLog { NotificationCenter.default.removeObserver(accessLog) }
+        end = nil
+        failure = nil
+        errorLog = nil
+        accessLog = nil
+        status = nil
     }
 }
 
