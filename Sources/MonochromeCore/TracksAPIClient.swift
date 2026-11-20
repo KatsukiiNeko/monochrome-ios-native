@@ -246,7 +246,11 @@ public actor TracksAPIClient {
                 throw error
             } catch {
                 cooldowns.penalize(base, at: now())
-                lastFailure = .unavailable(error.localizedDescription)
+                // A transport failure is reported by class, not as the opaque
+                // NSURLError description the system would print.
+                lastFailure = .unavailable(
+                    TransferFailure.classify(error).errorDescription ?? error.localizedDescription
+                )
             }
         }
         throw lastFailure
