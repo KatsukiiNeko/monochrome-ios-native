@@ -1,11 +1,7 @@
-// PlayerCacheSkipTests.swift: the 10-second window for cancelling a background download.
+// PlayerCacheSkipTests.swift: the half-heard threshold for staging a stream.
 import Foundation
 import Testing
 @testable import MonochromeCore
-
-private final class TestClock: @unchecked Sendable {
-    var now = Date(timeIntervalSince1970: 1_000)
-}
 
 @MainActor
 private final class QuietEngine: PlaybackEngine {
@@ -70,54 +66,9 @@ private func streamTrack(_ id: String) -> Track {
 }
 
 @MainActor
-@Suite("Player cache skip policy")
+@Suite("Player cache promotion policy")
 struct PlayerCacheSkipTests {
-    @Test func skippingWithinTenSecondsCancelsTheDownload() async {
-        let clock = TestClock()
-        let cache = RecordingCache()
-        let engine = QuietEngine()
-        let controller = PlayerController(
-            engine: engine,
-            resolver: FixedResolver(),
-            cache: cache,
-            now: { clock.now }
-        )
-        await controller.play(tracks: [streamTrack("1"), streamTrack("2")], startingAt: 0)
-        engine.emit(.ready(duration: 100, format: AudioFormat(codec: "flac")))
-        try? await Task.sleep(for: .milliseconds(20))
-
-        clock.now += 5
-        await controller.next()
-        try? await Task.sleep(for: .milliseconds(20))
-
-        let cancelled = await cache.cancelled
-        #expect(cancelled.map(\.id) == [Track.remoteIDPrefix + "1"])
-        #expect(cancelled.first?.reason == "skipped")
-    }
-
-    @Test func skippingAfterTenSecondsLetsTheDownloadFinish() async {
-        let clock = TestClock()
-        let cache = RecordingCache()
-        let engine = QuietEngine()
-        let controller = PlayerController(
-            engine: engine,
-            resolver: FixedResolver(),
-            cache: cache,
-            now: { clock.now }
-        )
-        await controller.play(tracks: [streamTrack("1"), streamTrack("2")], startingAt: 0)
-        engine.emit(.ready(duration: 100, format: AudioFormat(codec: "flac")))
-        try? await Task.sleep(for: .milliseconds(20))
-
-        clock.now += 11
-        await controller.next()
-        try? await Task.sleep(for: .milliseconds(20))
-
-        #expect(await cache.cancelled.isEmpty)
-        #expect(await cache.storedIDs == [Track.remoteIDPrefix + "1"])
-    }
-
-    @Test func twoSequentialStreamsBothStartAStore() async {
+    @Test func skippingBeforeHalfNeverStartsTheStore() async {
         let cache = RecordingCache()
         let engine = QuietEngine()
         let controller = PlayerController(
@@ -127,9 +78,78 @@ struct PlayerCacheSkipTests {
         )
         await controller.play(tracks: [streamTrack("1"), streamTrack("2")], startingAt: 0)
         engine.emit(.ready(duration: 100, format: AudioFormat(codec: "flac")))
+        for second in 1...30 {
+            engine.emit(.position(Double(second)))
+        }
         try? await Task.sleep(for: .milliseconds(20))
+
+        await controller.next()
+        try? await Task.sleep(for: .milliseconds(20))
+
+        #expect(await cache.storedIDs.isEmpty)
+        #expect(await cache.cancelled.isEmpty)
+    }
+
+    @Test func skippingAfterHalfLetsTheStoreFinish() async {
+        let cache = RecordingCache()
+        let engine = QuietEngine()
+        let controller = PlayerController(
+            engine: engine,
+            resolver: FixedResolver(),
+            cache: cache
+        )
+        await controller.play(tracks: [streamTrack("1"), streamTrack("2")], startingAt: 0)
+        engine.emit(.ready(duration: 100, format: AudioFormat(codec: "flac")))
+        for second in 1...60 {
+            engine.emit(.position(Double(second)))
+        }
+        try? await Task.sleep(for: .milliseconds(20))
+        #expect(await cache.storedIDs == [Track.remoteIDPrefix + "1"])
+
+        await controller.next()
+        try? await Task.sleep(for: .milliseconds(20))
+
+        #expect(await cache.storedIDs == [Track.remoteIDPrefix + "1"])
+        #expect(await cache.cancelled.isEmpty)
+    }
+
+    @Test func aSeekToTheEndDoesNotCountAsListening() async {
+        let cache = RecordingCache()
+        let engine = QuietEngine()
+        let controller = PlayerController(
+            engine: engine,
+            resolver: FixedResolver(),
+            cache: cache
+        )
+        await controller.play(tracks: [streamTrack("1")], startingAt: 0)
+        engine.emit(.ready(duration: 100, format: AudioFormat(codec: "flac")))
+        for second in 1...5 {
+            engine.emit(.position(Double(second)))
+        }
+        engine.emit(.position(95))
+        try? await Task.sleep(for: .milliseconds(20))
+
+        #expect(await cache.storedIDs.isEmpty)
+    }
+
+    @Test func twoSequentialStreamsBothStartAStoreAfterHalf() async {
+        let cache = RecordingCache()
+        let engine = QuietEngine()
+        let controller = PlayerController(
+            engine: engine,
+            resolver: FixedResolver(),
+            cache: cache
+        )
+        await controller.play(tracks: [streamTrack("1"), streamTrack("2")], startingAt: 0)
+        engine.emit(.ready(duration: 100, format: AudioFormat(codec: "flac")))
+        for second in 1...60 {
+            engine.emit(.position(Double(second)))
+        }
         await controller.next()
         engine.emit(.ready(duration: 90, format: AudioFormat(codec: "flac")))
+        for second in 1...60 {
+            engine.emit(.position(Double(second)))
+        }
         try? await Task.sleep(for: .milliseconds(20))
 
         let stored = await cache.storedIDs

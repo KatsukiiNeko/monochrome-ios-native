@@ -14,6 +14,7 @@ private final class FakeEngine: PlaybackEngine {
     private(set) var pauseCount = 0
     private(set) var seeks: [Double] = []
     private(set) var stopCount = 0
+    private(set) var haltCount = 0
     var loadError: (any Error)?
     /// The next `loadFailures` loads throw, then `loadError` repeats forever.
     var loadFailures = 0
@@ -44,6 +45,7 @@ private final class FakeEngine: PlaybackEngine {
     func pause() { pauseCount += 1 }
     func seek(to seconds: Double) { seeks.append(seconds) }
     func stop() { stopCount += 1 }
+    func halt() { haltCount += 1 }
 }
 
 private struct LoadFailure: LocalizedError {
@@ -780,7 +782,7 @@ struct PlayerControllerTests {
         #expect(controller.duration == 210)
     }
 
-    @Test func missStartsABackgroundStoreAfterTheItemIsReady() async {
+    @Test func storeStartsOnlyAfterHalfTheTrackIsHeard() async {
         let engine = FakeEngine()
         let resolver = FakeResolver()
         let cache = FakeCache()
@@ -789,7 +791,18 @@ struct PlayerControllerTests {
         await controller.play(tracks: [streamTrack("42")], startingAt: 0)
         engine.emit(.ready(duration: 100, format: AudioFormat(codec: "flac")))
         try? await Task.sleep(for: .milliseconds(20))
+        #expect(await cache.storedIDs.isEmpty)
 
+        for second in 1...30 {
+            engine.emit(.position(Double(second)))
+        }
+        try? await Task.sleep(for: .milliseconds(20))
+        #expect(await cache.storedIDs.isEmpty)
+
+        for second in 31...55 {
+            engine.emit(.position(Double(second)))
+        }
+        try? await Task.sleep(for: .milliseconds(20))
         #expect(await cache.storedIDs == [Track.remoteIDPrefix + "42"])
         #expect(controller.isCurrentFromCache == false)
     }
