@@ -29,6 +29,24 @@ final class AVPlayerEngine: PlaybackEngine {
     }
     /// Refuses a load older than the newest one this engine accepted.
     private var arbiter = PlaybackLoadArbiter()
+    /// What the player is actually doing, readable from any queue.
+    private struct FactState {
+        var itemStatus: ItemStatus = .unknown
+        var timeControl: TimeControl = .paused
+        var keepUp = false
+        var bufferEmpty = false
+    }
+    private let factLock = OSAllocatedUnfairLock<FactState>(initialState: FactState())
+    var facts: EngineFacts {
+        factLock.withLock {
+            EngineFacts(
+                itemStatus: $0.itemStatus,
+                timeControl: $0.timeControl,
+                likelyToKeepUp: $0.keepUp,
+                bufferEmpty: $0.bufferEmpty
+            )
+        }
+    }
     /// The load currently waiting for its item, if any.
     private var loadingToken: PlaybackToken?
     private var timeObserver: Any?
@@ -55,11 +73,21 @@ final class AVPlayerEngine: PlaybackEngine {
             guard let token = activeTokenLock.withLock({ $0 }) else { return }
             relay.send(PlaybackEngineEvent(token: token, event: .position(time.seconds)))
         }
-        timeControlObservation = player.observe(\.timeControlStatus, options: [.initial, .new]) { player, _ in
+        timeControlObservation = player.observe(\.timeControlStatus, options: [.initial, .new]) { [factLock] player, _ in
             let status = player.timeControlStatus.rawValue
             let reason = player.reasonForWaitingToPlay?.rawValue ?? "none"
+            let control: TimeControl = switch player.timeControlStatus {
+            case .playing: .playing
+            case .waitingToPlayAtSpecifiedRate: .waiting
+            case .paused: .paused
+            @unknown default: .paused
+            }
+            let snapshot = factLock.withLock { state -> FactState in
+                state.timeControl = control
+                return state
+            }
             playerLog.notice(
-                "timeControlStatus=\(status, privacy: .public) waitingReason=\(reason, privacy: .public)"
+                "[Engine] tcs=\(status, privacy: .public) waitingReason=\(reason, privacy: .public) rate=\(player.rate) status=\(snapshot.itemStatus.logName, privacy: .public) keepUp=\(snapshot.keepUp) empty=\(snapshot.bufferEmpty)"
             )
         }
     }
@@ -67,6 +95,11 @@ final class AVPlayerEngine: PlaybackEngine {
     func load(url: URL, contentType: String?, headers: [String: String] = [:], token: PlaybackToken) async throws {
         guard arbiter.accept(token) else { throw PlaybackSuperseded() }
         activeToken = token
+        factLock.withLock {
+            $0.itemStatus = .unknown
+            $0.keepUp = false
+            $0.bufferEmpty = false
+        }
         playbackLog.notice(
             "load start host=\(url.host ?? "none", privacy: .public) path=\(shortHash(url.path), privacy: .public) type=\(contentType ?? "none", privacy: .public) g=\(token.value, privacy: .public)"
         )
@@ -124,8 +157,20 @@ final class AVPlayerEngine: PlaybackEngine {
                 "item accessLog requests=\(log.numberOfMediaRequests) host=\(log.serverAddress.map(hostOnly) ?? "none", privacy: .public) path=\(shortHash(log.uri), privacy: .public) bytes=\(log.numberOfBytesTransferred)"
             )
         }
-        itemObservers.status = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
+        itemObservers.stall = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemPlaybackStalled, object: item, queue: .main
+        ) { notification in
+            let seconds = (notification.object as? AVPlayerItem)?.currentTime().seconds ?? 0
+            playbackLog.error("[Stall] begin position=\(seconds, privacy: .public)")
+        }
+        itemObservers.status = item.observe(\.status, options: [.initial, .new]) { [weak self, factLock] item, _ in
             let status = item.status.rawValue
+            let known: ItemStatus = switch item.status {
+            case .readyToPlay: .ready
+            case .failed: .failed
+            default: .unknown
+            }
+            factLock.withLock { $0.itemStatus = known }
             playerLog.notice("item.status=\(status, privacy: .public) g=\(token.value, privacy: .public)")
             guard item.status == .failed else { return }
             let error = item.error
@@ -140,6 +185,15 @@ final class AVPlayerEngine: PlaybackEngine {
                     event: .failed(error?.localizedDescription ?? "Playback failed.")
                 ))
             }
+        }
+        itemObservers.keepUp = item.observe(\.isPlaybackLikelyToKeepUp, options: [.initial, .new]) { [factLock] item, _ in
+            factLock.withLock { $0.keepUp = item.isPlaybackLikelyToKeepUp }
+            playerLog.notice(
+                "[Engine] keepUp=\(item.isPlaybackLikelyToKeepUp) empty=\(item.isPlaybackBufferEmpty)"
+            )
+        }
+        itemObservers.bufferEmpty = item.observe(\.isPlaybackBufferEmpty, options: [.initial, .new]) { [factLock] item, _ in
+            factLock.withLock { $0.bufferEmpty = item.isPlaybackBufferEmpty }
         }
         guard arbiter.owns(token) else { throw PlaybackSuperseded() }
         player.replaceCurrentItem(with: item)
@@ -209,7 +263,35 @@ final class AVPlayerEngine: PlaybackEngine {
         eqTrack = nil
         currentItem = nil
         player.replaceCurrentItem(with: nil)
+        factLock.withLock {
+            $0.itemStatus = .unknown
+            $0.timeControl = .paused
+            $0.keepUp = false
+            $0.bufferEmpty = false
+        }
         playerLog.notice("stopped")
+    }
+
+    /// Silences and detaches the item without touching the arbiter, so a newer
+    /// load can still accept its token. Nothing from the old item can speak.
+    func halt() {
+        activeToken = nil
+        player.pause()
+        stopObservingItem()
+        eqFrameLogTask?.cancel()
+        eqFrameLogTask = nil
+        eqTap = nil
+        eqTapStorage = nil
+        eqTrack = nil
+        currentItem = nil
+        player.replaceCurrentItem(with: nil)
+        factLock.withLock {
+            $0.itemStatus = .unknown
+            $0.timeControl = .paused
+            $0.keepUp = false
+            $0.bufferEmpty = false
+        }
+        playerLog.notice("[Engine] halt")
     }
 
     /// Resolves whether the item can carry the tap, then installs one if the
@@ -364,18 +446,25 @@ private final class ItemObservers {
     var failure: NSObjectProtocol?
     var errorLog: NSObjectProtocol?
     var accessLog: NSObjectProtocol?
+    var stall: NSObjectProtocol?
     var status: NSKeyValueObservation?
+    var keepUp: NSKeyValueObservation?
+    var bufferEmpty: NSKeyValueObservation?
 
     func invalidate() {
         if let end { NotificationCenter.default.removeObserver(end) }
         if let failure { NotificationCenter.default.removeObserver(failure) }
         if let errorLog { NotificationCenter.default.removeObserver(errorLog) }
         if let accessLog { NotificationCenter.default.removeObserver(accessLog) }
+        if let stall { NotificationCenter.default.removeObserver(stall) }
         end = nil
         failure = nil
         errorLog = nil
         accessLog = nil
+        stall = nil
         status = nil
+        keepUp = nil
+        bufferEmpty = nil
     }
 }
 

@@ -46,6 +46,12 @@ public protocol PlaybackEngine: AnyObject {
     func pause()
     func seek(to seconds: Double)
     func stop()
+    /// Pauses and detaches the current item without invalidating the load arbiter.
+    /// Called when a new attempt starts so the previous song never plays under a
+    /// new title.
+    func halt()
+    /// What the engine is actually doing; the controller derives UI state from it.
+    var facts: EngineFacts { get }
     /// Applies the equalizer to items this engine can process. Backends that
     /// cannot process audio ignore it.
     func setEqualizer(_ settings: EQSettings)
@@ -59,4 +65,8 @@ public extension PlaybackEngine {
     func setEqualizer(_ settings: EQSettings) {}
     var eqAvailability: EQAvailability { .available }
     func takeEqualizerPeak() -> Double { 0 }
+    func halt() {}
+    /// Backends that do not report facts are treated as healthy, so the stall
+    /// policy never reloads them.
+    var facts: EngineFacts { .optimistic }
 }
