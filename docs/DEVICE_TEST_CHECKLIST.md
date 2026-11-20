@@ -104,6 +104,28 @@ item by hand.
 - [ ] Enter a long title and artist, then the largest text size: the action row
       stays even and the info line stays on one line.
 
+## Playback reliability
+
+- [ ] Start a fresh track while another track plays: old audio stops immediately,
+      loading shows the new title and duration, and the scrubber seeks the new track.
+- [ ] Drag the scrubber while a fresh track loads: the seek applies after the
+      new item becomes ready and never changes the old item.
+- [ ] Listen below 50 percent, then skip: no cache entry is created and no cache
+      transfer remains active for the skipped track.
+- [ ] Listen past 50 percent, then skip: cache completion continues and the
+      finished file appears as a cache entry only after its size is validated.
+- [ ] Seek near the end without listening: this does not meet the cache threshold.
+- [ ] Trigger a network stall: progress stops, Now Playing rate becomes zero,
+      buffering is visible, and bounded recovery either resumes or shows an error.
+- [ ] Toggle Airplane Mode during fresh playback, restore the network, and check
+      recovery. The app must not claim playback while audio is silent.
+- [ ] Take a phone call or trigger Siri, then return: interruption recovery follows
+      the prior playback state and does not start unrelated audio.
+- [ ] Start a permanent download while another track plays: playback remains
+      responsive and the download reports a specific failure reason if it fails.
+- [ ] Play fresh tracks for ten minutes on Wi-Fi and cellular: check stalls, heat,
+      cache timing and that the Lock Screen progress does not advance over silence.
+
 Layout and feel can only be judged by a person; the host tests cover only the
 chip variants and the build check covers compilation.
 

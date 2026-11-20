@@ -56,9 +56,21 @@ in the same attempt.
   through `PlaybackSessionStore`; restore is paused, never auto-play.
 - Route changes pause on device loss; interruptions resume only when playback
   was active before and the system allows it.
-- Next-track preparation stages the following network track into cache past
-  halfway on unmetered Wi-Fi, at most one outstanding.
-- Network recovery retries once.
+- `PlayerController` starts each attempt with a new ownership token, halts the
+  old engine item, and applies loading-time seeks only after the new item is
+  ready.
+- `AVPlayerEngine` reports item status, time control, buffer state and keep-up
+  facts. `StallPolicy` gives bounded recovery actions; intent alone never means
+  that audio is playing.
+- `ListenAccumulator` counts forward playback time, not seek position. Cache
+  staging begins after 50 percent was heard. Permanent downloads remain owned
+  by `DownloadStore`.
+- `TransferFailure` preserves HTTP status and transport cause. File transfers
+  use a 20-second request timeout, a 120-second resource timeout, four host
+  connections and bounded retry backoff.
+- Next-track preparation still stages the following network track on unmetered
+  Wi-Fi, at most one outstanding. True play-while-downloading remains a device
+  loader decision; current playback uses AVPlayer network streaming.
 
 ## Layering rule
 
