@@ -547,8 +547,6 @@ final class AppModel {
 
     private func performDownload(_ track: Track) async {
         do {
-            let url = try await resolver.url(for: track)
-            let contentType = await resolver.contentType(for: track)
             let poll = Task {
                 while !Task.isCancelled {
                     await refreshDownloads()
@@ -559,13 +557,27 @@ final class AppModel {
                 poll.cancel()
                 Task { await refreshDownloads() }
             }
-            try await downloadStore.download(
-                track: track,
-                url: url,
-                contentType: contentType,
-                format: nil,
-                duration: track.durationSeconds
-            )
+            // A stream URL can expire between resolution and use; resolve one
+            // fresh URL rather than reporting a failure the caller cannot fix.
+            var refreshed = false
+            while true {
+                let url = try await resolver.url(for: track)
+                let contentType = await resolver.contentType(for: track)
+                do {
+                    try await downloadStore.download(
+                        track: track,
+                        url: url,
+                        contentType: contentType,
+                        format: nil,
+                        duration: track.durationSeconds
+                    )
+                    break
+                } catch let failure as TransferFailure {
+                    guard case .expiredOrForbidden = failure, !refreshed else { throw failure }
+                    refreshed = true
+                    playerLog.notice("[Download] re-resolve id=\(track.id)")
+                }
+            }
             await embedDownloadMetadata(for: track)
         } catch {
             errorMessage = error.localizedDescription

@@ -12,12 +12,12 @@ struct URLSessionFileDownloader: FileDownloader {
         to destination: URL,
         allowsExpensiveNetwork: Bool
     ) async throws -> DownloadResult {
-        try await ProgressTransfer(
-            url: url,
-            destination: destination,
+        try await transfer(
+            from: url,
+            to: destination,
             allowsExpensiveNetwork: allowsExpensiveNetwork && allowsCellular(),
             onProgress: { _, _ in }
-        ).run()
+        )
     }
 
     func download(
@@ -26,12 +26,55 @@ struct URLSessionFileDownloader: FileDownloader {
         allowsExpensiveNetwork: Bool,
         onProgress: @escaping @Sendable (Int, Int?) -> Void
     ) async throws -> DownloadResult {
-        try await ProgressTransfer(
-            url: url,
-            destination: destination,
+        try await transfer(
+            from: url,
+            to: destination,
             allowsExpensiveNetwork: allowsExpensiveNetwork && allowsCellular(),
             onProgress: onProgress
-        ).run()
+        )
+    }
+
+    /// Transient HTTP failures are retried here; a stale URL is not, because
+    /// only the resolver can replace it.
+    private func transfer(
+        from url: URL,
+        to destination: URL,
+        allowsExpensiveNetwork: Bool,
+        onProgress: @escaping @Sendable (Int, Int?) -> Void
+    ) async throws -> DownloadResult {
+        let host = url.host ?? "none"
+        let path = transferPathHash(url.path)
+        var attempt = 0
+        while true {
+            attempt += 1
+            playerLog.notice(
+                "[Transfer] start kind=file host=\(host, privacy: .public) path=\(path, privacy: .public) attempt=\(attempt)"
+            )
+            do {
+                let result = try await ProgressTransfer(
+                    url: url,
+                    destination: destination,
+                    allowsExpensiveNetwork: allowsExpensiveNetwork,
+                    onProgress: onProgress
+                ).run()
+                playerLog.notice(
+                    "[Transfer] finish host=\(host, privacy: .public) path=\(path, privacy: .public) bytes=\(result.bytesWritten) expected=\(result.expectedBytes ?? -1)"
+                )
+                return result
+            } catch {
+                let failure = TransferFailure.classify(error)
+                guard let delay = failure.retryDelay(attempt: attempt) else {
+                    playerLog.error(
+                        "[Transfer] failed host=\(host, privacy: .public) path=\(path, privacy: .public) reason=\(String(describing: failure), privacy: .public)"
+                    )
+                    throw failure
+                }
+                playerLog.error(
+                    "[Transfer] retry host=\(host, privacy: .public) path=\(path, privacy: .public) in=\(delay) reason=\(String(describing: failure), privacy: .public)"
+                )
+                try await Task.sleep(for: .seconds(delay))
+            }
+        }
     }
 }
 
@@ -60,12 +103,15 @@ private final class ProgressTransfer: NSObject, URLSessionDownloadDelegate, @unc
         try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
             let configuration = URLSessionConfiguration.default
+            configuration.timeoutIntervalForRequest = 20
+            configuration.timeoutIntervalForResource = 120
+            configuration.httpMaximumConnectionsPerHost = 4
             let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
             self.session = session
             var request = URLRequest(url: url)
             request.allowsExpensiveNetworkAccess = allowsExpensiveNetwork
             request.allowsConstrainedNetworkAccess = allowsExpensiveNetwork
-            request.timeoutInterval = 60
+            request.timeoutInterval = 20
             session.downloadTask(with: request).resume()
         }
     }
@@ -86,10 +132,18 @@ private final class ProgressTransfer: NSObject, URLSessionDownloadDelegate, @unc
         downloadTask: URLSessionDownloadTask,
         didFinishDownloadingTo location: URL
     ) {
-        guard let http = downloadTask.response as? HTTPURLResponse,
-              (200..<300).contains(http.statusCode) else {
+        guard let http = downloadTask.response as? HTTPURLResponse else {
             try? FileManager.default.removeItem(at: location)
-            finish(.failure(URLError(.badServerResponse)))
+            finish(.failure(TransferFailure.other("The server returned an unexpected response.")))
+            return
+        }
+        let retryAfter = http.value(forHTTPHeaderField: "Retry-After").flatMap(TimeInterval.init)
+        if let failure = TransferFailure.classify(status: http.statusCode, retryAfter: retryAfter) {
+            playerLog.error(
+                "[Transfer] bad status=\(http.statusCode) retryAfter=\(retryAfter ?? -1) host=\(http.url?.host ?? "none", privacy: .public)"
+            )
+            try? FileManager.default.removeItem(at: location)
+            finish(.failure(failure))
             return
         }
         let attributes = try? FileManager.default.attributesOfItem(atPath: location.path)
@@ -121,5 +175,15 @@ private final class ProgressTransfer: NSObject, URLSessionDownloadDelegate, @unc
         session = nil
         continuation.resume(with: result)
     }
+}
+
+/// Eight hex characters of an FNV-1a hash: enough to match requests in one run
+/// without writing a full path to the log.
+private func transferPathHash(_ value: String) -> String {
+    var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+    for byte in value.utf8 {
+        hash = (hash ^ UInt64(byte)) &* 0x0000_0100_0000_01b3
+    }
+    return String(format: "%08x", UInt32(truncatingIfNeeded: hash >> 16))
 }
 #endif
