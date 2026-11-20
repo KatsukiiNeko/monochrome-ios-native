@@ -124,6 +124,21 @@ struct NowPlayingProjectionTests {
         #expect(!restoring.isPlaying)
     }
 
+    @Test func aWaitingEnginePublishesAStoppedRateButKeepsIdentity() {
+        let buffering = NowPlayingProjection.make(
+            phase: .playing, track: track("a"), duration: 100, artworkReady: false, enginePlaying: false
+        )
+        #expect(!buffering.isPlaying)
+        #expect(buffering.identity?.trackID == "a")
+        #expect(buffering.identity?.duration == 100)
+
+        let loading = NowPlayingProjection.make(
+            phase: .loading(autoPlay: true), track: track("a"), duration: 100,
+            artworkReady: false, enginePlaying: false
+        )
+        #expect(!loading.isPlaying)
+    }
+
     @Test func failureKeepsTheTrackIdentity() {
         let state = NowPlayingProjection.make(
             phase: .failed("boom"), track: track("a"), duration: 100, artworkReady: false

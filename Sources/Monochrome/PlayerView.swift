@@ -22,7 +22,7 @@ struct PlayerView: View {
 
     private var isPlayerLoading: Bool {
         if case .loading = player.state { return true }
-        return false
+        return player.isBuffering
     }
 
     private var audioSpec: AudioSpec {

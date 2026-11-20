@@ -83,7 +83,8 @@ public enum NowPlayingProjection {
         phase: PlaybackState,
         track: Track?,
         duration: TimeInterval?,
-        artworkReady: Bool
+        artworkReady: Bool,
+        enginePlaying: Bool = true
     ) -> NowPlayingState {
         let knownDuration = duration.flatMap { $0 > 0 ? $0 : nil }
         switch phase {
@@ -92,10 +93,11 @@ public enum NowPlayingProjection {
         case .idle:
             return NowPlayingState(identity: nil, isPlaying: false, stopReason: nil, artworkReady: false)
         case .loading(let autoPlay):
-            // Buffering keeps the listener's intent.
-            return state(track, knownDuration, isPlaying: autoPlay, artworkReady)
+            // A buffering track keeps its identity but the system rate is 0, so
+            // iOS never advances the Lock Screen progress bar over silence.
+            return state(track, knownDuration, isPlaying: autoPlay && enginePlaying, artworkReady)
         case .playing:
-            return state(track, knownDuration, isPlaying: true, artworkReady)
+            return state(track, knownDuration, isPlaying: enginePlaying, artworkReady)
         case .paused, .failed:
             return state(track, knownDuration, isPlaying: false, artworkReady)
         }

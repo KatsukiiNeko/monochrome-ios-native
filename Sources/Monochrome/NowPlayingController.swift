@@ -75,6 +75,7 @@ final class NowPlayingController {
         var canNext: Bool
         var canPrevious: Bool
         var seekCount: Int
+        var isBuffering: Bool
     }
 
     /// One loop: arm the observation, publish what it read, then wait for the
@@ -108,7 +109,8 @@ final class NowPlayingController {
             position: player.position,
             canNext: player.queue.canAdvance,
             canPrevious: player.queue.canRewind,
-            seekCount: player.seekCount
+            seekCount: player.seekCount,
+            isBuffering: player.isBuffering
         )
     }
 
@@ -117,7 +119,8 @@ final class NowPlayingController {
             phase: inputs.phase,
             track: inputs.track,
             duration: inputs.duration,
-            artworkReady: artworkTrackID == inputs.track?.id && artworkImage != nil
+            artworkReady: artworkTrackID == inputs.track?.id && artworkImage != nil,
+            enginePlaying: !inputs.isBuffering && player.isEngineProducingAudio
         )
         var actions = NowPlayingPlanner.actions(from: published, to: next)
 
