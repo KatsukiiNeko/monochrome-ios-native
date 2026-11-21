@@ -1,8 +1,5 @@
 // MonochromeWidget.swift: the widget entry point, configuration and timeline.
 #if canImport(WidgetKit)
-@_cdecl("_monochromeWidgetKeepText")
-func monochromeWidgetKeepText() {}
-
 import AppIntents
 import MonochromeCore
 import SwiftUI
@@ -148,10 +145,6 @@ struct TurntableWidget: Widget {
 
 @main
 struct MonochromeWidgetBundle: WidgetBundle {
-    init() {
-        monochromeWidgetKeepText()
-    }
-
     var body: some Widget {
         TurntableWidget()
     }
