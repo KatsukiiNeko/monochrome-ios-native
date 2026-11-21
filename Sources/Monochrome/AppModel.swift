@@ -74,7 +74,6 @@ final class AppModel {
     private let networkMonitor = NetworkMonitor()
     #endif
     private let nowPlaying: NowPlayingController
-    private let widgetBridge: WidgetBridge
     private let artworkTints = ArtworkTintStore()
     /// Cache cleanup is launch-only; import/delete reloads must not touch a download.
     private var didReconcileCache = false
@@ -211,14 +210,9 @@ final class AppModel {
             }
             return track.artworkURL
         }
-        self.widgetBridge = WidgetBridge(
-            player: player,
-            store: .shared(),
-            mediaDirectory: media
-        )
         nowPlaying.start()
-        // Also writes the first parked-turntable snapshot for the widget.
-        widgetBridge.start()
+        // First snapshot: the widget shows a parked turntable before playback starts.
+        try? SnapshotStore.shared().write(PlaybackSnapshot(date: .now))
         applyStreamingSettings()
         equalizer.activate()
         if let session = sessionStore.load() {
