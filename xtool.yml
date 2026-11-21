@@ -8,6 +8,8 @@ extensions:
   - product: MonochromeWidget
     infoPath: Resources/MonochromeWidget-Info.plist
     entitlementsPath: Resources/MonochromeWidget.entitlements
+    resources:
+      - Branding/monochrome_logo.png
 # The web app's own icon, unchanged; see Branding/SOURCE.md.
 iconPath: Branding/appicon.png
 # The web logo, unchanged, bundled for the Home header.
