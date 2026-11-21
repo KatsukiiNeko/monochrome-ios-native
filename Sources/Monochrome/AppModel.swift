@@ -211,8 +211,6 @@ final class AppModel {
             return track.artworkURL
         }
         nowPlaying.start()
-        // First snapshot: the widget shows a parked turntable before playback starts.
-        try? SnapshotStore.shared().write(PlaybackSnapshot(date: .now))
         applyStreamingSettings()
         equalizer.activate()
         if let session = sessionStore.load() {

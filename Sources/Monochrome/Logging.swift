@@ -9,5 +9,4 @@ let playerLog = Logger(subsystem: logSubsystem, category: "player")
 let playbackLog = Logger(subsystem: logSubsystem, category: "playback")
 let sessionLog = Logger(subsystem: logSubsystem, category: "audio-session")
 let nowPlayingLog = Logger(subsystem: logSubsystem, category: "nowplaying")
-let widgetLog = Logger(subsystem: logSubsystem, category: "widget")
 #endif
