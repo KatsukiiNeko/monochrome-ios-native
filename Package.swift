@@ -9,10 +9,12 @@ let package = Package(
         .macOS(.v14)],
     products: [
         .library(name: "Monochrome", targets: ["Monochrome"]),
+        .library(name: "MonochromeWidget", targets: ["MonochromeWidget"]),
     ],
     targets: [
         .target(name: "MonochromeCore"),
         .target(name: "Monochrome", dependencies: ["MonochromeCore"]),
+        .target(name: "MonochromeWidget", dependencies: ["MonochromeCore"]),
         .testTarget(name: "MonochromeCoreTests", dependencies: ["MonochromeCore"], resources: [.copy("Fixtures")]),
     ],
     swiftLanguageModes: [.v6]
