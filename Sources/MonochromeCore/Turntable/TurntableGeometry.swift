@@ -3,6 +3,8 @@ import Foundation
 
 /// Millimetres, with IEC groove radii and a 9-inch Baerwald arm.
 public struct TurntableGeometry: Sendable {
+    public static let standard = TurntableGeometry()
+
     public var recordRadius = 150.0
     public var outerGrooveRadius = 146.05
     public var innerGrooveRadius = 60.325
