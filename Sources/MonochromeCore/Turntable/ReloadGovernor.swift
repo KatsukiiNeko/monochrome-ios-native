@@ -13,8 +13,13 @@ public struct ReloadGovernor: Sendable {
     public init() {}
 
     /// `.now` means reload; `.later` means schedule one deferred reload at the
-    /// given date, replacing any pending one.
-    public mutating func request(at now: Date) -> ReloadDecision {
+    /// given date, replacing any pending one. An urgent request (a track just
+    /// started) reloads at once so the drop is not missed.
+    public mutating func request(at now: Date, urgent: Bool = false) -> ReloadDecision {
+        if urgent {
+            lastReload = now
+            return .now
+        }
         if let last = lastReload, now.timeIntervalSince(last) < minInterval {
             return .later(last.addingTimeInterval(minInterval))
         }

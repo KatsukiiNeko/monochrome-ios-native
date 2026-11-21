@@ -453,6 +453,7 @@ struct PlayerControllerTests {
         #expect(controller.currentTrack?.id == "b")
         #expect(engine.seeks == [0])
         #expect(controller.position == 0)
+        #expect(controller.seekCount == 1, "observers need the restart as a seek")
     }
 
     @Test func previousGoesBackNearStart() async {
