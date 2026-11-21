@@ -31,8 +31,12 @@ enum MotionOption: String, AppEnum {
 struct TurntableConfiguration: WidgetConfigurationIntent {
     static let title: LocalizedStringResource = "Turntable"
 
-    @Parameter(title: "Motion", default: .spin)
+    @Parameter(title: "Motion")
     var motion: MotionOption
+
+    init() {
+        motion = .spin
+    }
 }
 
 struct TurntableEntry: TimelineEntry {
