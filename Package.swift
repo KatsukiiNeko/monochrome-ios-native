@@ -14,10 +14,10 @@ let package = Package(
     targets: [
         .target(name: "MonochromeCore"),
         .target(name: "Monochrome", dependencies: ["MonochromeCore"], linkerSettings: [
-            .unsafeFlags(["-Wl,-headerpad,0x1000"]),
+            .unsafeFlags(["-Xlinker", "-headerpad_max_install_names"]),
         ]),
         .target(name: "MonochromeWidget", dependencies: ["MonochromeCore"], linkerSettings: [
-            .unsafeFlags(["-Wl,-headerpad,0x1000"]),
+            .unsafeFlags(["-Xlinker", "-headerpad_max_install_names"]),
         ]),
         .testTarget(name: "MonochromeCoreTests", dependencies: ["MonochromeCore"], resources: [.copy("Fixtures")]),
     ],
