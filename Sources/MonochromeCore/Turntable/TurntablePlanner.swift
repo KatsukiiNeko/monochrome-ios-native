@@ -25,7 +25,7 @@ public struct TurntableFrame: Equatable, Sendable {
 
 public struct TurntablePlanner: Sendable {
     public var geometry = TurntableGeometry()
-    public var degreesPerSecond = PlaybackSnapshot.platterDegreesPerSecond
+    public var degreesPerSecond = 200.0
     /// About the fastest cadence WidgetKit shows.
     public var step: TimeInterval = 2
     public var maxFrames = 150
@@ -39,59 +39,41 @@ public struct TurntablePlanner: Sendable {
         }
         let elapsed = s.elapsed(at: now)
         let platterNow = s.platter(at: now)
+        func arm(_ t: TimeInterval) -> Double {
+            geometry.armRotation(progress: t / duration)
+        }
 
         guard s.isPlaying, mode == .spin else {
-            return [TurntableFrame(
-                date: now,
-                platterDegrees: platterNow,
-                armRotation: arm(at: elapsed, duration: duration),
-                lift: 0
-            )]
+            return [TurntableFrame(date: now, platterDegrees: platterNow, armRotation: arm(elapsed), lift: 0)]
         }
 
         var out: [TurntableFrame] = []
         var k = 0
+        if let started = s.playStartedAt, now.timeIntervalSince(started) < dropWindow {
+            // Parked and lifted, swing over the groove still lifted, then lower.
+            out.append(TurntableFrame(date: now, platterDegrees: platterNow, armRotation: 0, lift: 1))
+            out.append(TurntableFrame(
+                date: now + step,
+                platterDegrees: platterNow + degreesPerSecond * step,
+                armRotation: arm(elapsed + step),
+                lift: 1
+            ))
+            k = 2
+        }
         while out.count < maxFrames {
             let t = Double(k) * step
-            let songTime = elapsed + t
-            if songTime >= duration { break }
-            // The drop is keyed to the actual start, not to this timeline run,
-            // so a reload a few seconds late still picks up the arm mid-drop.
-            let sinceStart = s.playStartedAt.map { now.addingTimeInterval(t).timeIntervalSince($0) }
+            if elapsed + t >= duration { break }
             out.append(TurntableFrame(
-                date: now.addingTimeInterval(t),
+                date: now + t,
                 platterDegrees: platterNow + degreesPerSecond * t,
-                armRotation: arm(at: songTime, duration: duration, sinceStart: sinceStart),
-                lift: lift(sinceStart: sinceStart)
+                armRotation: arm(elapsed + t),
+                lift: 0
             ))
             k += 1
         }
         if out.isEmpty {
-            return [TurntableFrame(
-                date: now,
-                platterDegrees: platterNow,
-                armRotation: arm(at: duration, duration: duration),
-                lift: 0
-            )]
+            return [TurntableFrame(date: now, platterDegrees: platterNow, armRotation: arm(duration), lift: 0)]
         }
         return out
-    }
-
-    private func arm(at songTime: TimeInterval, duration: TimeInterval) -> Double {
-        geometry.armRotation(progress: songTime / duration)
-    }
-
-    /// Parked until the first step, swung over the groove until `dropWindow`,
-    /// then lowered onto it.
-    private func arm(at songTime: TimeInterval, duration: TimeInterval, sinceStart: TimeInterval?) -> Double {
-        guard let sinceStart, sinceStart < dropWindow, sinceStart < step else {
-            return arm(at: songTime, duration: duration)
-        }
-        return 0
-    }
-
-    private func lift(sinceStart: TimeInterval?) -> Double {
-        guard let sinceStart, sinceStart < dropWindow else { return 0 }
-        return 1
     }
 }

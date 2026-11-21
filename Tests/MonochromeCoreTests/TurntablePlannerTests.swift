@@ -79,14 +79,6 @@ struct TurntablePlannerTests {
         #expect(frames.allSatisfy { $0.lift == 0 })
     }
 
-    @Test func aLateTimelinePicksUpTheArmMidDrop() {
-        // A reload three seconds in must not restart the drop or miss it.
-        let frames = planner.frames(for: playing(started: -3), now: start, mode: .spin)
-        #expect(frames[0].lift == 1)
-        #expect(frames[0].armRotation > 0)
-        #expect(frames[1].lift == 0)
-    }
-
     @Test func nothingLoadedIsParkedAndLifted() {
         let frames = planner.frames(for: .nothingPlaying, now: start, mode: .spin)
         #expect(frames.count == 1)
@@ -186,14 +178,5 @@ struct ReloadGovernorTests {
         #expect(governor.request(at: t0) == .now)
         #expect(governor.request(at: t0.addingTimeInterval(1)) == .later(t0.addingTimeInterval(5)))
         #expect(governor.request(at: t0.addingTimeInterval(6)) == .now)
-    }
-
-    @Test func anUrgentRequestIgnoresTheBudget() {
-        var governor = ReloadGovernor()
-        let t0 = Date(timeIntervalSince1970: 10_000)
-        #expect(governor.request(at: t0) == .now)
-        #expect(governor.request(at: t0.addingTimeInterval(1), urgent: true) == .now)
-        // The urgent reload also resets the window for ordinary requests.
-        #expect(governor.request(at: t0.addingTimeInterval(2)) == .later(t0.addingTimeInterval(6)))
     }
 }

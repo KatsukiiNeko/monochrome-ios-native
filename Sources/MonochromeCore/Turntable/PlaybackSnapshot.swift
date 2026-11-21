@@ -2,8 +2,6 @@
 import Foundation
 
 public struct PlaybackSnapshot: Codable, Equatable, Sendable {
-    /// The platter turns at 33⅓ rpm clockwise, read as degrees on screen.
-    public static let platterDegreesPerSecond = 200.0
     public var trackID: String?
     public var title: String
     public var artist: String
@@ -54,7 +52,7 @@ public struct PlaybackSnapshot: Codable, Equatable, Sendable {
     /// The platter angle at `now`; only playback time turns it.
     public func platter(at now: Date) -> Double {
         guard isPlaying else { return platterDegrees }
-        return platterDegrees + Self.platterDegreesPerSecond * max(0, now.timeIntervalSince(date))
+        return platterDegrees + 200 * max(0, now.timeIntervalSince(date))
     }
 }
 
@@ -62,8 +60,6 @@ public struct PlaybackSnapshot: Codable, Equatable, Sendable {
 public struct SnapshotStore: Sendable {
     public static let appGroup = "group.com.katsukiineko.monochrome"
     public static let snapshotFile = "playback-snapshot.json"
-    /// The WidgetKit kind the app reloads and the extension registers.
-    public static let widgetKind = "Turntable"
 
     public enum StoreError: Error, Equatable {
         case noContainer
@@ -74,8 +70,6 @@ public struct SnapshotStore: Sendable {
     public init(directory: URL?) {
         self.directory = directory
     }
-
-    public var isAvailable: Bool { directory != nil }
 
     public static func shared() -> SnapshotStore {
         #if canImport(Darwin)

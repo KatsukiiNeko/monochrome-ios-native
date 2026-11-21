@@ -207,14 +207,12 @@ public final class PlayerController {
         if position > 3 {
             engine.seek(to: 0)
             position = 0
-            seekCount += 1
             return
         }
         let abandoned = queue.current
         guard queue.rewind() != nil else {
             engine.seek(to: 0)
             position = 0
-            seekCount += 1
             return
         }
         reportAbandonedTrack(abandoned)
