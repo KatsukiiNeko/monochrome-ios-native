@@ -7,6 +7,9 @@
 - `Monochrome` (app target): SwiftUI views, AVFoundation playback, network
   clients, system integration (audio session, Now Playing), and the composition
   root in `AppModel`.
+- `MonochromeWidget` (widget extension): a WidgetKit face over the same
+  `MonochromeCore` turntable geometry. It has no player and no network; it reads
+  one snapshot from the App Group. `WidgetBridge` in the app writes it.
 
 ## Recording, candidate, playback source
 
@@ -71,6 +74,24 @@ in the same attempt.
 - Next-track preparation still stages the following network track on unmetered
   Wi-Fi, at most one outstanding. True play-while-downloading remains a device
   loader decision; current playback uses AVPlayer network streaming.
+
+## Turntable widget
+
+- `PlaybackSnapshot` is the single shared value: track identity, title, artist,
+  duration, position at `date`, engine-derived `isPlaying`, the absolute
+  `platterDegrees`, `playStartedAt` and the artwork file name. It is JSON in
+  `group.com.katsukiineko.monochrome`; a missing or corrupt file reads as nil.
+- `WidgetBridge` owns the only observation loop. It wakes on track, phase, seek,
+  duration and position changes, reads engine facts when it writes, and writes a
+  snapshot only on a meaningful change, never on every position tick. It then
+  asks WidgetKit to reload. A reload governor coalesces rapid changes; playback
+  start is urgent so the arm drop is not missed.
+- `TurntableGeometry` is the arm and groove math; `TurntableLayout` maps it into
+  a widget rectangle; `TurntablePlanner` turns a snapshot plus a clock into
+  timeline frames. All three live in core and have host tests.
+- The app is authoritative. The extension never mutates playback, never opens a
+  network connection, and never keeps its own state beyond the current entry.
+- Details and the experimental motion contract: `docs/WIDGET_MOTION.md`.
 
 ## Layering rule
 
