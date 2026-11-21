@@ -63,8 +63,19 @@ final class WidgetBridge {
         writeSnapshot()
         let (stream, continuation) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
         wake = continuation
+        // The closure keeps a weak reference: the task is stored on self, so a
+        // strong capture would be a cycle for the app's whole lifetime.
         pumpTask = Task { [weak self] in
-            await self?.pump(stream)
+            while !Task.isCancelled {
+                guard let recheck = Self.pass(self) else { return }
+                if recheck {
+                    // The engine reports pause a moment after the state flips,
+                    // and no position tick follows. Settle the snapshot.
+                    try? await Task.sleep(for: .milliseconds(300))
+                    continue
+                }
+                for await _ in stream { break }
+            }
         }
         widgetLog.notice("bridge start")
     }
@@ -80,30 +91,26 @@ final class WidgetBridge {
         artworkTask = nil
     }
 
-    private func pump(_ stream: AsyncStream<Void>) async {
-        while !Task.isCancelled {
-            let wake = self.wake
-            var inputs: Inputs?
-            withObservationTracking {
-                inputs = Inputs(
-                    track: player.currentTrack,
-                    phase: player.state,
-                    seekCount: player.seekCount,
-                    duration: player.duration,
-                    position: player.position
-                )
-            } onChange: {
-                wake?.yield(())
-            }
-            if let inputs { apply(inputs) }
-            // The engine reports pause a moment after the state flips, and no
-            // position tick follows. One short recheck settles the snapshot.
-            if inputs?.phase == .paused, player.isEngineProducingAudio {
-                try? await Task.sleep(for: .milliseconds(300))
-                continue
-            }
-            for await _ in stream { break }
+    /// One synchronous observation pass. Returns whether the pause needs a
+    /// recheck, or nil once the bridge is gone. Keeping this static and scoped
+    /// means the long-lived task holds only a weak reference.
+    private static func pass(_ bridge: WidgetBridge?) -> Bool? {
+        guard let bridge else { return nil }
+        let wake = bridge.wake
+        var inputs: Inputs?
+        withObservationTracking {
+            inputs = Inputs(
+                track: bridge.player.currentTrack,
+                phase: bridge.player.state,
+                seekCount: bridge.player.seekCount,
+                duration: bridge.player.duration,
+                position: bridge.player.position
+            )
+        } onChange: {
+            wake?.yield(())
         }
+        if let inputs { bridge.apply(inputs) }
+        return inputs?.phase == .paused && bridge.player.isEngineProducingAudio
     }
 
     private func apply(_ inputs: Inputs) {
