@@ -13,12 +13,8 @@ let package = Package(
     ],
     targets: [
         .target(name: "MonochromeCore"),
-        .target(name: "Monochrome", dependencies: ["MonochromeCore"], linkerSettings: [
-            .unsafeFlags(["-Wl,-headerpad,0x1000"]),
-        ]),
-        .target(name: "MonochromeWidget", dependencies: ["MonochromeCore"], linkerSettings: [
-            .unsafeFlags(["-Wl,-headerpad,0x1000"]),
-        ]),
+        .target(name: "Monochrome", dependencies: ["MonochromeCore"]),
+        .target(name: "MonochromeWidget", dependencies: ["MonochromeCore"]),
         .testTarget(name: "MonochromeCoreTests", dependencies: ["MonochromeCore"], resources: [.copy("Fixtures")]),
     ],
     swiftLanguageModes: [.v6]
