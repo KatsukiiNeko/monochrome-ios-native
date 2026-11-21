@@ -293,16 +293,9 @@ private struct Metadata: View {
                     .lineLimit(1)
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.bottom, 8)
+        .padding(.horizontal, 12)
+        .padding(.bottom, 9)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-        .background {
-            LinearGradient(
-                colors: [.clear, WidgetTheme.background.opacity(0.75)],
-                startPoint: .center,
-                endPoint: .bottom
-            )
-        }
     }
 }
 #endif
