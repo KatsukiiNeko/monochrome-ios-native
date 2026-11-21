@@ -661,3 +661,61 @@ the tap is not receiving audio; a curve that does nothing on a track that logged
       searching placeholder have sensible labels.
 - [ ] At the largest Dynamic Type size, Home, Search and the player still read
       in order.
+
+## Turntable widget
+
+These checks require an install signed with the app and extension entitlements.
+Both targets must carry `group.com.katsukiineko.monochrome`; a free/personal team
+that rejects App Groups will show `Open Monochrome` forever and no snapshot will
+be written. Stop and record the exact provisioning error rather than guessing.
+
+- [ ] `xtool dev` provisions both app IDs and never asks to drop the App Group.
+- [ ] The built `.app` contains `PlugIns/MonochromeWidget.appex`, and the
+      `.appex` Info.plist names `com.apple.widgetkit-extension`.
+- [ ] Both `CFBundleShortVersionString` and `CFBundleVersion` in the extension
+      match the app.
+- [ ] Console filter `subsystem:com.katsukiineko.monochrome category:widget`
+      shows `bridge start` and a snapshot line after launch.
+- [ ] Console shows `[Widget] timeline ... frames=...` when the widget loads.
+- [ ] Add the small widget from the gallery: the default pose is a parked arm on
+      a stopped record, labelled `Not playing` after the app has launched.
+- [ ] Open the widget edit sheet: `Motion` offers `Spin (experimental)` and
+      `Still`; the choice survives removing and re-adding the widget.
+- [ ] Start a song while the widget is visible: within a few seconds the arm
+      swings over the record, lowers, and the platter steps forward.
+- [ ] Start a song while the Home Screen is not visible, then return: the
+      widget shows the current song, not the previous one, and the arm is on the
+      groove.
+- [ ] Pause: the platter stops and stays stopped after a minute; resume: a new
+      drop runs and the platter turns again.
+- [ ] Seek backward and forward while playing: the arm moves to the new
+      position; the platter never visibly reverses.
+- [ ] Skip next/previous: title, artist and artwork change together; no previous
+      artwork remains on the label.
+- [ ] Let a track end: the widget moves to the next track or stops cleanly; it
+      never claims to play an empty queue.
+- [ ] Play a track with no artwork: the label shows the Monochrome logo, not a
+      blank or the previous track's art.
+- [ ] Play a downloaded/local track: the label shows its embedded artwork.
+- [ ] A very long title and artist truncate with an ellipsis; the deck is not
+      covered by the text.
+- [ ] Choose `Still`: the record holds one pose through a whole song; the arm
+      still reflects the current position when the timeline refreshes.
+- [ ] Turn on Reduce Motion in Accessibility: `Spin` behaves as `Still` after the
+      next timeline reload.
+- [ ] Add the medium widget: the deck is centred and the text is not clipped.
+- [ ] Lock the device while playing: Lock Screen metadata matches the widget;
+      unlocking returns to the same state.
+- [ ] Force-quit the app, play nothing for ten minutes, reopen: a single platter
+      jump is acceptable; the widget settles to `Not playing`.
+- [ ] Check the widget after a device reboot: the last snapshot still renders,
+      and playback controls stay with the app, not the widget.
+- [ ] VoiceOver reads the widget as `Now playing, <title> by <artist>, playing`
+      or `paused`; an unconfigured widget says to open Monochrome.
+- [ ] In the extension's own Console stream, confirm no network request and no
+      write to the App Group.
+
+Record the iOS version, device, widget family, motion option and the observed
+update cadence. WidgetKit timing is not an app guarantee, so a slower cadence is
+a limitation, not automatically a failure. A blank widget, stale title, missing
+artwork or a provisioning error is a failure.
